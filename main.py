@@ -10,8 +10,12 @@ from discord.ext import commands
 from database.python.mongodb import db
 from database.python.Hunos import init_db_hunos
 from comandos.ECONOMIA.auditoria import AuditoriaEconomia
-from comandos.ECONOMIA.GLOBAL.ciclo_automatico import configurar_ciclo_economico
 from comandos.ECONOMIA.GLOBAL.diagnostico import DiagnosticoEconomiaGlobal
+
+# Economia global automática e eventos automáticos de assentamentos estão
+# temporariamente desativados por configuração operacional.
+CICLO_ECONOMICO_ATIVO = False
+EVENTOS_ASSENTAMENTOS_ATIVOS = False
 
 init_db_hunos(db)
 
@@ -32,9 +36,15 @@ async def on_ready():
     canal = bot.get_channel(1543040912912031775)
     print(f"Bot conectado como {bot.user}")
     if canal is not None:
-        embed = discord.Embed(title="🟢 | Online", description="Moon Tensura está online e pronto para o RPG", colour=0x1caa00, timestamp=agora)
+        embed = discord.Embed(
+            title="🟢 | Online",
+            description="Moon Tensura está online e pronto para o RPG",
+            colour=0x1caa00,
+            timestamp=agora,
+        )
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
         await canal.send(embed=embed)
+
     for guild in bot.guilds:
         membros = [member for member in guild.members if not member.bot]
         quantidade = cadastro(membros)
@@ -43,27 +53,31 @@ async def on_ready():
     if not getattr(bot, "diagnostico_economia_executado", False):
         diagnostico = await asyncio.to_thread(DiagnosticoEconomiaGlobal(db).executar)
         bot.diagnostico_economia_executado = True
-        print(f"Diagnóstico econômico: {diagnostico['ok']}/{diagnostico['total']} módulos válidos ({diagnostico['saude_percentual']}%).")
+        print(
+            f"Diagnóstico econômico: {diagnostico['ok']}/{diagnostico['total']} "
+            f"módulos válidos ({diagnostico['saude_percentual']}%)."
+        )
         if diagnostico["erros"]:
             for item in diagnostico["itens"]:
                 if item["status"] == "erro":
                     print(f"[ECONOMIA][ERRO] {item['nome']}: {item['erro']}")
 
-    ciclo = configurar_ciclo_economico(bot, db, intervalo_segundos=60)
-    if not getattr(ciclo, "_ativo", False):
-        await ciclo.iniciar()
-        print("Ciclo econômico global automático iniciado: intervalo de 60 segundos.")
+    print("[ECONOMIA] Ciclo econômico automático: DESATIVADO.")
+    print("[ASSENTAMENTOS] Eventos automáticos: DESATIVADOS.")
 
 
 async def carregar_extensoes():
     extensoes = [
         "comandos.RPG.luta", "comandos.RPG.party", "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs", "comandos.RPG.usarhab", "comandos.RPG.status", "comandos.RPG.nivel", "comandos.RPG.nascimento", "comandos.RPG.correcoes_luta", "comandos.RPG.status_habilidades",
         "comandos.ECONOMIA.cassino", "comandos.ECONOMIA.loja", "comandos.ECONOMIA.loja_canais", "comandos.ECONOMIA.Hunos", "comandos.ECONOMIA.Mora", "comandos.ECONOMIA.recompensas", "comandos.ECONOMIA.hunos_interacoes",
-        "comandos.ECONOMIA.MEMBROS.empresas", "comandos.ECONOMIA.MEMBROS.paineis", "comandos.ECONOMIA.MEMBROS.reinos", "comandos.ECONOMIA.MEMBROS.eventos_assentamentos",
+        "comandos.ECONOMIA.MEMBROS.empresas", "comandos.ECONOMIA.MEMBROS.paineis", "comandos.ECONOMIA.MEMBROS.reinos",
         "comandos.ECONOMIA.ADMIN.governos",
         "comandos.ECONOMIA.GLOBAL.comandos", "comandos.ECONOMIA.GLOBAL.banco_central", "comandos.ECONOMIA.GLOBAL.credito_comandos", "comandos.ECONOMIA.GLOBAL.comercio_comandos", "comandos.ECONOMIA.GLOBAL.trabalho_comandos", "comandos.ECONOMIA.GLOBAL.teste_integracao",
         "comandos.ADMINISTRACAO.autorole_commands", "comandos.ADMINISTRACAO.autorole", "comandos.ADMINISTRACAO.configurações", "comandos.ADMINISTRACAO.moderacao", "comandos.ADMINISTRACAO.automod", "comandos.ADMINISTRACAO.boas_vindas", "comandos.ADMINISTRACAO.logs", "comandos.ADMINISTRACAO.ajuda"
     ]
+
+    if EVENTOS_ASSENTAMENTOS_ATIVOS:
+        extensoes.append("comandos.ECONOMIA.MEMBROS.eventos_assentamentos")
 
     extensoes_duplicadas = sorted({extensao for extensao in extensoes if extensoes.count(extensao) > 1})
     if extensoes_duplicadas:
