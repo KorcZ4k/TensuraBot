@@ -1,0 +1,41 @@
+name: Limpar economia migrada para MoonEconomy
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/limpar-economia-migrada.yml"
+      - "LIMPEZA_ECONOMIA_TRIGGER"
+
+permissions:
+  contents: write
+
+jobs:
+  limpar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Manter apenas Hunos no TensuraBot
+        run: |
+          find comandos/ECONOMIA -type d -name __pycache__ -prune -exec rm -rf {} +
+          find comandos/ECONOMIA -type f \
+            ! -name 'Hunos.py' \
+            ! -name 'hunos_interacoes.py' \
+            -delete
+          find comandos/ECONOMIA -type d -empty -delete
+
+      - name: Commit da separação
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nada para remover."
+          else
+            git commit -m "migra economia global para MoonEconomy e mantém Hunos"
+            git pull --rebase origin main
+            git push
+          fi
