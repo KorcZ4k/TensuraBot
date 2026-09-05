@@ -1,8 +1,8 @@
 {
   "versao": 1,
   "configuracao": {
-    "intervalo_eventos_segundos": 600,
-    "chance_evento": 0.35,
+    "intervalo_eventos_segundos": 600000,
+    "chance_evento": 0,
     "xp_perdido_por_evento_ignorado_percentual": 1,
     "xp_multiplicador_minimo": 0
   },
