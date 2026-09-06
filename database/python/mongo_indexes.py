@@ -32,8 +32,16 @@ _INDEXES = {
 
 
 async def ensure_indexes():
-    """Cria somente os índices aprovados; operação idempotente."""
+    """Garante os índices sem falhar por diferenças de nome pré-existentes."""
     for collection_name, indexes in _INDEXES.items():
         collection = db[collection_name]
+        existing = await run_db(lambda: list(collection.list_indexes()))
+        existing_keys = {
+            tuple(item["key"].items())
+            for item in existing
+        }
+
         for keys, options in indexes:
+            if tuple(keys) in existing_keys:
+                continue
             await run_db(collection.create_index, keys, **options)
