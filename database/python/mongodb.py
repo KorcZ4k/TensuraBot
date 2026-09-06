@@ -1,3 +1,4 @@
+import asyncio
 import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
@@ -37,3 +38,18 @@ except Exception as e:
     print("ERRO AO CONECTAR AO MONGODB:")
     print(repr(e))
     raise
+
+
+async def run_db(operation, *args, **kwargs):
+    """Executa uma operação PyMongo síncrona fora do event loop do Discord."""
+    return await asyncio.to_thread(operation, *args, **kwargs)
+
+
+async def mongo_find_one(collection, query, projection=None):
+    """Consulta um documento sem bloquear o event loop."""
+    return await run_db(collection.find_one, query, projection)
+
+
+async def mongo_update_one(collection, query, update, *, upsert=False):
+    """Atualiza um documento sem bloquear o event loop."""
+    return await run_db(collection.update_one, query, update, upsert=upsert)
