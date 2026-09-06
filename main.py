@@ -26,13 +26,37 @@ async def on_member_join(member):
 
 @bot.event
 async def on_command_error(ctx, error):
-    """Recupera o monstro do PvE quando o parser do comando falhar."""
+    """Trata erros de parsing de comandos que podem ser recuperados com segurança."""
+    command = getattr(ctx, "command", None)
+    parent = getattr(command, "parent", None)
+    param_name = getattr(getattr(error, "param", None), "name", None)
+
+    # O callback de luta é substituído por luta.py depois que o Command é
+    # criado. O parser do discord.py pode manter metadados antigos do
+    # parâmetro. Para menções, usamos a lista oficial de mentions da mensagem
+    # como fallback, evitando rejeitar !luta pvp @membro.
     if (
         isinstance(error, commands.MissingRequiredArgument)
-        and getattr(error.param, "name", None) == "monstro_tipo"
-        and getattr(ctx.command, "name", None) == "pve"
-        and getattr(ctx.command, "parent", None) is not None
-        and getattr(ctx.command.parent, "name", None) == "luta"
+        and param_name == "membro"
+        and getattr(command, "name", None) == "pvp"
+        and getattr(parent, "name", None) == "luta"
+    ):
+        mencoes = [m for m in ctx.message.mentions if not m.bot]
+        if mencoes:
+            membro = next((m for m in mencoes if m.id != ctx.author.id), None)
+            if membro is not None and hasattr(ctx, "cog"):
+                await command.callback(ctx.cog, ctx, membro)
+                return
+
+        await ctx.send("❌ Mencione um membro válido. Exemplo: `!luta pvp @jogador`")
+        return
+
+    if (
+        isinstance(error, commands.MissingRequiredArgument)
+        and param_name == "monstro_tipo"
+        and getattr(command, "name", None) == "pve"
+        and parent is not None
+        and getattr(parent, "name", None) == "luta"
     ):
         partes = ctx.message.content.strip().split()
         indice_pve = next(
@@ -43,7 +67,7 @@ async def on_command_error(ctx, error):
         if indice_pve is not None:
             monstro_tipo = " ".join(partes[indice_pve + 1:]).strip()
             if monstro_tipo:
-                await ctx.command.callback(ctx.cog, ctx, monstro_tipo)
+                await command.callback(ctx.cog, ctx, monstro_tipo)
                 return
 
         await ctx.send("❌ Informe o monstro. Use `!luta pve slime`.")
