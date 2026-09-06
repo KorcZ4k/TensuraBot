@@ -12,7 +12,6 @@ from database.python.mongo_indexes import ensure_indexes
 
 load_dotenv()
 
-# Usa apenas os intents necessários para reduzir eventos desnecessários.
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -22,7 +21,6 @@ _cadastro_inicial_concluido = False
 
 @bot.event
 async def on_member_join(member):
-    # cadastro_async usa run_db para manter todo o acesso ao Mongo fora do event loop.
     await cadastro_async([member])
 
 
@@ -31,6 +29,16 @@ async def _cadastrar_guild(guild):
     quantidade = await cadastro_async(membros)
     print(f"{guild.name}: {quantidade} usuários processados.")
     return quantidade
+
+
+async def _cadastro_inicial_background():
+    global _cadastro_inicial_concluido
+    try:
+        await asyncio.gather(*(_cadastrar_guild(guild) for guild in bot.guilds))
+    except Exception as erro:
+        print(f"[CADASTRO][ERRO] {type(erro).__name__}: {erro}")
+        return
+    _cadastro_inicial_concluido = True
 
 
 @bot.event
@@ -53,16 +61,12 @@ async def on_ready():
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
         await canal.send(embed=embed)
 
-    # on_ready pode ocorrer novamente após uma reconexão. O cadastro completo
-    # é necessário apenas no primeiro ready; novos membros usam on_member_join.
     if not _cadastro_inicial_concluido:
-        await asyncio.gather(*(_cadastrar_guild(guild) for guild in bot.guilds))
-        _cadastro_inicial_concluido = True
+        asyncio.create_task(_cadastro_inicial_background())
 
 
 async def carregar_extensoes():
     extensoes = [
-        # RPG
         "comandos.RPG.luta",
         "comandos.RPG.party",
         "comandos.RPG.treino",
@@ -74,11 +78,7 @@ async def carregar_extensoes():
         "comandos.RPG.nascimento",
         "comandos.RPG.correcoes_luta",
         "comandos.RPG.status_habilidades",
-
-        # MORA
         "comandos.ECONOMIA.Mora",
-
-        # ADMINISTRAÇÃO
         "comandos.ADMINISTRACAO.autorole_commands",
         "comandos.ADMINISTRACAO.autorole",
         "comandos.ADMINISTRACAO.configurações",
@@ -99,7 +99,6 @@ async def carregar_extensoes():
 
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-
 if not TOKEN:
     raise RuntimeError("DISCORD_TOKEN não foi configurado.")
 
@@ -107,8 +106,8 @@ if not TOKEN:
 async def main():
     try:
         async with bot:
-            await ensure_indexes()
             await carregar_extensoes()
+            asyncio.create_task(ensure_indexes())
             await bot.start(TOKEN)
     finally:
         await close_db()
