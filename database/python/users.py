@@ -5,7 +5,6 @@ from database.python.mongodb import db, run_db
 
 players = db["Jogadores"]
 mora = db["Mora"]
-hunos = db["Hunos"]
 inv = db["Inventários"]
 mag = db["Magias"]
 hab = db["Habilidades"]
@@ -14,7 +13,6 @@ hab = db["Habilidades"]
 def _build_cadastro_ops(membros):
     players_ops = []
     mora_ops = []
-    hunos_ops = []
     inv_ops = []
     mag_ops = []
     hab_ops = []
@@ -44,11 +42,6 @@ def _build_cadastro_ops(membros):
             "carteira": 0, "banco": 0,
         }}, upsert=True))
 
-        hunos_ops.append(UpdateOne(filtro, {"$setOnInsert": {
-            "ID": user_id, "guild_id": guild_id, "Situação": "pendente",
-            "carteira": 0, "banco": 0,
-        }}, upsert=True))
-
         inv_ops.append(UpdateOne(filtro, {"$setOnInsert": {
             "ID": user_id, "guild_id": guild_id, "Situação": "pendente",
             "itens": [],
@@ -64,14 +57,14 @@ def _build_cadastro_ops(membros):
             "habilidades": [],
         }}, upsert=True))
 
-    return (players_ops, mora_ops, hunos_ops, inv_ops, mag_ops, hab_ops)
+    return (players_ops, mora_ops, inv_ops, mag_ops, hab_ops)
 
 
 def cadastro(membros):
     """API síncrona legada; use cadastro_async no event loop do Discord."""
     ops = _build_cadastro_ops(membros)
     for collection, collection_ops in zip(
-        (players, mora, hunos, inv, mag, hab), ops
+        (players, mora, inv, mag, hab), ops
     ):
         if collection_ops:
             collection.bulk_write(collection_ops)
@@ -84,7 +77,7 @@ async def cadastro_async(membros):
     tasks = [
         run_db(collection.bulk_write, collection_ops)
         for collection, collection_ops in zip(
-            (players, mora, hunos, inv, mag, hab), ops
+            (players, mora, inv, mag, hab), ops
         )
         if collection_ops
     ]
