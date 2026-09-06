@@ -1,32 +1,26 @@
-import asyncio
 import discord
-from database.python.mongodb import db
 from discord.ext import commands
-import datetime
 
-fuso = datetime.timezone(datetime.timedelta(hours = -3))
-horario = datetime.datetime.now(fuso)
 
 class Loritta(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        
 
     @commands.command(name="sistemas")
-    @commands.has_permissions(administrator= True)
+    @commands.guild_only()
+    @commands.has_permissions(administrator=True)
     async def sistema(self, ctx):
-        sys = discord.Embed(
-            title = "Tensura Moon",
-            description = """""",
-            color = "",
-            timestamp = horario
+        guild_icon = ctx.guild.icon.url if ctx.guild.icon else None
+        embed = discord.Embed(
+            title="Tensura Moon",
+            description="Painel de sistemas do bot.",
+            color=discord.Color.blurple(),
+            timestamp=discord.utils.utcnow(),
         )
-        sys.set_footer = "Tensura Moon - Korczak Technologies!"
-        sys.set_thumbnail(ctx.guild.avatar.url)
-        sys.set_image(url = '')
-
-        await ctx.send(embed=sys)
-        
+        embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+        if guild_icon:
+            embed.set_thumbnail(url=guild_icon)
+        await ctx.send(embed=embed)
 
 
 async def setup(bot):
