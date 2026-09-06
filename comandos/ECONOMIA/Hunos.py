@@ -1,5 +1,4 @@
 import discord
-import datetime
 from discord.ext import commands
 
 from database.python.Hunos import (
@@ -10,510 +9,126 @@ from database.python.Hunos import (
     sacar_hunos,
     pagar_hunos,
     ranking_hunos,
-    economia_hunos
 )
-fuso = datetime.timezone(datetime.timedelta(hours = -3))
-horario = datetime.datetime.now(fuso)
+
 
 class Hunos(commands.Cog):
+    """Economia simples de Hunos, no estilo de comandos básicos do UnbelievaBot."""
 
     def __init__(self, bot):
         self.bot = bot
 
-
-    # ==========================================
-    # SALDO
-    # ==========================================
-
-    @commands.command(name='saldo')
-    async def saldo(self, ctx):
-
-        jogador = obter_hunos(
-            ctx.author.id,
-            ctx.guild.id
+    def _embed(self, title, description=None, color=None):
+        return discord.Embed(
+            title=title,
+            description=description,
+            color=color or discord.Color.blurple(),
+            timestamp=discord.utils.utcnow(),
         )
 
-        carteira = jogador["carteira"]
-        banco = jogador["banco"]
+    @commands.command(name="saldo")
+    async def saldo(self, ctx):
+        jogador = obter_hunos(ctx.author.id, ctx.guild.id)
+        carteira = jogador.get("carteira", 0)
+        banco = jogador.get("banco", 0)
         total = carteira + banco
 
-        MSG = discord.Embed(
-            title=f"| Saldo de {ctx.author.display_name}",
-            description="Saldo de Hunos",
-            color=discord.Color.green(),
-            timestamp=horario
+        embed = self._embed(
+            f"💰 Saldo de {ctx.author.display_name}",
+            "Saldo de Hunos",
+            discord.Color.green(),
         )
+        embed.add_field(name="💵 Carteira", value=f"**{carteira:,} Hunos**", inline=True)
+        embed.add_field(name="🏦 Banco", value=f"**{banco:,} Hunos**", inline=True)
+        embed.add_field(name="💎 Total", value=f"**{total:,} Hunos**", inline=False)
+        await ctx.send(embed=embed)
 
-        MSG.add_field(
-            name="💰 Carteira",
-            value=f"**{carteira:,} Hunos**",
-            inline=True
-        )
-
-        MSG.add_field(
-            name="🏦 Banco",
-            value=f"**{banco:,} Hunos**",
-            inline=True
-        )
-
-        MSG.add_field(
-            name="💎 Total",
-            value=f"**{total:,} Hunos**",
-            inline=False
-        )
-
-        MSG.set_footer(
-            text="Tensura Moon - Korczak Technologies!"
-        )
-
-        await ctx.send(embed=MSG)
-
-
-    # ==========================================
-    # PAGAR
-    # ==========================================
-
-    @commands.command(name='pagar')
-    async def pagar(self, ctx, quantidade: int):
-
-        mencoes = ctx.message.mentions
-
-        if len(mencoes) != 1:
-
-            ERRO = discord.Embed(
-                title="| Erro",
-                description="**Você precisa mencionar exatamente um usuário!**",
-                color=0xff0000,
-                timestamp=horario
-            )
-
-            ERRO.set_footer(
-                text="Tensura Moon - Korczak Technologies!"
-            )
-
-            await ctx.send(embed=ERRO)
-            return
-
-        destinatario = mencoes[0]
-
+    @commands.command(name="pagar")
+    async def pagar(self, ctx, membro: discord.Member, quantidade: int):
         if quantidade <= 0:
-
-            ERRO = discord.Embed(
-                title="| Erro",
-                description="**A quantidade deve ser maior que 0!**",
-                color=0xff0000,
-                timestamp=horario
-            )
-
-            ERRO.set_footer(
-                text="Tensura Moon - Korczak Technologies!"
-            )
-
-            await ctx.send(embed=ERRO)
-            return
-
-        if destinatario.id == ctx.author.id:
-
-            ERRO = discord.Embed(
-                title="| Erro",
-                description="**Você não pode transferir Hunos para si mesmo!**",
-                color=0xff0000,
-                timestamp=horario
-            )
-
-            ERRO.set_footer(
-                text="Tensura Moon - Korczak Technologies!"
-            )
-
-            await ctx.send(embed=ERRO)
-            return
-
-        if destinatario.bot:
-
-            ERRO = discord.Embed(
-                title="| Erro",
-                description="**Você não pode transferir Hunos para um bot!**",
-                color=0xff0000,
-                timestamp=horario
-            )
-
-            ERRO.set_footer(
-                text="Tensura Moon - Korczak Technologies!"
-            )
-
-            await ctx.send(embed=ERRO)
-            return
+            return await ctx.send("❌ A quantidade deve ser maior que zero.")
+        if membro.bot:
+            return await ctx.send("❌ Você não pode transferir Hunos para um bot.")
+        if membro.id == ctx.author.id:
+            return await ctx.send("❌ Você não pode transferir Hunos para si mesmo.")
 
         try:
+            pagar_hunos(ctx.author.id, membro.id, ctx.guild.id, quantidade)
+        except ValueError as erro:
+            return await ctx.send(f"❌ {erro}")
 
-            pagar_hunos(
-                ctx.author.id,
-                destinatario.id,
-                ctx.guild.id,
-                quantidade
-            )
+        await ctx.send(f"✅ {ctx.author.mention} pagou **{quantidade:,} Hunos** para {membro.mention}.")
 
-        except ValueError:
-
-            ERRO = discord.Embed(
-                title="| Erro",
-                description="**Você não possui Hunos suficientes!**",
-                color=0xff0000,
-                timestamp=horario
-            )
-
-            ERRO.set_footer(
-                text="Tensura Moon - Korczak Technologies!"
-            )
-
-            await ctx.send(embed=ERRO)
-            return
-
-        MSG = discord.Embed(
-            title="| Transferência",
-            description=(
-                f"Você transferiu **{quantidade:,} Hunos** "
-                f"para {destinatario.mention}!"
-            ),
-            color=discord.Color.green(),
-            timestamp=horario
-        )
-
-        MSG.set_footer(
-            text="Tensura Moon - Korczak Technologies!"
-        )
-
-        await ctx.send(embed=MSG)
-
-
-    # ==========================================
-    # DEPOSITAR
-    # ==========================================
-
-    @commands.command(name='depositar')
+    @commands.command(name="depositar")
     async def depositar(self, ctx, quantidade: int):
-
         if quantidade <= 0:
-
-            await ctx.send(
-                "A quantidade deve ser maior que 0."
-            )
-
-            return
-
+            return await ctx.send("❌ A quantidade deve ser maior que zero.")
         try:
+            saldo = depositar_hunos(ctx.author.id, ctx.guild.id, quantidade)
+        except ValueError as erro:
+            return await ctx.send(f"❌ {erro}")
 
-            saldo = depositar_hunos(
-                ctx.author.id,
-                ctx.guild.id,
-                quantidade
-            )
-
-        except ValueError:
-
-            ERRO = discord.Embed(
-                title="| Erro",
-                description="**Você não possui Hunos suficientes na carteira!**",
-                color=0xff0000,
-                timestamp=horario
-            )
-
-            ERRO.set_footer(
-                text="Tensura Moon - Korczak Technologies!"
-            )
-
-            await ctx.send(embed=ERRO)
-            return
-
-        MSG = discord.Embed(
-            title="| Banco",
-            description=(
-                f"Você depositou **{quantidade:,} Hunos**.\n\n"
-                f"💰 Carteira: **{saldo['carteira']:,} Hunos**\n"
-                f"🏦 Banco: **{saldo['banco']:,} Hunos**"
-            ),
-            color=discord.Color.green(),
-            timestamp=horario
+        await ctx.send(
+            f"🏦 Depósito realizado: **{quantidade:,} Hunos**\n"
+            f"Carteira: **{saldo['carteira']:,}** | Banco: **{saldo['banco']:,}**"
         )
 
-        MSG.set_footer(
-            text="Tensura Moon - Korczak Technologies!"
-        )
-
-        await ctx.send(embed=MSG)
-
-
-    # ==========================================
-    # SACAR
-    # ==========================================
-
-    @commands.command(name='sacar')
+    @commands.command(name="sacar")
     async def sacar(self, ctx, quantidade: int):
-
         if quantidade <= 0:
-
-            await ctx.send(
-                "A quantidade deve ser maior que 0."
-            )
-
-            return
-
+            return await ctx.send("❌ A quantidade deve ser maior que zero.")
         try:
+            saldo = sacar_hunos(ctx.author.id, ctx.guild.id, quantidade)
+        except ValueError as erro:
+            return await ctx.send(f"❌ {erro}")
 
-            saldo = sacar_hunos(
-                ctx.author.id,
-                ctx.guild.id,
-                quantidade
-            )
-
-        except ValueError:
-
-            ERRO = discord.Embed(
-                title="| Erro",
-                description="**Você não possui essa quantidade de Hunos no banco!**",
-                color=0xff0000,
-                timestamp=horario
-            )
-
-            ERRO.set_footer(
-                text="Tensura Moon - Korczak Technologies!"
-            )
-
-            await ctx.send(embed=ERRO)
-            return
-
-        MSG = discord.Embed(
-            title="| Banco",
-            description=(
-                f"Você sacou **{quantidade:,} Hunos**.\n\n"
-                f"💰 Carteira: **{saldo['carteira']:,} Hunos**\n"
-                f"🏦 Banco: **{saldo['banco']:,} Hunos**"
-            ),
-            color=discord.Color.green(),
-            timestamp=horario
+        await ctx.send(
+            f"🏦 Saque realizado: **{quantidade:,} Hunos**\n"
+            f"Carteira: **{saldo['carteira']:,}** | Banco: **{saldo['banco']:,}**"
         )
 
-        MSG.set_footer(
-            text="Tensura Moon - Korczak Technologies!"
-        )
-
-        await ctx.send(embed=MSG)
-
-
-    # ==========================================
-    # RANKING
-    # ==========================================
-
-    @commands.command(name='ranking')
+    @commands.command(name="ranking")
     async def ranking(self, ctx):
-
-        jogadores = ranking_hunos(
-            ctx.guild.id,
-            10
-        )
-
+        jogadores = ranking_hunos(ctx.guild.id, 10)
         if not jogadores:
+            return await ctx.send("Ainda não existem jogadores no ranking de Hunos.")
 
-            await ctx.send(
-                "Ainda não existem jogadores registrados."
-            )
-
-            return
-
-        descricao = ""
-
+        linhas = []
         for posicao, jogador in enumerate(jogadores, 1):
+            carteira = jogador.get("carteira", 0)
+            banco = jogador.get("banco", 0)
+            membro = ctx.guild.get_member(int(jogador["ID"]))
+            nome = membro.display_name if membro else f"Usuário {jogador['ID']}"
+            linhas.append(f"**{posicao}.** {nome} — **{carteira + banco:,} Hunos**")
 
-            carteira = jogador.get(
-                "carteira",
-                0
-            )
-
-            banco = jogador.get(
-                "banco",
-                0
-            )
-
-            total = carteira + banco
-
-            membro = ctx.guild.get_member(
-                int(jogador["ID"])
-            )
-
-            if membro:
-                nome = membro.display_name
-            else:
-                nome = f"Usuário {jogador['ID']}"
-
-            descricao += (
-                f"**{posicao}.** {nome} — "
-                f"💰 **{total:,} Hunos**\n"
-            )
-
-        MSG = discord.Embed(
-            title="| Ranking de Hunos",
-            description=descricao,
-            color=discord.Color.gold(),
-            timestamp=horario
+        embed = self._embed(
+            "🏆 Ranking de Hunos",
+            "\n".join(linhas),
+            discord.Color.gold(),
         )
+        await ctx.send(embed=embed)
 
-        MSG.set_footer(
-            text="Tensura Moon - Korczak Technologies!"
-        )
-
-        await ctx.send(embed=MSG)
-
-
-    # ==========================================
-    # ADICIONAR HUNOS
-    # ==========================================
-
-    @commands.command(name='adicionar-hunos')
+    @commands.command(name="adicionar-hunos")
     @commands.has_permissions(administrator=True)
-    async def adicionar_hunos_cmd(
-        self,
-        ctx,
-        jogador: discord.Member,
-        quantidade: int
-    ):
-
+    async def adicionar_hunos_cmd(self, ctx, membro: discord.Member, quantidade: int):
         if quantidade <= 0:
-
-            await ctx.send(
-                "A quantidade deve ser maior que 0."
-            )
-
-            return
-
+            return await ctx.send("❌ A quantidade deve ser maior que zero.")
         try:
-
-            saldo = adicionar_hunos(
-                jogador.id,
-                ctx.guild.id,
-                quantidade
-            )
-
+            saldo = adicionar_hunos(membro.id, ctx.guild.id, quantidade)
         except ValueError as erro:
+            return await ctx.send(f"❌ {erro}")
+        await ctx.send(f"✅ Adicionados **{quantidade:,} Hunos** para {membro.mention}. Carteira: **{saldo:,}**.")
 
-            await ctx.send(str(erro))
-            return
-
-        MSG = discord.Embed(
-            title="| Hunos adicionados",
-            description=(
-                f"{jogador.mention} recebeu "
-                f"**{quantidade:,} Hunos**.\n\n"
-                f"Carteira: **{saldo:,} Hunos**."
-            ),
-            color=discord.Color.green(),
-            timestamp=horario
-        )
-
-        MSG.set_footer(
-            text="Tensura Moon - Korczak Technologies!"
-        )
-
-        await ctx.send(embed=MSG)
-
-
-    # ==========================================
-    # REMOVER HUNOS
-    # ==========================================
-
-    @commands.command(name='remover-hunos')
+    @commands.command(name="remover-hunos")
     @commands.has_permissions(administrator=True)
-    async def remover_hunos_cmd(
-        self,
-        ctx,
-        jogador: discord.Member,
-        quantidade: int
-    ):
-
+    async def remover_hunos_cmd(self, ctx, membro: discord.Member, quantidade: int):
         if quantidade <= 0:
-
-            await ctx.send(
-                "A quantidade deve ser maior que 0."
-            )
-
-            return
-
+            return await ctx.send("❌ A quantidade deve ser maior que zero.")
         try:
-
-            saldo = remover_hunos(
-                jogador.id,
-                ctx.guild.id,
-                quantidade
-            )
-
+            saldo = remover_hunos(membro.id, ctx.guild.id, quantidade)
         except ValueError as erro:
-
-            await ctx.send(str(erro))
-            return
-
-        MSG = discord.Embed(
-            title="| Hunos removidos",
-            description=(
-                f"Foram removidos **{quantidade:,} Hunos** "
-                f"de {jogador.mention}.\n\n"
-                f"Carteira: **{saldo:,} Hunos**."
-            ),
-            color=discord.Color.red(),
-            timestamp=horario
-        )
-
-        MSG.set_footer(
-            text="Tensura Moon - Korczak Technologies!"
-        )
-
-        await ctx.send(embed=MSG)
-
-
-    # ==========================================
-    # ECONOMIA
-    # ==========================================
-
-    @commands.command(name='economia')
-    async def economia(self, ctx):
-
-        dados = economia_hunos(
-            ctx.guild.id
-        )
-
-        MSG = discord.Embed(
-            title="| Economia de Hunos",
-            color=discord.Color.blue(),
-            timestamp=horario
-        )
-
-        MSG.add_field(
-            name="💰 Hunos em carteiras",
-            value=f"**{dados['carteira_total']:,}**",
-            inline=True
-        )
-
-        MSG.add_field(
-            name="🏦 Hunos nos bancos",
-            value=f"**{dados['banco_total']:,}**",
-            inline=True
-        )
-
-        MSG.add_field(
-            name="💎 Hunos totais",
-            value=f"**{dados['total']:,}**",
-            inline=True
-        )
-
-        MSG.add_field(
-            name="👥 Jogadores",
-            value=f"**{dados['jogadores']:,}**",
-            inline=True
-        )
-
-        MSG.set_footer(
-            text="Tensura Moon - Korczak Technologies!"
-        )
-
-        await ctx.send(embed=MSG)
+            return await ctx.send(f"❌ {erro}")
+        await ctx.send(f"✅ Removidos **{quantidade:,} Hunos** de {membro.mention}. Carteira: **{saldo:,}**.")
 
 
 async def setup(bot):
