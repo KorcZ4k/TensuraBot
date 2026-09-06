@@ -28,6 +28,13 @@ async def on_member_join(member):
     await cadastro_async([member])
 
 
+async def _cadastrar_guild(guild):
+    membros = [member for member in guild.members if not member.bot]
+    quantidade = await cadastro_async(membros)
+    print(f"{guild.name}: {quantidade} usuários processados.")
+    return quantidade
+
+
 @bot.event
 async def on_ready():
     global _cadastro_inicial_concluido
@@ -52,10 +59,7 @@ async def on_ready():
     # é necessário apenas no primeiro ready; novos membros usam on_member_join.
     if not _cadastro_inicial_concluido:
         _cadastro_inicial_concluido = True
-        for guild in bot.guilds:
-            membros = [member for member in guild.members if not member.bot]
-            quantidade = await cadastro_async(membros)
-            print(f"{guild.name}: {quantidade} usuários processados.")
+        await asyncio.gather(*(_cadastrar_guild(guild) for guild in bot.guilds))
 
     print("Economia simplificada ativa: ciclos, eventos e economia global estão desligados.")
 
