@@ -5,7 +5,7 @@ from datetime import timedelta
 
 import discord
 from discord.ext import commands
-from database.python.mongodb import db, mongo_find_one, mongo_update_one
+from database.python.mongodb import db, get_guild_config, update_guild_config
 
 CONFIG = db["configuracoes_servidor"]
 
@@ -15,10 +15,10 @@ class AutoMod(commands.Cog):
         self.message_history = defaultdict(deque)
 
     async def get_config(self, guild_id):
-        return await mongo_find_one(CONFIG, {"guild_id": guild_id}) or {"guild_id": guild_id}
+        return await get_guild_config(CONFIG, guild_id)
 
     async def update_config(self, guild_id, data):
-        return await mongo_update_one(CONFIG, {"guild_id": guild_id}, {"$set": data}, upsert=True)
+        return await update_guild_config(CONFIG, guild_id, data)
 
     def is_exempt(self, member):
         return member.guild_permissions.administrator or member.bot
