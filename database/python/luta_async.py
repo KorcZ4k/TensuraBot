@@ -27,3 +27,19 @@ async def pode_lutar(user_id: str, guild_id: str):
 
 async def finalizar_combate(combate):
     return await run_db(luta_db.finalizar_combate, combate)
+
+
+async def atualizar_situacao(user_id: str, guild_id: str, situacao: str):
+    """Atualiza a situação do jogador sem bloquear o event loop."""
+    return await run_db(
+        luta_db.jogadores.update_one,
+        {
+            "ID": str(user_id),
+            "guild_id": str(guild_id),
+        },
+        {
+            "$set": {
+                "Situação": situacao,
+            }
+        },
+    )
