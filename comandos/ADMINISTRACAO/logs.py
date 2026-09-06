@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from database.python.mongodb import db, mongo_find_one, mongo_update_one
+from database.python.mongodb import db, get_guild_config, update_guild_config
 
 CONFIG = db["configuracoes_servidor"]
 CANAL_LOGS_PADRAO = 1545142627547091057
@@ -10,7 +10,7 @@ class Logs(commands.Cog):
         self.bot = bot
 
     async def _config(self, guild_id):
-        return await mongo_find_one(CONFIG, {"guild_id": guild_id}) or {}
+        return await get_guild_config(CONFIG, guild_id)
 
     async def _send_log(self, guild, embed):
         config = await self._config(guild.id)
@@ -36,12 +36,12 @@ class Logs(commands.Cog):
 
     @logs.command(name="channel")
     async def logs_channel(self, ctx, channel: discord.TextChannel):
-        await mongo_update_one(CONFIG, {"guild_id": ctx.guild.id}, {"$set": {"logs_channel_id": channel.id}}, upsert=True)
+        await update_guild_config(CONFIG, ctx.guild.id, {"logs_channel_id": channel.id})
         await ctx.send(embed=discord.Embed(title="✅ Logs configurados", description=f"Os registros serão enviados para {channel.mention}.", color=discord.Color.green()))
 
     @logs.command(name="disable", aliases=["off"])
     async def logs_disable(self, ctx):
-        await mongo_update_one(CONFIG, {"guild_id": ctx.guild.id}, {"$set": {"logs_channel_id": None}}, upsert=True)
+        await update_guild_config(CONFIG, ctx.guild.id, {"logs_channel_id": None})
         await ctx.send(embed=discord.Embed(title="🛑 Logs desativados", description="Nenhum novo registro será enviado pelo sistema de logs.", color=discord.Color.red()))
 
     @commands.Cog.listener()
