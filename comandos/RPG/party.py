@@ -6,6 +6,7 @@ from discord.ext import commands
 from database.python.luta_async import (
     pode_lutar,
     criar_participante_jogador,
+    atualizar_situacao,
 )
 from database.python.luta import criar_monstro
 
@@ -208,7 +209,7 @@ class PartyCombate(commands.Cog):
 
         for jogador in participantes:
             if jogador.get("tipo") == "jogador":
-                luta_cog._atualizar_situacao(jogador["id"], guild_id, "ativo_combate")
+                await atualizar_situacao(jogador["id"], guild_id, "ativo_combate")
 
         await ctx.send(f"⚔️ A party com **{len(party['membros'])} membro(s)** iniciou uma luta contra **{monstro.get('nome', monstro_id)}**!")
         await luta_cog._mostrar_inicio(ctx)
