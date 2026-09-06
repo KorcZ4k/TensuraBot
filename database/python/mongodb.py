@@ -34,7 +34,6 @@ except Exception as e:
 logger = logging.getLogger("tensurabot.mongodb")
 _PERF_ENABLED = os.getenv("MONGO_PERF_LOG", "0") == "1"
 _DB_STATS = Counter()
-_DB_STATS_LOCK = asyncio.Lock()
 
 
 async def run_db(operation, *args, **kwargs):
@@ -48,25 +47,22 @@ async def run_db(operation, *args, **kwargs):
         result = await asyncio.to_thread(operation, *args, **kwargs)
     except Exception:
         elapsed_ms = (time.perf_counter() - started) * 1000
-        async with _DB_STATS_LOCK:
-            _DB_STATS["errors"] += 1
+        _DB_STATS["errors"] += 1
         logger.warning("MongoDB erro em %s (%.1f ms)", operation_name, elapsed_ms)
         raise
     else:
         elapsed_ms = (time.perf_counter() - started) * 1000
-        async with _DB_STATS_LOCK:
-            _DB_STATS["calls"] += 1
-            _DB_STATS["total_ms"] += elapsed_ms
-            if elapsed_ms >= 250:
-                _DB_STATS["slow_calls"] += 1
+        _DB_STATS["calls"] += 1
+        _DB_STATS["total_ms"] += elapsed_ms
+        if elapsed_ms >= 250:
+            _DB_STATS["slow_calls"] += 1
         logger.info("MongoDB %s (%.1f ms)", operation_name, elapsed_ms)
         return result
 
 
 async def get_db_stats():
     """Retorna um snapshot das métricas do processo."""
-    async with _DB_STATS_LOCK:
-        stats = dict(_DB_STATS)
+    stats = dict(_DB_STATS)
     calls = stats.get("calls", 0)
     stats["avg_ms"] = (stats.get("total_ms", 0.0) / calls) if calls else 0.0
     return stats
@@ -74,8 +70,7 @@ async def get_db_stats():
 
 async def reset_db_stats():
     """Zera as métricas coletadas sem afetar operações do MongoDB."""
-    async with _DB_STATS_LOCK:
-        _DB_STATS.clear()
+    _DB_STATS.clear()
 
 
 async def mongo_healthcheck():
