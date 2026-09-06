@@ -17,12 +17,10 @@ class CorrecoesLuta(commands.Cog):
         if isinstance(tipos, str):
             tipos = [tipos]
         tipos = {str(tipo).strip().lower() for tipo in tipos}
-
         efeito = dados_magia.get("efeito", {})
         nome_efeito = ""
         if isinstance(efeito, dict):
             nome_efeito = str(efeito.get("nome", "")).strip().lower()
-
         defesa_base = float(dados_magia.get("defesa_base", 0) or 0)
         return (
             "defesa" in tipos
@@ -38,17 +36,12 @@ class CorrecoesLuta(commands.Cog):
             return False
         if getattr(luta, "_magia_defensiva_corrigida", False):
             return True
-
-        original_usar_magia = getattr(luta, "usar_magia_no_combate", None)
-        original_resolver = getattr(luta, "_resolver_ataque", None)
-        if original_usar_magia is None or original_resolver is None:
-            print("⚠️ Correções de luta aguardando métodos do sistema de combate.")
-            return False
+        original_usar_magia = luta.usar_magia_no_combate
+        original_resolver = luta._resolver_ataque
 
         async def usar_magia_corrigida(cog, ctx, dados_magia):
             if not self._eh_magia_defensiva(dados_magia):
                 return await original_usar_magia(ctx, dados_magia)
-
             combate = cog._obter_combate(ctx.channel.id)
             if not combate or not combate.get("ativo"):
                 return False
@@ -58,7 +51,6 @@ class CorrecoesLuta(commands.Cog):
             if combate.get("fase") != "ataque":
                 await ctx.send("❌ Você não pode conjurar uma defesa durante outra ação pendente.")
                 return True
-
             usuario = cog._obter_atacante(combate)
             if usuario.get("tipo") != "jogador":
                 await ctx.send("❌ Não é a vez de um jogador usar magia.")
@@ -66,26 +58,22 @@ class CorrecoesLuta(commands.Cog):
             if str(usuario.get("id")) != str(ctx.author.id):
                 await ctx.send("❌ Não é sua vez de agir.")
                 return True
-
             mana_base = int(float(dados_magia.get("mana_base", 0) or 0))
             mana_atual = int(float(usuario.get("mana", 0) or 0))
             if mana_atual < mana_base:
                 await ctx.send(f"❌ Mana insuficiente. Necessário: {mana_base}.")
                 return True
-
             efeito = dados_magia.get("efeito", {})
             if not isinstance(efeito, dict):
                 efeito = {}
             defesa_base = int(float(dados_magia.get("defesa_base", 0) or 0))
             if defesa_base <= 0:
                 defesa_base = int(float(efeito.get("valor", 0) or 0))
-
             usuario["mana"] = mana_atual - mana_base
             usuario["defesa_bonus_magica"] = max(0, defesa_base)
             usuario["defesa_ativa"] = True
             usuario["esquiva_ativa"] = False
             usuario["magia_defensiva_ativa"] = True
-
             nome = dados_magia.get("nome", "Magia Defensiva")
             nome_efeito = str(efeito.get("nome", "")).strip()
             descricao = (
@@ -95,13 +83,7 @@ class CorrecoesLuta(commands.Cog):
             )
             if nome_efeito:
                 descricao += f"\n🔮 Efeito: **{nome_efeito}**"
-
-            embed = discord.Embed(
-                title="🛡️ Defesa Mágica",
-                description=descricao,
-                color=discord.Color.blue(),
-                timestamp=discord.utils.utcnow(),
-            )
+            embed = discord.Embed(title="🛡️ Defesa Mágica", description=descricao, color=discord.Color.blue(), timestamp=discord.utils.utcnow())
             await ctx.send(embed=embed)
             await asyncio.sleep(0.5)
             await cog._proximo_turno(ctx)
@@ -114,13 +96,15 @@ class CorrecoesLuta(commands.Cog):
             if defensor and defensor.get("magia_defensiva_ativa"):
                 bonus = float(defensor.get("defesa_bonus_magica", 0) or 0)
                 if bonus:
-                    defensor["defesa"] = float(defensor.get("defesa", 0) or 0) + bonus
+                    defesa_atual = float(defensor.get("defesa", 0) or 0)
+                    defensor["defesa"] = defesa_atual + bonus
             try:
                 return await original_resolver(ctx)
             finally:
                 if defensor and defensor.get("magia_defensiva_ativa"):
                     if bonus:
-                        defensor["defesa"] = max(0, float(defensor.get("defesa", 0) or 0) - bonus)
+                        defesa_atual = float(defensor.get("defesa", 0) or 0)
+                        defensor["defesa"] = max(0, defesa_atual - bonus)
                     defensor.pop("defesa_bonus_magica", None)
                     defensor.pop("magia_defensiva_ativa", None)
 
