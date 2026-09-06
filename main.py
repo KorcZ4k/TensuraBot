@@ -7,7 +7,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from database.python.users import cadastro
-from database.python.mongodb import db
+from database.python.mongodb import db, close_db
 from database.python.Hunos import init_db_hunos
 from database.python.mongo_indexes import ensure_indexes
 
@@ -101,10 +101,13 @@ if not TOKEN:
 
 
 async def main():
-    async with bot:
-        await ensure_indexes()
-        await carregar_extensoes()
-        await bot.start(TOKEN)
+    try:
+        async with bot:
+            await ensure_indexes()
+            await carregar_extensoes()
+            await bot.start(TOKEN)
+    finally:
+        await close_db()
 
 
 asyncio.run(main())
