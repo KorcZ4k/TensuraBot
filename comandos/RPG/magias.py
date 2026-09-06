@@ -68,3 +68,7 @@ class Magias(_MagiasSync):
         _magia_doc.set(_MISSING)
         _formas_catalogo.set(_MISSING)
         _elementos_catalogo.set(_MISSING)
+
+
+async def setup(bot):
+    await bot.add_cog(Magias(bot))
