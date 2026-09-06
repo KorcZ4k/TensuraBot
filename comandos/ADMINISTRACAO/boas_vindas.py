@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from database.python.mongodb import db, mongo_find_one, mongo_update_one
+from database.python.mongodb import db, get_guild_config, update_guild_config
 
 CONFIG = db["configuracoes_servidor"]
 
@@ -9,10 +9,10 @@ class BoasVindas(commands.Cog):
         self.bot = bot
 
     async def _config(self, guild_id):
-        return await mongo_find_one(CONFIG, {"guild_id": guild_id}) or {"guild_id": guild_id}
+        return await get_guild_config(CONFIG, guild_id)
 
     async def _update(self, guild_id, data):
-        return await mongo_update_one(CONFIG, {"guild_id": guild_id}, {"$set": data}, upsert=True)
+        return await update_guild_config(CONFIG, guild_id, data)
 
     @commands.group(name="welcome", aliases=["boasvindas"], invoke_without_command=True)
     @commands.guild_only()
