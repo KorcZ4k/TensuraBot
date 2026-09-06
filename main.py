@@ -8,11 +8,9 @@ from dotenv import load_dotenv
 
 from database.python.users import cadastro_async
 from database.python.mongodb import db, close_db
-from database.python.Hunos import init_db_hunos
 from database.python.mongo_indexes import ensure_indexes
 
 load_dotenv()
-init_db_hunos(db)
 
 # Usa apenas os intents necessários para reduzir eventos desnecessários.
 intents = discord.Intents.default()
@@ -61,8 +59,6 @@ async def on_ready():
         await asyncio.gather(*(_cadastrar_guild(guild) for guild in bot.guilds))
         _cadastro_inicial_concluido = True
 
-    print("Economia simplificada ativa: ciclos, eventos e economia global estão desligados.")
-
 
 async def carregar_extensoes():
     extensoes = [
@@ -79,8 +75,7 @@ async def carregar_extensoes():
         "comandos.RPG.correcoes_luta",
         "comandos.RPG.status_habilidades",
 
-        # ECONOMIA SIMPLES
-        "comandos.ECONOMIA.Hunos",
+        # MORA
         "comandos.ECONOMIA.Mora",
 
         # ADMINISTRAÇÃO
