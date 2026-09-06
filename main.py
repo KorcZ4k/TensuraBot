@@ -13,14 +13,18 @@ from database.python.Hunos import init_db_hunos
 load_dotenv()
 init_db_hunos(db)
 
-intents = discord.Intents.all()
+# Usa apenas os intents necessários para reduzir eventos desnecessários.
+intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, case_insensitive=True)
 
 
 @bot.event
 async def on_member_join(member):
-    cadastro(user_id=member.id, guild_id=member.guild.id)
+    # cadastro() usa PyMongo síncrono. Executá-lo em uma thread evita travar
+    # o event loop do Discord enquanto o MongoDB responde.
+    await asyncio.to_thread(cadastro, [member])
 
 
 @bot.event
@@ -41,9 +45,10 @@ async def on_ready():
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
         await canal.send(embed=embed)
 
+    # Mantém o cadastro inicial, mas fora do event loop para não bloquear o bot.
     for guild in bot.guilds:
         membros = [member for member in guild.members if not member.bot]
-        quantidade = cadastro(membros)
+        quantidade = await asyncio.to_thread(cadastro, membros)
         print(f"{guild.name}: {quantidade} usuários processados.")
 
     print("Economia simplificada ativa: ciclos, eventos e economia global estão desligados.")
@@ -65,7 +70,6 @@ async def carregar_extensoes():
         "comandos.RPG.status_habilidades",
 
         # ECONOMIA SIMPLES
-        # Apenas comandos básicos no estilo UnbelievaBoat para Hunos e Mora.
         "comandos.ECONOMIA.Hunos",
         "comandos.ECONOMIA.Mora",
 
