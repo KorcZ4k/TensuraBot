@@ -1,0 +1,57 @@
+name: Repair status consistency
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 2
+
+      - name: Repair status state handling
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('database/python/status.py')
+          s = p.read_text(encoding='utf-8')
+
+          old = 'magiculas = jogador.get("Magículas", 0)\n        raca = jogador.get("Raça", "Humano")'
+          new = 'magiculas = jogador.get("Magiculas", jogador.get("Magículas", 0))\n        raca = jogador.get("Raça", "Humano").strip().casefold()'
+          assert old in s, 'death mana snippet not found'
+          s = s.replace(old, new, 1)
+
+          old = '''        # Verifica se é monstro\n        racas_monstro = ["monstro", "criatura", "bestial", "dragão", "fera", "demônio", "abominação"]\n        is_monstro = raca.lower() in racas_monstro\n        \n        # Verifica se é humano (vida zerada = morte)\n        if not is_monstro and vida <= 0:\n            return _aplicar_morte_permanente(jogador, user_id, guild_id, "humano")\n        \n        # Verifica se é monstro (vida ou magículas zerada = morte)\n        if is_monstro:\n            if vida <= 0:\n                return _aplicar_morte_permanente(jogador, user_id, guild_id, "monstro_vida")\n            if magiculas <= 0:\n                return _aplicar_morte_permanente(jogador, user_id, guild_id, "monstro_magia")\n        \n        # Verifica se é animado/constructo (vida zerada = morte)\n        racas_animadas = ["constructo", "golem", "boneco", "esqueleto", "zumbi", "lorde das trevas"]\n        if raca.lower() in racas_animadas and vida <= 0:\n            return _aplicar_morte_permanente(jogador, user_id, guild_id, "animado")'''
+          new = '''        racas_monstro = {"monstro", "criatura", "bestial", "dragão", "fera", "demônio", "abominação"}\n        racas_animadas = {"constructo", "golem", "boneco", "esqueleto", "zumbi", "lorde das trevas"}\n        is_monstro = raca in racas_monstro\n        is_animado = raca in racas_animadas\n\n        if is_animado and vida <= 0:\n            return _aplicar_morte_permanente(jogador, user_id, guild_id, "animado")\n\n        if is_monstro:\n            if vida <= 0:\n                return _aplicar_morte_permanente(jogador, user_id, guild_id, "monstro_vida")\n            if magiculas <= 0:\n                return _aplicar_morte_permanente(jogador, user_id, guild_id, "monstro_magia")\n\n        if vida <= 0:\n            return _aplicar_morte_permanente(jogador, user_id, guild_id, "humano")'''
+          assert old in s, 'death classification block not found'
+          s = s.replace(old, new, 1)
+
+          old = '''    return resultado.get(\n        "XP",\n        0\n    )\n\n\n# ==========================================\n# REMOVER XP'''
+          new = '''    return xp_atual\n\n\n# ==========================================\n# REMOVER XP'''
+          assert old in s, 'XP return block not found'
+          s = s.replace(old, new, 1)
+
+          old = '''{"Nome": None, "Raça": None, "Nivel": 0, "XP": 0, "Força": 0, "Defesa": 0, "Velocidade": 0, "Destreza": 0, "Magia": 0, "Sorte": 0, "Situação": "pendente"}'''
+          new = '''{"Nome": None, "Raça": None, "Nivel": 0, "XP": 0, "XP_maximo": 0, "Força": 0, "Defesa": 0, "Vitalidade": 0, "Velocidade": 0, "Destreza": 0, "Magia": 0, "Sorte": 0, "inteligencia": 0, "Magiculas": 0, "Magículas": 0, "Vida": 0, "Vida_Maxima": 0, "Mana": 0, "Mana Total": 0, "Situação": "pendente", "mortes": 0, "data_morte": None, "mensagem_morte": None, "tipo_morte": None, "ultimo_treino": {}, "ultima_recuperacao": {}}'''
+          assert old in s, 'deregistration reset block not found'
+          s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding='utf-8')
+      - name: Commit and remove temporary workflow
+        shell: bash
+        run: |
+          rm .github/workflows/fix-status.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add database/python/status.py .github/workflows/fix-status.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix RPG status lifecycle consistency"
+          git push origin main
