@@ -1,16 +1,13 @@
 """Camada não bloqueante do sistema de combate.
 
-O código legado do combate fica em ``luta_sync.py``. Este módulo mantém a
-mesma classe e comandos, mas tira as operações MongoDB do event loop.
+O motor legado fica em ``luta_sync.py``. Este módulo substitui somente os
+pontos que acessam MongoDB, mantendo os comandos e regras do combate.
 """
 
 import asyncio
 
 from database.python.mongodb import db, run_db
 from database.python import luta as luta_db
-from database.python import luta as _luta_sync
-
-# O arquivo legado é preservado sem alterações para minimizar risco.
 from . import luta_sync as _base
 
 Luta = _base.Luta
@@ -34,6 +31,13 @@ def _agendar_db(self, operation, *args, **kwargs):
     tasks.add(task)
     task.add_done_callback(tasks.discard)
     return task
+
+
+async def _aguardar_escritas(self):
+    tasks = getattr(self, "_mongo_tasks", None)
+    if not tasks:
+        return
+    await asyncio.gather(*tuple(tasks))
 
 
 def _atualizar_situacao(self, user_id, guild_id, situacao):
@@ -127,9 +131,8 @@ async def luta_pve(self, ctx, monstro_tipo: str):
         return
 
     jogador["nome"] = jogador.get("nome") or ctx.author.display_name
+    monstro = luta_db.criar_monstro(monstro_id, 1)
 
-    monstro = self._encontrar_monstro(monstro_tipo)
-    monstro = _luta_sync.criar_monstro(monstro_id, 1)
     if not monstro:
         await ctx.send("❌ Não foi possível criar esse monstro.")
         return
@@ -217,13 +220,23 @@ async def luta_pvp(self, ctx, membro):
     await self._mostrar_inicio(ctx)
 
 
-# Substitui apenas os dois callbacks que consultam Mongo durante a criação
-# do combate. Todo o restante do motor permanece exatamente no código legado.
+async def _cog_after_invoke(self, ctx):
+    # As escritas continuam fora do event loop, mas terminam antes de o
+    # comando ser considerado concluído. Isso evita corrida entre comandos.
+    await _aguardar_escritas(self)
+
+
+async def _cog_unload(self):
+    await _aguardar_escritas(self)
+
+
 _base.Luta.luta_pve.callback = luta_pve
 _base.Luta.luta_pvp.callback = luta_pvp
 _base.Luta._atualizar_situacao = _atualizar_situacao
 _base.Luta._dar_recompensas = _dar_recompensas
 _base.Luta._salvar_participantes = _salvar_participantes
+_base.Luta.cog_after_invoke = _cog_after_invoke
+_base.Luta.cog_unload = _cog_unload
 
 
 async def setup(bot):
