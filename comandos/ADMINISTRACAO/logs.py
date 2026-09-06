@@ -1,9 +1,11 @@
+import asyncio
 import discord
 from discord.ext import commands
 from database.python.mongodb import db, get_guild_config, update_guild_config
 
 CONFIG = db["configuracoes_servidor"]
 CANAL_LOGS_PADRAO = 1545142627547091057
+
 
 class Logs(commands.Cog):
     def __init__(self, bot):
@@ -12,14 +14,17 @@ class Logs(commands.Cog):
     async def _config(self, guild_id):
         return await get_guild_config(CONFIG, guild_id)
 
+    async def _update(self, guild_id, data):
+        return await update_guild_config(CONFIG, guild_id, data)
+
     async def _send_log(self, guild, embed):
         config = await self._config(guild.id)
         channel_id = config.get("logs_channel_id", CANAL_LOGS_PADRAO)
-        channel = guild.get_channel(channel_id)
+        channel = guild.get_channel(channel_id) if channel_id else None
         if channel:
             try:
                 await channel.send(embed=embed)
-            except discord.Forbidden:
+            except (discord.Forbidden, discord.HTTPException):
                 pass
 
     @commands.group(name="logs", aliases=["log"], invoke_without_command=True)
@@ -28,20 +33,24 @@ class Logs(commands.Cog):
     async def logs(self, ctx):
         config = await self._config(ctx.guild.id)
         channel_id = config.get("logs_channel_id", CANAL_LOGS_PADRAO)
-        channel = ctx.guild.get_channel(channel_id)
+        channel = ctx.guild.get_channel(channel_id) if channel_id else None
         embed = discord.Embed(title="📜 Sistema de Logs", description="Configure o canal que receberá os registros administrativos do servidor.", color=discord.Color.blue())
-        embed.add_field(name="Canal atual", value=channel.mention if channel else f"`{channel_id}`", inline=False)
+        embed.add_field(name="Canal atual", value=channel.mention if channel else "Desativado", inline=False)
         embed.add_field(name="Comandos", value="`!logs channel #canal`\n`!logs disable`", inline=False)
         await ctx.send(embed=embed)
 
     @logs.command(name="channel")
+    @commands.guild_only()
+    @commands.has_permissions(manage_guild=True)
     async def logs_channel(self, ctx, channel: discord.TextChannel):
-        await update_guild_config(CONFIG, ctx.guild.id, {"logs_channel_id": channel.id})
+        await self._update(ctx.guild.id, {"logs_channel_id": channel.id})
         await ctx.send(embed=discord.Embed(title="✅ Logs configurados", description=f"Os registros serão enviados para {channel.mention}.", color=discord.Color.green()))
 
     @logs.command(name="disable", aliases=["off"])
+    @commands.guild_only()
+    @commands.has_permissions(manage_guild=True)
     async def logs_disable(self, ctx):
-        await update_guild_config(CONFIG, ctx.guild.id, {"logs_channel_id": None})
+        await self._update(ctx.guild.id, {"logs_channel_id": None})
         await ctx.send(embed=discord.Embed(title="🛑 Logs desativados", description="Nenhum novo registro será enviado pelo sistema de logs.", color=discord.Color.red()))
 
     @commands.Cog.listener()
@@ -66,7 +75,7 @@ class Logs(commands.Cog):
         if len(before_content) > 500:
             before_content = before_content[:497] + "..."
         if len(after_content) > 500:
-            after_content = after_content[:497] + "..."
+            after_content = after.content[:497] + "..."
         embed = discord.Embed(title="✏️ Mensagem editada", color=discord.Color.orange(), timestamp=discord.utils.utcnow())
         embed.add_field(name="Autor", value=f"{after.author.mention} (`{after.author.id}`)", inline=False)
         embed.add_field(name="Canal", value=after.channel.mention, inline=False)
@@ -116,6 +125,7 @@ class Logs(commands.Cog):
         embed = discord.Embed(title="➖ Canal apagado", description=f"`{channel.name}` foi apagado.", color=discord.Color.red(), timestamp=discord.utils.utcnow())
         embed.add_field(name="Tipo", value=str(channel.type), inline=True)
         await self._send_log(channel.guild, embed)
+
 
 async def setup(bot):
     await bot.add_cog(Logs(bot))
