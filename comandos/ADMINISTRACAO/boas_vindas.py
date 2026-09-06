@@ -1,88 +1,47 @@
 import discord
 from discord.ext import commands
-from database.python.mongodb import db
+from database.python.mongodb import db, mongo_find_one, mongo_update_one
 
 CONFIG = db["configuracoes_servidor"]
-
 
 class BoasVindas(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def _config(self, guild_id):
-        return CONFIG.find_one({"guild_id": guild_id}) or {"guild_id": guild_id}
+    async def _config(self, guild_id):
+        return await mongo_find_one(CONFIG, {"guild_id": guild_id}) or {"guild_id": guild_id}
 
-    def _update(self, guild_id, data):
-        CONFIG.update_one(
-            {"guild_id": guild_id},
-            {"$set": data},
-            upsert=True
-        )
+    async def _update(self, guild_id, data):
+        return await mongo_update_one(CONFIG, {"guild_id": guild_id}, {"$set": data}, upsert=True)
 
     @commands.group(name="welcome", aliases=["boasvindas"], invoke_without_command=True)
     @commands.guild_only()
     @commands.has_permissions(manage_guild=True)
     async def welcome(self, ctx):
-        config = self._config(ctx.guild.id)
+        config = await self._config(ctx.guild.id)
         channel_id = config.get("welcome_channel_id")
         channel = ctx.guild.get_channel(channel_id) if channel_id else None
-
-        embed = discord.Embed(
-            title="👋 Boas-vindas",
-            description="Configure as mensagens de entrada e saída do servidor.",
-            color=discord.Color.green()
-        )
-        embed.add_field(
-            name="Canal de entrada",
-            value=channel.mention if channel else "Não configurado",
-            inline=False
-        )
-        embed.add_field(
-            name="Comandos",
-            value=(
-                "`!welcome channel #canal`\n"
-                "`!welcome message <mensagem>`\n"
-                "`!welcome toggle`\n"
-                "`!goodbye channel #canal`\n"
-                "`!goodbye message <mensagem>`\n"
-                "`!goodbye toggle`\n\n"
-                "Variáveis: `{member}`, `{user}`, `{server}`, `{count}`"
-            ),
-            inline=False
-        )
+        embed = discord.Embed(title="👋 Boas-vindas", description="Configure as mensagens de entrada e saída do servidor.", color=discord.Color.green())
+        embed.add_field(name="Canal de entrada", value=channel.mention if channel else "Não configurado", inline=False)
+        embed.add_field(name="Comandos", value="`!welcome channel #canal`\n`!welcome message <mensagem>`\n`!welcome toggle`\n`!goodbye channel #canal`\n`!goodbye message <mensagem>`\n`!goodbye toggle`\n\nVariáveis: `{member}`, `{user}`, `{server}`, `{count}`", inline=False)
         await ctx.send(embed=embed)
 
     @welcome.command(name="channel")
     async def welcome_channel(self, ctx, channel: discord.TextChannel):
-        self._update(ctx.guild.id, {
-            "welcome_channel_id": channel.id,
-            "welcome_enabled": True
-        })
-        await ctx.send(embed=discord.Embed(
-            title="✅ Canal configurado",
-            description=f"As boas-vindas serão enviadas em {channel.mention}.",
-            color=discord.Color.green()
-        ))
+        await self._update(ctx.guild.id, {"welcome_channel_id": channel.id, "welcome_enabled": True})
+        await ctx.send(embed=discord.Embed(title="✅ Canal configurado", description=f"As boas-vindas serão enviadas em {channel.mention}.", color=discord.Color.green()))
 
     @welcome.command(name="message")
     async def welcome_message(self, ctx, *, message: str):
-        self._update(ctx.guild.id, {"welcome_message": message})
-        await ctx.send(embed=discord.Embed(
-            title="✏️ Mensagem atualizada",
-            description="A mensagem de boas-vindas foi salva.",
-            color=discord.Color.green()
-        ))
+        await self._update(ctx.guild.id, {"welcome_message": message})
+        await ctx.send(embed=discord.Embed(title="✏️ Mensagem atualizada", description="A mensagem de boas-vindas foi salva.", color=discord.Color.green()))
 
     @welcome.command(name="toggle")
     async def welcome_toggle(self, ctx):
-        config = self._config(ctx.guild.id)
+        config = await self._config(ctx.guild.id)
         enabled = not config.get("welcome_enabled", False)
-        self._update(ctx.guild.id, {"welcome_enabled": enabled})
-        await ctx.send(embed=discord.Embed(
-            title="👋 Boas-vindas",
-            description=f"Sistema {'ativado' if enabled else 'desativado'}.",
-            color=discord.Color.green() if enabled else discord.Color.red()
-        ))
+        await self._update(ctx.guild.id, {"welcome_enabled": enabled})
+        await ctx.send(embed=discord.Embed(title="👋 Boas-vindas", description=f"Sistema {'ativado' if enabled else 'desativado'}.", color=discord.Color.green() if enabled else discord.Color.red()))
 
     @commands.group(name="goodbye", aliases=["despedida"], invoke_without_command=True)
     @commands.guild_only()
@@ -92,92 +51,51 @@ class BoasVindas(commands.Cog):
 
     @goodbye.command(name="channel")
     async def goodbye_channel(self, ctx, channel: discord.TextChannel):
-        self._update(ctx.guild.id, {
-            "goodbye_channel_id": channel.id,
-            "goodbye_enabled": True
-        })
-        await ctx.send(embed=discord.Embed(
-            title="👋 Canal de despedida",
-            description=f"As despedidas serão enviadas em {channel.mention}.",
-            color=discord.Color.orange()
-        ))
+        await self._update(ctx.guild.id, {"goodbye_channel_id": channel.id, "goodbye_enabled": True})
+        await ctx.send(embed=discord.Embed(title="👋 Canal de despedida", description=f"As despedidas serão enviadas em {channel.mention}.", color=discord.Color.orange()))
 
     @goodbye.command(name="message")
     async def goodbye_message(self, ctx, *, message: str):
-        self._update(ctx.guild.id, {"goodbye_message": message})
-        await ctx.send(embed=discord.Embed(
-            title="✏️ Mensagem atualizada",
-            description="A mensagem de despedida foi salva.",
-            color=discord.Color.orange()
-        ))
+        await self._update(ctx.guild.id, {"goodbye_message": message})
+        await ctx.send(embed=discord.Embed(title="✏️ Mensagem atualizada", description="A mensagem de despedida foi salva.", color=discord.Color.orange()))
 
     @goodbye.command(name="toggle")
     async def goodbye_toggle(self, ctx):
-        config = self._config(ctx.guild.id)
+        config = await self._config(ctx.guild.id)
         enabled = not config.get("goodbye_enabled", False)
-        self._update(ctx.guild.id, {"goodbye_enabled": enabled})
-        await ctx.send(embed=discord.Embed(
-            title="👋 Despedidas",
-            description=f"Sistema {'ativado' if enabled else 'desativado'}.",
-            color=discord.Color.green() if enabled else discord.Color.red()
-        ))
+        await self._update(ctx.guild.id, {"goodbye_enabled": enabled})
+        await ctx.send(embed=discord.Embed(title="👋 Despedidas", description=f"Sistema {'ativado' if enabled else 'desativado'}.", color=discord.Color.green() if enabled else discord.Color.red()))
 
     def format_message(self, template, guild, member):
-        return template.format(
-            member=member.mention,
-            user=member.display_name,
-            server=guild.name,
-            count=guild.member_count
-        )
+        return template.format(member=member.mention, user=member.display_name, server=guild.name, count=guild.member_count)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        config = self._config(member.guild.id)
+        config = await self._config(member.guild.id)
         if not config.get("welcome_enabled", False):
             return
-
         channel_id = config.get("welcome_channel_id")
         channel = member.guild.get_channel(channel_id) if channel_id else None
         if channel is None:
             return
-
-        template = config.get(
-            "welcome_message",
-            "👋 Seja bem-vindo(a), {member}, ao **{server}**! Você é o membro número **{count}**."
-        )
-        embed = discord.Embed(
-            title="🎉 Bem-vindo(a)!",
-            description=self.format_message(template, member.guild, member),
-            color=discord.Color.green(),
-            timestamp=discord.utils.utcnow()
-        )
+        template = config.get("welcome_message", "👋 Seja bem-vindo(a), {member}, ao **{server}**! Você é o membro número **{count}**.")
+        embed = discord.Embed(title="🎉 Bem-vindo(a)!", description=self.format_message(template, member.guild, member), color=discord.Color.green(), timestamp=discord.utils.utcnow())
         embed.set_thumbnail(url=member.display_avatar.url)
         await channel.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-        config = self._config(member.guild.id)
+        config = await self._config(member.guild.id)
         if not config.get("goodbye_enabled", False):
             return
-
         channel_id = config.get("goodbye_channel_id")
         channel = member.guild.get_channel(channel_id) if channel_id else None
         if channel is None:
             return
-
-        template = config.get(
-            "goodbye_message",
-            "👋 **{user}** saiu de **{server}**."
-        )
-        embed = discord.Embed(
-            title="👋 Até logo",
-            description=self.format_message(template, member.guild, member),
-            color=discord.Color.orange(),
-            timestamp=discord.utils.utcnow()
-        )
+        template = config.get("goodbye_message", "👋 **{user}** saiu de **{server}**.")
+        embed = discord.Embed(title="👋 Até logo", description=self.format_message(template, member.guild, member), color=discord.Color.orange(), timestamp=discord.utils.utcnow())
         embed.set_thumbnail(url=member.display_avatar.url)
         await channel.send(embed=embed)
-
 
 async def setup(bot):
     await bot.add_cog(BoasVindas(bot))
