@@ -5,12 +5,20 @@ pontos que acessam MongoDB, mantendo os comandos e regras do combate.
 """
 
 import asyncio
+import unicodedata
 
 from database.python.mongodb import db, run_db
 from database.python import luta as luta_db
 from . import luta_sync as _base
 
 Luta = _base.Luta
+
+
+def _normalizar_nome(nome):
+    """Normaliza nomes para ignorar maiúsculas/minúsculas e variações Unicode."""
+    texto = str(nome or "").strip()
+    texto = unicodedata.normalize("NFKC", texto)
+    return texto.casefold()
 
 
 async def _pode_lutar(user_id, guild_id):
@@ -31,6 +39,20 @@ def _agendar_db(self, operation, *args, **kwargs):
     tasks.add(task)
     task.add_done_callback(tasks.discard)
     return task
+
+
+def _encontrar_monstro(self, nome):
+    """Encontra monstros sem diferenciar maiúsculas/minúsculas."""
+    nome_normalizado = _normalizar_nome(nome)
+
+    for monstro_id, dados in luta_db.MONSTROS.items():
+        if _normalizar_nome(monstro_id) == nome_normalizado:
+            return monstro_id
+
+        if _normalizar_nome(dados.get("nome", "")) == nome_normalizado:
+            return monstro_id
+
+    return None
 
 
 async def _aguardar_escritas(self):
@@ -112,6 +134,7 @@ async def luta_pve(self, ctx, monstro_tipo: str):
         await ctx.send("❌ Já existe um combate ativo neste canal.")
         return
 
+    monstro_tipo = _normalizar_nome(monstro_tipo)
     monstro_id = self._encontrar_monstro(monstro_tipo)
     if not monstro_id:
         await ctx.send(f"❌ Monstro `{monstro_tipo}` não encontrado.")
@@ -232,6 +255,7 @@ async def _cog_unload(self):
 
 _base.Luta.luta_pve.callback = luta_pve
 _base.Luta.luta_pvp.callback = luta_pvp
+_base.Luta._encontrar_monstro = _encontrar_monstro
 _base.Luta._atualizar_situacao = _atualizar_situacao
 _base.Luta._dar_recompensas = _dar_recompensas
 _base.Luta._salvar_participantes = _salvar_participantes
