@@ -7,6 +7,8 @@ pontos que acessam MongoDB, mantendo os comandos e regras do combate.
 import asyncio
 import unicodedata
 
+import discord
+
 from database.python.mongodb import db, run_db
 from database.python import luta as luta_db
 from . import luta_sync as _base
@@ -182,8 +184,16 @@ async def luta_pve(self, ctx, monstro_tipo: str):
     await self._mostrar_inicio(ctx)
 
 
-async def luta_pvp(self, ctx, membro):
+async def luta_pvp(self, ctx, membro: discord.Member):
+    """Inicia um PvP aceitando menções, IDs e nomes convertidos pelo Discord."""
     if not ctx.guild:
+        return
+
+    # O conversor discord.Member resolve automaticamente <@ID>, <@!ID>,
+    # IDs e membros pelo nome. A validação abaixo impede strings inválidas
+    # de chegarem ao motor de combate quando o callback é substituído.
+    if not isinstance(membro, discord.Member):
+        await ctx.send("❌ Mencione um membro válido. Exemplo: `!luta pvp @jogador`")
         return
 
     if membro.bot:
