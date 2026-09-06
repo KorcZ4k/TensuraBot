@@ -18,8 +18,6 @@ from database.python.luta import (
 class Luta(commands.Cog):
 
     def __init__(self, bot):
-
         self.bot = bot
         self.combates = {}
 
-    # O arquivo original completo desta versão é restaurado pelo histórico Git.
