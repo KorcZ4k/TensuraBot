@@ -10,9 +10,6 @@ _INDEXES = {
     "configuracoes_servidor": [
         ([('guild_id', 1)], {"name": "idx_guild_id"}),
     ],
-    "Hunos": [
-        ([('ID', 1), ('guild_id', 1)], {"name": "idx_id_guild"}),
-    ],
     "Mora": [
         ([('ID', 1), ('guild_id', 1)], {"name": "idx_id_guild"}),
     ],
