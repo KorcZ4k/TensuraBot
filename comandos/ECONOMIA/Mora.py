@@ -11,7 +11,8 @@ from database.python.Mora import (
 class Mora(commands.Cog):
     """Economia simples de Mora, no estilo de comandos básicos do UnbelievaBot."""
 
-    def __init__(self, bot): self.bot = bot
+    def __init__(self, bot):
+        self.bot = bot
 
     def _embed(self, title, description=None, color=None):
         return discord.Embed(title=title, description=description, color=color or discord.Color.blurple(), timestamp=discord.utils.utcnow())
@@ -20,6 +21,7 @@ class Mora(commands.Cog):
         return await asyncio.to_thread(funcao, *args)
 
     @commands.command(name="msaldo")
+    @commands.guild_only()
     async def msaldo(self, ctx):
         jogador = await self._db(obter_mora, ctx.author.id, ctx.guild.id)
         carteira, banco = jogador.get("carteira", 0), jogador.get("banco", 0)
@@ -30,15 +32,24 @@ class Mora(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="mpagar")
+    @commands.guild_only()
     async def mpagar(self, ctx, membro: discord.Member, quantidade: int):
-        if quantidade <= 0: return await ctx.send("❌ A quantidade deve ser maior que zero.")
-        if membro.bot: return await ctx.send("❌ Você não pode transferir Mora para um bot.")
-        if membro.id == ctx.author.id: return await ctx.send("❌ Você não pode transferir Mora para si mesmo.")
-        try: await self._db(pagar_mora, ctx.author.id, membro.id, ctx.guild.id, quantidade)
-        except ValueError as erro: return await ctx.send(f"❌ {erro}")
+        if quantidade <= 0:
+            return await ctx.send("❌ A quantidade deve ser maior que zero.")
+        if membro.bot:
+            return await ctx.send("❌ Você não pode transferir Mora para um bot.")
+        if membro.id == ctx.author.id:
+            return await ctx.send("❌ Você não pode transferir Mora para si mesmo.")
+        try:
+            await self._db(pagar_mora, ctx.author.id, membro.id, ctx.guild.id, quantidade)
+        except ValueError as erro:
+            return await ctx.send(f"❌ {erro}")
+        except RuntimeError as erro:
+            return await ctx.send(f"❌ {erro}")
         await ctx.send(f"✅ {ctx.author.mention} pagou **{quantidade:,} Mora** para {membro.mention}.")
 
     @commands.command(name="mdepositar")
+    @commands.guild_only()
     async def mdepositar(self, ctx, quantidade: int):
         if quantidade <= 0: return await ctx.send("❌ A quantidade deve ser maior que zero.")
         try: saldo = await self._db(depositar_mora, ctx.author.id, ctx.guild.id, quantidade)
@@ -46,6 +57,7 @@ class Mora(commands.Cog):
         await ctx.send(f"🏦 Depósito realizado: **{quantidade:,} Mora**\nCarteira: **{saldo['carteira']:,}** | Banco: **{saldo['banco']:,}**")
 
     @commands.command(name="msacar")
+    @commands.guild_only()
     async def msacar(self, ctx, quantidade: int):
         if quantidade <= 0: return await ctx.send("❌ A quantidade deve ser maior que zero.")
         try: saldo = await self._db(sacar_mora, ctx.author.id, ctx.guild.id, quantidade)
@@ -53,6 +65,7 @@ class Mora(commands.Cog):
         await ctx.send(f"🏦 Saque realizado: **{quantidade:,} Mora**\nCarteira: **{saldo['carteira']:,}** | Banco: **{saldo['banco']:,}**")
 
     @commands.command(name="mranking")
+    @commands.guild_only()
     async def mranking(self, ctx):
         jogadores = await self._db(ranking_mora, ctx.guild.id, 10)
         if not jogadores: return await ctx.send("Ainda não existem jogadores no ranking de Mora.")
@@ -65,6 +78,7 @@ class Mora(commands.Cog):
         await ctx.send(embed=self._embed("🏆 Ranking de Mora", "\n".join(linhas), discord.Color.gold()))
 
     @commands.command(name="madicionar-mora")
+    @commands.guild_only()
     @commands.has_permissions(administrator=True)
     async def adicionar_mora_cmd(self, ctx, membro: discord.Member, quantidade: int):
         if quantidade <= 0: return await ctx.send("❌ A quantidade deve ser maior que zero.")
@@ -73,6 +87,7 @@ class Mora(commands.Cog):
         await ctx.send(f"✅ Adicionados **{quantidade:,} Mora** para {membro.mention}. Carteira: **{saldo:,}**.")
 
     @commands.command(name="mremover-mora")
+    @commands.guild_only()
     @commands.has_permissions(administrator=True)
     async def remover_mora_cmd(self, ctx, membro: discord.Member, quantidade: int):
         if quantidade <= 0: return await ctx.send("❌ A quantidade deve ser maior que zero.")
