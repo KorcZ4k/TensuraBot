@@ -45,40 +45,54 @@ class AutoMod(commands.Cog):
         await ctx.send(embed=embed)
 
     @automod.command(name="toggle")
+    @commands.has_permissions(administrator=True)
+    @commands.guild_only()
     async def toggle(self, ctx):
         value = not (await self.get_config(ctx.guild.id)).get("automod_enabled", False)
         await self.update_config(ctx.guild.id, {"automod_enabled": value})
         await ctx.send(embed=discord.Embed(title="🛡️ AutoMod", description=f"Sistema {'ativado' if value else 'desativado'}.", color=discord.Color.green() if value else discord.Color.red()))
 
     @automod.command(name="links")
+    @commands.has_permissions(administrator=True)
+    @commands.guild_only()
     async def links(self, ctx):
         value = not (await self.get_config(ctx.guild.id)).get("filter_links", False)
         await self.update_config(ctx.guild.id, {"filter_links": value})
         await ctx.send(embed=discord.Embed(title="🔗 Filtro de Links", description=f"Filtro {'ativado' if value else 'desativado'}.", color=discord.Color.green() if value else discord.Color.red()))
 
     @automod.command(name="words")
+    @commands.has_permissions(administrator=True)
+    @commands.guild_only()
     async def words(self, ctx):
         value = not (await self.get_config(ctx.guild.id)).get("filter_words", False)
         await self.update_config(ctx.guild.id, {"filter_words": value})
         await ctx.send(embed=discord.Embed(title="🤬 Filtro de Palavras", description=f"Filtro {'ativado' if value else 'desativado'}.", color=discord.Color.green() if value else discord.Color.red()))
 
     @automod.command(name="spam")
+    @commands.has_permissions(administrator=True)
+    @commands.guild_only()
     async def spam(self, ctx):
         value = not (await self.get_config(ctx.guild.id)).get("anti_spam", False)
         await self.update_config(ctx.guild.id, {"anti_spam": value})
         await ctx.send(embed=discord.Embed(title="📨 Anti-Spam", description=f"Sistema {'ativado' if value else 'desativado'}.", color=discord.Color.green() if value else discord.Color.red()))
 
     @automod.command(name="addword")
+    @commands.has_permissions(administrator=True)
+    @commands.guild_only()
     async def addword(self, ctx, *, word):
         c = await self.get_config(ctx.guild.id)
         words = c.get("blocked_words", [])
         word = word.lower().strip()
+        if not word:
+            return await ctx.send("❌ Informe uma palavra válida.")
         if word not in words:
             words.append(word)
             await self.update_config(ctx.guild.id, {"blocked_words": words})
         await ctx.send(embed=discord.Embed(title="✅ Palavra Adicionada", description=f"`{word}` foi adicionada à lista.", color=discord.Color.green()))
 
     @automod.command(name="delword", aliases=["removeword"])
+    @commands.has_permissions(administrator=True)
+    @commands.guild_only()
     async def delword(self, ctx, *, word):
         c = await self.get_config(ctx.guild.id)
         words = c.get("blocked_words", [])
@@ -89,6 +103,8 @@ class AutoMod(commands.Cog):
         await ctx.send(embed=discord.Embed(title="🗑️ Palavra Removida", description=f"`{word}` foi removida da lista.", color=discord.Color.orange()))
 
     @automod.command(name="listwords")
+    @commands.has_permissions(administrator=True)
+    @commands.guild_only()
     async def listwords(self, ctx):
         words = (await self.get_config(ctx.guild.id)).get("blocked_words", [])
         await ctx.send(embed=discord.Embed(title="📋 Palavras Bloqueadas", description=("\n".join(f"• `{w}`" for w in words) or "Nenhuma palavra configurada.")[:4096], color=discord.Color.blue()))
