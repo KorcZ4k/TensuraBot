@@ -1,11 +1,14 @@
+import ast
 import asyncio
 import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from database.python.json_cache import clear_json_cache, load_json
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class PerformanceSafetyTests(unittest.TestCase):
@@ -46,6 +49,32 @@ class PerformanceSafetyTests(unittest.TestCase):
             clear_json_cache()
 
             self.assertEqual(load_json(str(path))["version"], 2)
+
+    def test_optimized_wrappers_keep_extension_setup(self):
+        for relative in (
+            "comandos/RPG/luta.py",
+            "comandos/RPG/magias.py",
+            "comandos/RPG/status.py",
+        ):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=relative)
+            functions = {node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+            self.assertIn("setup", functions, relative)
+
+    def test_legacy_engines_are_preserved(self):
+        for relative in (
+            "comandos/RPG/luta_sync.py",
+            "comandos/RPG/magias_sync.py",
+            "comandos/RPG/status_sync.py",
+        ):
+            path = ROOT / relative
+            self.assertTrue(path.is_file(), relative)
+            self.assertGreater(path.stat().st_size, 1000, relative)
+
+    def test_startup_uses_async_registration(self):
+        source = (ROOT / "main.py").read_text(encoding="utf-8")
+        self.assertIn("from database.python.users import cadastro_async", source)
+        self.assertNotIn("await asyncio.to_thread(cadastro", source)
 
 
 if __name__ == "__main__":
