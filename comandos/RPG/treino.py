@@ -1,14 +1,14 @@
+import asyncio
 import discord
 from discord.ext import commands
-from database.python.mongodb import db
+from database.python.mongodb import run_db
 from database.python.treino import (
     realizar_treino,
-    verificar_cooldown,
     listar_treinos_disponiveis,
     get_cooldown_restante,
     CONFIG_TREINO
 )
-import datetime
+
 
 class Treino(commands.Cog):
     def __init__(self, bot):
@@ -22,10 +22,13 @@ class Treino(commands.Cog):
             description="Treine para aumentar seus atributos!",
             color=discord.Color.blue()
         )
-        
-        # Mostra os treinos disponíveis
-        treinos = listar_treinos_disponiveis(str(ctx.author.id), str(ctx.guild.id))
-        
+
+        treinos = await run_db(
+            listar_treinos_disponiveis,
+            str(ctx.author.id),
+            str(ctx.guild.id)
+        )
+
         if not treinos:
             embed.add_field(
                 name="❌ Nenhum treino disponível",
@@ -35,22 +38,26 @@ class Treino(commands.Cog):
         else:
             texto = ""
             for treino in treinos:
-                # Verifica cooldown
-                cooldown = get_cooldown_restante(str(ctx.author.id), str(ctx.guild.id), treino["tipo"])
-                
+                cooldown = await run_db(
+                    get_cooldown_restante,
+                    str(ctx.author.id),
+                    str(ctx.guild.id),
+                    treino["tipo"]
+                )
+
                 if cooldown == 0:
                     status = "✅ Disponível"
                 else:
                     status = f"⏰ {int(cooldown)}h restantes"
-                
+
                 texto += f"{treino['emoji']} **{treino['nome']}** - Nv. {treino['nivel_minimo']}+ - {status}\n"
-            
+
             embed.add_field(
                 name="📋 Treinos Disponíveis",
                 value=texto,
                 inline=False
             )
-        
+
         embed.add_field(
             name="📖 Comandos",
             value=(
@@ -63,108 +70,87 @@ class Treino(commands.Cog):
             ),
             inline=False
         )
-        
+
         await ctx.send(embed=embed)
 
     @treino.command(name="leve")
     async def treino_leve(self, ctx):
-        """Realiza treino leve (Nv. 1+)"""
         await self._executar_treino(ctx, "leve")
 
     @treino.command(name="medio")
     async def treino_medio(self, ctx):
-        """Realiza treino médio (Nv. 10+)"""
         await self._executar_treino(ctx, "medio")
 
     @treino.command(name="pesado")
     async def treino_pesado(self, ctx):
-        """Realiza treino pesado (Nv. 20+)"""
         await self._executar_treino(ctx, "pesado")
 
     @treino.command(name="supremo")
     async def treino_supremo(self, ctx):
-        """Realiza treino supremo (Nv. 50+)"""
         await self._executar_treino(ctx, "supremo")
 
     async def _executar_treino(self, ctx, tipo: str):
-        """Executa um treino específico"""
-        # Verifica cooldown primeiro
-        verificacao = verificar_cooldown(str(ctx.author.id), str(ctx.guild.id), tipo)
-        
-        if not verificacao["pode"]:
-            await ctx.send(verificacao["mensagem"])
-            return
-        
-        # Realiza o treino
-        resultado = realizar_treino(str(ctx.author.id), str(ctx.guild.id), tipo)
-        
+        """Executa o fluxo completo de treino fora do event loop."""
+        resultado = await run_db(
+            realizar_treino,
+            str(ctx.author.id),
+            str(ctx.guild.id),
+            tipo
+        )
+
         if not resultado["sucesso"]:
             await ctx.send(resultado["mensagem"])
             return
-        
-        # Cria o embed de resultado
+
         treino_config = CONFIG_TREINO["treinos"][tipo]
-        
         embed = discord.Embed(
             title=f"{treino_config['emoji']} {resultado['mensagem']}",
-            description=f"Seus atributos aumentaram!",
+            description="Seus atributos aumentaram!",
             color=discord.Color.green()
         )
-        
-        # Mostra os aumentos
+
         texto_aumentos = ""
         for atributo, aumento in resultado["aumentos"].items():
             novo_valor = resultado["novos_valores"][atributo]
             texto_aumentos += f"• **{atributo}:** +{aumento:.2f} → {novo_valor:.1f}\n"
-        
+
         embed.add_field(
             name="📈 Aumentos",
             value=texto_aumentos,
             inline=False
         )
-        
         embed.add_field(
             name="⏰ Cooldown",
             value=f"{treino_config['cooldown_horas']} horas",
             inline=True
         )
-        
         embed.set_footer(text="Volte depois do cooldown para treinar novamente!")
-        
         await ctx.send(embed=embed)
 
     @treino.command(name="info")
     async def treino_info(self, ctx):
-        """Mostra informações detalhadas sobre os treinos"""
         embed = discord.Embed(
             title="📖 Informações dos Treinos",
             description="Detalhes de cada tipo de treino",
             color=discord.Color.blue()
         )
-        
+
+        jogador = await run_db(
+            __import__("database.python.treino", fromlist=["obter_jogador"]).obter_jogador,
+            str(ctx.author.id),
+            str(ctx.guild.id)
+        )
+        nivel = jogador.get("Nivel", 1) if jogador else 1
+
         for tipo, config in CONFIG_TREINO["treinos"].items():
-            # Verifica se o jogador pode fazer
-            nivel = 1
-            jogador = None
-            try:
-                from database.python.mongodb import db
-                jogador = db["Jogadores"].find_one({
-                    "ID": str(ctx.author.id),
-                    "guild_id": str(ctx.guild.id)
-                })
-                if jogador:
-                    nivel = jogador.get("Nivel", 1)
-            except:
-                pass
-            
             pode = nivel >= config["nivel_minimo"]
             status = "✅ Disponível" if pode else f"❌ Nv. {config['nivel_minimo']} necessário"
-            
+
             if config["min_aumento"] == config["max_aumento"]:
                 aumento_texto = f"{config['min_aumento']:.2f}"
             else:
                 aumento_texto = f"{config['min_aumento']:.2f} - {config['max_aumento']:.2f}"
-            
+
             embed.add_field(
                 name=f"{config['emoji']} {config['nome']}",
                 value=(
@@ -176,36 +162,40 @@ class Treino(commands.Cog):
                 ),
                 inline=False
             )
-        
+
         await ctx.send(embed=embed)
 
     @treino.command(name="cooldown")
     async def treino_cooldown(self, ctx):
-        """Mostra o tempo restante de cooldown de cada treino"""
         embed = discord.Embed(
             title="⏰ Cooldowns de Treino",
             description="Tempo restante para cada treino",
             color=discord.Color.blue()
         )
-        
+
         for tipo, config in CONFIG_TREINO["treinos"].items():
-            cooldown = get_cooldown_restante(str(ctx.author.id), str(ctx.guild.id), tipo)
-            
+            cooldown = await run_db(
+                get_cooldown_restante,
+                str(ctx.author.id),
+                str(ctx.guild.id),
+                tipo
+            )
+
             if cooldown == 0:
                 status = "✅ Disponível"
             elif cooldown < 1:
-                minutos = int(cooldown * 60)
-                status = f"⏰ {minutos} minutos"
+                status = f"⏰ {int(cooldown * 60)} minutos"
             else:
                 status = f"⏰ {int(cooldown)} horas"
-            
+
             embed.add_field(
                 name=f"{config['emoji']} {config['nome']}",
                 value=status,
                 inline=True
             )
-        
+
         await ctx.send(embed=embed)
+
 
 async def setup(bot):
     await bot.add_cog(Treino(bot))
