@@ -2,8 +2,9 @@
 
 from contextvars import ContextVar
 
-from database.python.mongodb import db, run_db
+from database.python.mongodb import db
 from database.python.magias import DatabaseMagias
+from database.python.magias_async import get_magia_doc
 from comandos.RPG.magias_sync import Magias as _MagiasSync
 
 _MISSING = object()
@@ -29,10 +30,8 @@ class Magias(_MagiasSync):
             return
         if ctx.guild is None:
             return
-        database = DatabaseMagias(db)
-        doc = await run_db(
-            _original_get_magia_doc,
-            database,
+        doc = await get_magia_doc(
+            db,
             str(ctx.author.id),
             str(ctx.guild.id),
         )
