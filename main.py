@@ -58,8 +58,8 @@ async def on_ready():
     # on_ready pode ocorrer novamente após uma reconexão. O cadastro completo
     # é necessário apenas no primeiro ready; novos membros usam on_member_join.
     if not _cadastro_inicial_concluido:
-        _cadastro_inicial_concluido = True
         await asyncio.gather(*(_cadastrar_guild(guild) for guild in bot.guilds))
+        _cadastro_inicial_concluido = True
 
     print("Economia simplificada ativa: ciclos, eventos e economia global estão desligados.")
 
