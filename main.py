@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from database.python.users import cadastro
+from database.python.users import cadastro_async
 from database.python.mongodb import db, close_db
 from database.python.Hunos import init_db_hunos
 from database.python.mongo_indexes import ensure_indexes
@@ -19,17 +19,19 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, case_insensitive=True)
+_cadastro_inicial_concluido = False
 
 
 @bot.event
 async def on_member_join(member):
-    # cadastro() usa PyMongo síncrono. Executá-lo em uma thread evita travar
-    # o event loop do Discord enquanto o MongoDB responde.
-    await asyncio.to_thread(cadastro, [member])
+    # cadastro_async usa run_db para manter todo o acesso ao Mongo fora do event loop.
+    await cadastro_async([member])
 
 
 @bot.event
 async def on_ready():
+    global _cadastro_inicial_concluido
+
     fuso_horario = datetime.timezone(datetime.timedelta(hours=-3))
     agora = datetime.datetime.now(fuso_horario)
     canal = bot.get_channel(1543040912912031775)
@@ -46,11 +48,14 @@ async def on_ready():
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
         await canal.send(embed=embed)
 
-    # Mantém o cadastro inicial, mas fora do event loop para não bloquear o bot.
-    for guild in bot.guilds:
-        membros = [member for member in guild.members if not member.bot]
-        quantidade = await asyncio.to_thread(cadastro, membros)
-        print(f"{guild.name}: {quantidade} usuários processados.")
+    # on_ready pode ocorrer novamente após uma reconexão. O cadastro completo
+    # é necessário apenas no primeiro ready; novos membros usam on_member_join.
+    if not _cadastro_inicial_concluido:
+        _cadastro_inicial_concluido = True
+        for guild in bot.guilds:
+            membros = [member for member in guild.members if not member.bot]
+            quantidade = await cadastro_async(membros)
+            print(f"{guild.name}: {quantidade} usuários processados.")
 
     print("Economia simplificada ativa: ciclos, eventos e economia global estão desligados.")
 
