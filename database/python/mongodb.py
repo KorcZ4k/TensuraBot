@@ -38,11 +38,7 @@ _DB_STATS_LOCK = asyncio.Lock()
 
 
 async def run_db(operation, *args, **kwargs):
-    """Executa uma operação síncrona do Mongo fora do event loop.
-
-    Quando MONGO_PERF_LOG=1, registra contagem, duração e erros sem alterar
-    o resultado ou a exceção produzida pela operação original.
-    """
+    """Executa uma operação síncrona do Mongo fora do event loop."""
     if not _PERF_ENABLED:
         return await asyncio.to_thread(operation, *args, **kwargs)
 
@@ -80,6 +76,17 @@ async def reset_db_stats():
     """Zera as métricas coletadas sem afetar operações do MongoDB."""
     async with _DB_STATS_LOCK:
         _DB_STATS.clear()
+
+
+async def mongo_healthcheck():
+    """Verifica conectividade sem bloquear o event loop."""
+    await run_db(client.admin.command, "ping")
+    return True
+
+
+async def close_db():
+    """Fecha o cliente MongoDB de forma não bloqueante."""
+    await run_db(client.close)
 
 
 async def mongo_find_one(collection, query, projection=None):
