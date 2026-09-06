@@ -16,20 +16,11 @@ if not database_name:
     raise RuntimeError("MONGODB_DATABASE não encontrada no .env")
 
 client = MongoClient(
-    uri, tls=True, maxPoolSize=50, minPoolSize=1, maxIdleTimeMS=60000,
-    serverSelectionTimeoutMS=10000, connectTimeoutMS=10000,
-    socketTimeoutMS=20000, retryReads=True, retryWrites=True, appname="TensuraBot",
+    uri, tls=True, maxPoolSize=50, maxIdleTimeMS=60000,
+    serverSelectionTimeoutMS=5000, connectTimeoutMS=5000,
+    socketTimeoutMS=10000, retryReads=True, retryWrites=True, appname="TensuraBot",
 )
 db = client[database_name]
-
-try:
-    client.admin.command("ping")
-    print(f"MongoDB conectado! Database: {database_name}")
-except Exception as e:
-    print("ERRO AO CONECTAR AO MONGODB:")
-    print(repr(e))
-    raise
-
 
 logger = logging.getLogger("tensurabot.mongodb")
 _PERF_ENABLED = os.getenv("MONGO_PERF_LOG", "0") == "1"
@@ -61,7 +52,6 @@ async def run_db(operation, *args, **kwargs):
 
 
 async def get_db_stats():
-    """Retorna um snapshot das métricas do processo."""
     stats = dict(_DB_STATS)
     calls = stats.get("calls", 0)
     stats["avg_ms"] = (stats.get("total_ms", 0.0) / calls) if calls else 0.0
@@ -69,18 +59,15 @@ async def get_db_stats():
 
 
 async def reset_db_stats():
-    """Zera as métricas coletadas sem afetar operações do MongoDB."""
     _DB_STATS.clear()
 
 
 async def mongo_healthcheck():
-    """Verifica conectividade sem bloquear o event loop."""
     await run_db(client.admin.command, "ping")
     return True
 
 
 async def close_db():
-    """Fecha o cliente MongoDB de forma não bloqueante."""
     await run_db(client.close)
 
 
