@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 
 import discord
@@ -12,21 +13,33 @@ class Moderacao(commands.Cog):
         self.avisos = db["Avisos"]
 
     def _embed(self, titulo, descricao, cor=discord.Color.blurple()):
-        return discord.Embed(
-            title=titulo,
-            description=descricao,
-            color=cor,
-            timestamp=datetime.datetime.now(datetime.timezone.utc)
-        )
+        return discord.Embed(title=titulo, description=descricao, color=cor, timestamp=datetime.datetime.now(datetime.timezone.utc))
 
     async def _erro(self, ctx, texto):
         await ctx.send(embed=self._embed("❌ | Erro", texto, discord.Color.red()))
+
+    async def _db(self, funcao, *args, **kwargs):
+        return await asyncio.to_thread(funcao, *args, **kwargs)
+
+    def _can_moderate(self, ctx, membro):
+        return (
+            membro != ctx.guild.owner
+            and membro != ctx.author
+            and (ctx.author == ctx.guild.owner or membro.top_role < ctx.author.top_role)
+        )
+
+    def _can_manage_role(self, ctx, cargo):
+        return (
+            cargo != ctx.guild.default_role
+            and (ctx.author == ctx.guild.owner or cargo < ctx.author.top_role)
+            and cargo < ctx.guild.me.top_role
+        )
 
     @commands.command(name="kick")
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     async def kick(self, ctx, membro: discord.Member, *, motivo="Não informado"):
-        if membro == ctx.author or membro.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+        if not self._can_moderate(ctx, membro):
             return await self._erro(ctx, "Você não pode expulsar esse membro.")
         try:
             await membro.kick(reason=f"{motivo} | Por {ctx.author}")
@@ -38,7 +51,7 @@ class Moderacao(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     async def ban(self, ctx, membro: discord.Member, *, motivo="Não informado"):
-        if membro == ctx.author or membro.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+        if not self._can_moderate(ctx, membro):
             return await self._erro(ctx, "Você não pode banir esse membro.")
         try:
             await membro.ban(reason=f"{motivo} | Por {ctx.author}")
@@ -55,6 +68,8 @@ class Moderacao(commands.Cog):
             await ctx.guild.unban(usuario, reason=f"{motivo} | Por {ctx.author}")
         except discord.NotFound:
             return await self._erro(ctx, "Usuário não encontrado ou não está banido.")
+        except discord.Forbidden:
+            return await self._erro(ctx, "Não tenho permissão para remover esse banimento.")
         await ctx.send(embed=self._embed("🔓 | Banimento removido", f"**{usuario}** foi desbanido.\n**Motivo:** {motivo}", discord.Color.green()))
 
     @commands.command(name="timeout", aliases=["mute"])
@@ -63,11 +78,10 @@ class Moderacao(commands.Cog):
     async def timeout(self, ctx, membro: discord.Member, minutos: int, *, motivo="Não informado"):
         if minutos <= 0 or minutos > 40320:
             return await self._erro(ctx, "Informe uma duração entre 1 minuto e 28 dias.")
-        if membro == ctx.author or membro.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+        if not self._can_moderate(ctx, membro):
             return await self._erro(ctx, "Você não pode aplicar timeout nesse membro.")
         try:
-            duracao = datetime.timedelta(minutes=minutos)
-            await membro.timeout(duracao, reason=f"{motivo} | Por {ctx.author}")
+            await membro.timeout(datetime.timedelta(minutes=minutos), reason=f"{motivo} | Por {ctx.author}")
         except discord.Forbidden:
             return await self._erro(ctx, "Não tenho permissão para aplicar timeout nesse membro.")
         await ctx.send(embed=self._embed("🔇 | Timeout aplicado", f"**{membro.mention}** recebeu timeout por **{minutos} minuto(s)**.\n**Motivo:** {motivo}", discord.Color.orange()))
@@ -76,6 +90,8 @@ class Moderacao(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(moderate_members=True)
     async def untimeout(self, ctx, membro: discord.Member, *, motivo="Não informado"):
+        if not self._can_moderate(ctx, membro):
+            return await self._erro(ctx, "Você não pode remover o timeout desse membro.")
         try:
             await membro.timeout(None, reason=f"{motivo} | Por {ctx.author}")
         except discord.Forbidden:
@@ -96,27 +112,27 @@ class Moderacao(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(moderate_members=True)
     async def warn(self, ctx, membro: discord.Member, *, motivo="Não informado"):
+        if not self._can_moderate(ctx, membro):
+            return await self._erro(ctx, "Você não pode advertir esse membro.")
         documento = {
             "guild_id": str(ctx.guild.id),
             "user_id": str(membro.id),
             "moderador_id": str(ctx.author.id),
             "motivo": motivo,
-            "data": datetime.datetime.now(datetime.timezone.utc)
+            "data": datetime.datetime.now(datetime.timezone.utc),
         }
-        self.avisos.insert_one(documento)
-        total = self.avisos.count_documents({"guild_id": str(ctx.guild.id), "user_id": str(membro.id)})
+        await self._db(self.avisos.insert_one, documento)
+        total = await self._db(self.avisos.count_documents, {"guild_id": str(ctx.guild.id), "user_id": str(membro.id)})
         await ctx.send(embed=self._embed("⚠️ | Aviso aplicado", f"**{membro.mention}** recebeu um aviso.\n**Motivo:** {motivo}\n**Total de avisos:** {total}", discord.Color.orange()))
 
     @commands.command(name="warnings", aliases=["avisos"])
     @commands.guild_only()
     @commands.has_permissions(moderate_members=True)
     async def warnings(self, ctx, membro: discord.Member):
-        avisos = list(self.avisos.find({"guild_id": str(ctx.guild.id), "user_id": str(membro.id)}).sort("data", -1).limit(10))
+        avisos = await self._db(lambda: list(self.avisos.find({"guild_id": str(ctx.guild.id), "user_id": str(membro.id)}).sort("data", -1).limit(10)))
         if not avisos:
             return await ctx.send(embed=self._embed("⚠️ | Avisos", f"{membro.mention} não possui avisos registrados.", discord.Color.green()))
-        linhas = []
-        for i, aviso in enumerate(avisos, 1):
-            linhas.append(f"**{i}.** {aviso.get('motivo', 'Sem motivo')}")
+        linhas = [f"**{i}.** {aviso.get('motivo', 'Sem motivo')}" for i, aviso in enumerate(avisos, 1)]
         await ctx.send(embed=self._embed("⚠️ | Histórico de avisos", f"**Membro:** {membro.mention}\n\n" + "\n".join(linhas), discord.Color.orange()))
 
     @commands.command(name="delwarn", aliases=["removeraviso"])
@@ -125,10 +141,10 @@ class Moderacao(commands.Cog):
     async def delwarn(self, ctx, membro: discord.Member, numero: int):
         if numero < 1:
             return await self._erro(ctx, "O número do aviso deve ser maior que zero.")
-        avisos = list(self.avisos.find({"guild_id": str(ctx.guild.id), "user_id": str(membro.id)}).sort("data", -1))
+        avisos = await self._db(lambda: list(self.avisos.find({"guild_id": str(ctx.guild.id), "user_id": str(membro.id)}).sort("data", -1)))
         if numero > len(avisos):
             return await self._erro(ctx, "Esse aviso não existe.")
-        self.avisos.delete_one({"_id": avisos[numero - 1]["_id"]})
+        await self._db(self.avisos.delete_one, {"_id": avisos[numero - 1]["_id"]})
         await ctx.send(embed=self._embed("🗑️ | Aviso removido", f"O aviso **#{numero}** de {membro.mention} foi removido.", discord.Color.green()))
 
     @commands.command(name="slowmode")
@@ -165,21 +181,36 @@ class Moderacao(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(manage_roles=True)
     async def addrole(self, ctx, membro: discord.Member, cargo: discord.Role):
-        await membro.add_roles(cargo, reason=f"Adicionado por {ctx.author}")
+        if not self._can_moderate(ctx, membro) or not self._can_manage_role(ctx, cargo):
+            return await self._erro(ctx, "Você não pode alterar esse membro ou esse cargo.")
+        try:
+            await membro.add_roles(cargo, reason=f"Adicionado por {ctx.author}")
+        except discord.Forbidden:
+            return await self._erro(ctx, "Não tenho posição/permissão suficiente para adicionar esse cargo.")
         await ctx.send(embed=self._embed("🎭 | Cargo adicionado", f"{cargo.mention} foi adicionado a {membro.mention}.", discord.Color.green()))
 
     @commands.command(name="removerole")
     @commands.guild_only()
     @commands.has_permissions(manage_roles=True)
     async def removerole(self, ctx, membro: discord.Member, cargo: discord.Role):
-        await membro.remove_roles(cargo, reason=f"Removido por {ctx.author}")
+        if not self._can_moderate(ctx, membro) or not self._can_manage_role(ctx, cargo):
+            return await self._erro(ctx, "Você não pode alterar esse membro ou esse cargo.")
+        try:
+            await membro.remove_roles(cargo, reason=f"Removido por {ctx.author}")
+        except discord.Forbidden:
+            return await self._erro(ctx, "Não tenho posição/permissão suficiente para remover esse cargo.")
         await ctx.send(embed=self._embed("🎭 | Cargo removido", f"{cargo.mention} foi removido de {membro.mention}.", discord.Color.orange()))
 
     @commands.command(name="nickname", aliases=["nick"])
     @commands.guild_only()
     @commands.has_permissions(manage_nicknames=True)
     async def nickname(self, ctx, membro: discord.Member, *, nome: str = None):
-        await membro.edit(nick=nome, reason=f"Alterado por {ctx.author}")
+        if not self._can_moderate(ctx, membro):
+            return await self._erro(ctx, "Você não pode alterar o apelido desse membro.")
+        try:
+            await membro.edit(nick=nome, reason=f"Alterado por {ctx.author}")
+        except discord.Forbidden:
+            return await self._erro(ctx, "Não tenho posição/permissão suficiente para alterar esse apelido.")
         texto = "removido" if nome is None else f"alterado para **{nome}**"
         await ctx.send(embed=self._embed("✏️ | Apelido", f"O apelido de {membro.mention} foi {texto}.", discord.Color.green()))
 
