@@ -19,5 +19,3 @@ class Luta(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.combates = {}
-
-    # O restante do motor de combate será restaurado do histórico do commit anterior.
