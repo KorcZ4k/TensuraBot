@@ -20,45 +20,17 @@ async def obter_atributo(user_id: int, guild_id: int, atributo: str):
 
 async def alterar_atributo(user_id: int, guild_id: int, atributo: str, valor: int):
     """Altera um atributo sem bloquear o event loop."""
-    return await run_db(
-        status_db.alterar_atributo,
-        user_id,
-        guild_id,
-        atributo,
-        valor,
-    )
+    return await run_db(status_db.alterar_atributo, user_id, guild_id, atributo, valor)
 
 
-async def aumentar_atributo(
-    user_id: int,
-    guild_id: int,
-    atributo: str,
-    quantidade: int,
-):
+async def aumentar_atributo(user_id: int, guild_id: int, atributo: str, quantidade: int):
     """Aumenta um atributo sem bloquear o event loop."""
-    return await run_db(
-        status_db.aumentar_atributo,
-        user_id,
-        guild_id,
-        atributo,
-        quantidade,
-    )
+    return await run_db(status_db.aumentar_atributo, user_id, guild_id, atributo, quantidade)
 
 
-async def reduzir_atributo(
-    user_id: int,
-    guild_id: int,
-    atributo: str,
-    quantidade: int,
-):
+async def reduzir_atributo(user_id: int, guild_id: int, atributo: str, quantidade: int):
     """Reduz um atributo sem bloquear o event loop."""
-    return await run_db(
-        status_db.reduzir_atributo,
-        user_id,
-        guild_id,
-        atributo,
-        quantidade,
-    )
+    return await run_db(status_db.reduzir_atributo, user_id, guild_id, atributo, quantidade)
 
 
 async def adicionar_xp(user_id: int, guild_id: int, quantidade: int):
@@ -93,7 +65,7 @@ async def verificar_morte(user_id: int, guild_id: int):
 
 async def reviver(user_id: int, guild_id: int):
     """Revive o personagem sem bloquear o event loop."""
-    return await run_db(status_db.reviv er, user_id, guild_id)
+    return await run_db(status_db.reviver, user_id, guild_id)
 
 
 async def aplicar_dano(user_id: int, guild_id: int, dano: int):
@@ -113,12 +85,7 @@ async def recuperar_mana(user_id: int, guild_id: int, quantidade: int):
 
 async def get_cooldown_recuperacao(user_id: str, guild_id: str, tipo: str):
     """Obtém cooldown de recuperação sem bloquear o event loop."""
-    return await run_db(
-        status_db.get_cooldown_recuperacao,
-        user_id,
-        guild_id,
-        tipo,
-    )
+    return await run_db(status_db.get_cooldown_recuperacao, user_id, guild_id, tipo)
 
 
 async def esta_morto(user_id: int, guild_id: int):
