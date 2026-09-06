@@ -24,6 +24,37 @@ async def on_member_join(member):
     await cadastro_async([member])
 
 
+@bot.event
+async def on_command_error(ctx, error):
+    """Recupera o monstro do PvE quando o parser do comando falhar."""
+    if (
+        isinstance(error, commands.MissingRequiredArgument)
+        and getattr(error.param, "name", None) == "monstro_tipo"
+        and getattr(ctx.command, "name", None) == "pve"
+        and getattr(ctx.command, "parent", None) is not None
+        and getattr(ctx.command.parent, "name", None) == "luta"
+    ):
+        partes = ctx.message.content.strip().split()
+        indice_pve = next(
+            (i for i, parte in enumerate(partes) if parte.lower() == "pve"),
+            None,
+        )
+
+        if indice_pve is not None:
+            monstro_tipo = " ".join(partes[indice_pve + 1:]).strip()
+            if monstro_tipo:
+                await ctx.command.callback(ctx.cog, ctx, monstro_tipo)
+                return
+
+        await ctx.send("❌ Informe o monstro. Use `!luta pve slime`.")
+        return
+
+    if isinstance(error, commands.CommandNotFound):
+        return
+
+    raise error
+
+
 async def _cadastrar_guild(guild):
     membros = [member for member in guild.members if not member.bot]
     quantidade = await cadastro_async(membros)
