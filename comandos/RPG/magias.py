@@ -6,13 +6,14 @@ from database.python.mongodb import db, run_db
 from database.python.magias import DatabaseMagias
 from comandos.RPG.magias_sync import Magias as _MagiasSync
 
-_magia_doc = ContextVar("magia_doc", default=None)
+_MISSING = object()
+_magia_doc = ContextVar("magia_doc", default=_MISSING)
 _original_get_magia_doc = DatabaseMagias.get_magia_doc
 
 
 def _get_magia_doc_nonblocking(self, user_id, guild_id):
     cached = _magia_doc.get()
-    if cached is not None:
+    if cached is not _MISSING:
         return cached
     return _original_get_magia_doc(self, user_id, guild_id)
 
@@ -36,3 +37,6 @@ class Magias(_MagiasSync):
             str(ctx.guild.id),
         )
         _magia_doc.set(doc)
+
+    async def cog_after_invoke(self, ctx):
+        _magia_doc.set(_MISSING)
