@@ -71,6 +71,118 @@
       "custo_mana": 30,
       "descricao": "O golpe definitivo! Consome muita mana",
       "tipo": "magico"
+    },
+    "mordida": {
+      "nome": "Mordida",
+      "emoji": "🦷",
+      "tipo": "monstro",
+      "efeito": {"nome": "sangramento", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Uma mordida que pode causar sangramento."
+    },
+    "arranhar": {
+      "nome": "Arranhar",
+      "emoji": "🐾",
+      "tipo": "monstro",
+      "efeito": {"nome": "sangramento", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Um arranhão que pode causar sangramento."
+    },
+    "corte": {
+      "nome": "Corte",
+      "emoji": "🗡️",
+      "tipo": "monstro",
+      "efeito": {"nome": "sangramento", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Um corte profundo que pode causar sangramento."
+    },
+    "estocada": {
+      "nome": "Estocada",
+      "emoji": "⚔️",
+      "tipo": "monstro",
+      "efeito": {"nome": "sangramento", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Um ataque perfurante que pode causar sangramento."
+    },
+    "machadada": {
+      "nome": "Machadada",
+      "emoji": "🪓",
+      "tipo": "monstro",
+      "efeito": {"nome": "sangramento", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Um golpe pesado de machado que pode causar sangramento."
+    },
+    "esmagamento": {
+      "nome": "Esmagamento",
+      "emoji": "💥",
+      "tipo": "monstro",
+      "efeito": {"nome": "atordoamento", "turnos": 1, "valor": 0},
+      "descricao": "Um impacto brutal que pode atordoar."
+    },
+    "golpe_osseo": {
+      "nome": "Golpe Ósseo",
+      "emoji": "🦴",
+      "tipo": "monstro",
+      "efeito": {"nome": "sangramento", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Um golpe de ossos que pode causar sangramento."
+    },
+    "garras": {
+      "nome": "Garras",
+      "emoji": "🐉",
+      "tipo": "monstro",
+      "efeito": {"nome": "sangramento", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Um ataque com garras que pode causar sangramento."
+    },
+    "sopro_de_fogo": {
+      "nome": "Sopro de Fogo",
+      "emoji": "🔥",
+      "tipo": "monstro",
+      "efeito": {"nome": "queimadura", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Uma rajada de fogo que causa queimadura."
+    },
+    "garra_sombria": {
+      "nome": "Garra Sombria",
+      "emoji": "👁️",
+      "tipo": "monstro",
+      "efeito": {"nome": "sangramento", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Uma garra demoníaca que pode causar sangramento."
+    },
+    "chama_sombria": {
+      "nome": "Chama Sombria",
+      "emoji": "🖤",
+      "tipo": "monstro",
+      "efeito": {"nome": "queimadura", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Uma chama sombria que causa queimadura."
+    },
+    "soco_colossal": {
+      "nome": "Soco Colossal",
+      "emoji": "🗿",
+      "tipo": "monstro",
+      "efeito": {"nome": "atordoamento", "turnos": 1, "valor": 0},
+      "descricao": "Um soco gigantesco que pode atordoar."
+    },
+    "bicada_flamejante": {
+      "nome": "Bicada Flamejante",
+      "emoji": "🔥",
+      "tipo": "monstro",
+      "efeito": {"nome": "queimadura", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Uma bicada envolta em chamas."
+    },
+    "asas_flamejantes": {
+      "nome": "Asas Flamejantes",
+      "emoji": "🪽",
+      "tipo": "monstro",
+      "efeito": {"nome": "queimadura", "valor": 10, "turnos_min": 1, "turnos_max": 3},
+      "descricao": "Um golpe de asas cobertas por fogo."
+    },
+    "pancada": {
+      "nome": "Pancada",
+      "emoji": "🟢",
+      "tipo": "monstro",
+      "efeito": {"nome": "atordoamento", "turnos": 1, "valor": 0},
+      "descricao": "Uma pancada de corpo inteiro."
+    },
+    "investida": {
+      "nome": "Investida",
+      "emoji": "💨",
+      "tipo": "monstro",
+      "efeito": {"nome": "atordoamento", "turnos": 1, "valor": 0},
+      "descricao": "Uma investida que pode atordoar."
     }
   }
 }
