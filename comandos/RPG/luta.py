@@ -5,6 +5,7 @@ pontos que acessam MongoDB, mantendo os comandos e regras do combate.
 """
 
 import asyncio
+import random
 import unicodedata
 
 import discord
@@ -128,6 +129,88 @@ def _salvar_participantes(self, combate, situacao_padrao="ativo", morto_id=None)
         )
 
 
+def _obter_golpe_monstro(monstro):
+    """Escolhe somente um golpe que esteja configurado para aquele monstro."""
+    golpes_ids = monstro.get("golpes", [])
+    disponiveis = [luta_db.GOLPES[g] for g in golpes_ids if g in luta_db.GOLPES]
+    if not disponiveis:
+        return {
+            "nome": "Ataque do Monstro",
+            "emoji": "👹",
+            "efeito": {},
+        }
+    return random.choice(disponiveis)
+
+
+async def _ataque_monstro(self, ctx):
+    """Ataque do monstro usando a lista de golpes configurada no JSON."""
+    combate = self._obter_combate(ctx.channel.id)
+    if not combate or not combate.get("ativo") or combate["fase"] != "ataque":
+        return
+
+    atacante = self._obter_atacante(combate)
+    defensor = self._obter_defensor(combate)
+    if atacante["tipo"] != "monstro":
+        return
+
+    golpe = _obter_golpe_monstro(atacante)
+    efeito = golpe.get("efeito", {})
+    efeito = dict(efeito) if isinstance(efeito, dict) else {}
+
+    # A duração é sorteada no momento do golpe e fica fixa durante o efeito.
+    if efeito.get("nome") == "sangramento":
+        efeito["turnos"] = random.randint(
+            int(efeito.get("turnos_min", 1) or 1),
+            int(efeito.get("turnos_max", 3) or 3),
+        )
+
+    combate["ataque_pendente"] = {
+        "tipo": "ataque_monstro",
+        "nome": f"{golpe.get('emoji', '👹')} {golpe.get('nome', 'Ataque do Monstro')}",
+        "atacante_id": atacante.get("id"),
+        "defensor_id": defensor.get("id"),
+        "magia": False,
+        "golpe_id": next((k for k, v in luta_db.GOLPES.items() if v is golpe), None),
+        "efeito": efeito,
+    }
+    combate["fase"] = "defesa"
+    await self._anunciar_ataque(ctx)
+
+
+async def _resolver_ataque(self, ctx):
+    """Prepara efeitos de golpes de monstros e delega o cálculo ao motor legado."""
+    combate = self._obter_combate(ctx.channel.id)
+    ataque = combate.get("ataque_pendente") if combate else None
+
+    if combate and ataque and ataque.get("tipo") == "ataque_monstro":
+        atacante = self._obter_atacante(combate)
+        defensor = self._obter_defensor(combate)
+        efeito = ataque.get("efeito") or {}
+        nome_efeito = _normalizar_nome(efeito.get("nome", ""))
+
+        if nome_efeito == "sangramento":
+            # A regra usa a Defesa do personagem, não a defesa total do dano.
+            # No participante atual: defesa_total = (Força + Defesa) * 2.
+            forca_jogador = float(defensor.get("Força", 0) or 0)
+            defesa_total = float(defensor.get("defesa", 0) or 0)
+            defesa_base = max(0.0, defesa_total / 2 - forca_jogador)
+
+            # Defender bloqueia completamente o sangramento. Caso contrário,
+            # o monstro precisa ter Força estritamente maior que a Defesa.
+            if (
+                defensor.get("tipo") == "jogador"
+                and not defensor.get("defesa_ativa", False)
+                and float(atacante.get("Força", 0) or 0) > defesa_base
+            ):
+                defensor.setdefault("efeitos", []).append({
+                    "nome": "sangramento",
+                    "turnos": int(efeito.get("turnos", random.randint(1, 3)) or 1),
+                    "valor": int(efeito.get("valor", 10) or 10),
+                })
+
+    await _base.Luta._resolver_ataque(self, ctx)
+
+
 async def luta_pve(self, ctx, monstro_tipo: str):
     if not ctx.guild:
         return
@@ -189,9 +272,6 @@ async def luta_pvp(self, ctx, membro: discord.Member):
     if not ctx.guild:
         return
 
-    # O conversor discord.Member resolve automaticamente <@ID>, <@!ID>,
-    # IDs e membros pelo nome. A validação abaixo impede strings inválidas
-    # de chegarem ao motor de combate quando o callback é substituído.
     if not isinstance(membro, discord.Member):
         await ctx.send("❌ Mencione um membro válido. Exemplo: `!luta pvp @jogador`")
         return
@@ -254,8 +334,6 @@ async def luta_pvp(self, ctx, membro: discord.Member):
 
 
 async def _cog_after_invoke(self, ctx):
-    # As escritas continuam fora do event loop, mas terminam antes de o
-    # comando ser considerado concluído. Isso evita corrida entre comandos.
     await _aguardar_escritas(self)
 
 
@@ -265,6 +343,8 @@ async def _cog_unload(self):
 
 _base.Luta.luta_pve.callback = luta_pve
 _base.Luta.luta_pvp.callback = luta_pvp
+_base.Luta._ataque_monstro = _ataque_monstro
+_base.Luta._resolver_ataque = _resolver_ataque
 _base.Luta._encontrar_monstro = _encontrar_monstro
 _base.Luta._atualizar_situacao = _atualizar_situacao
 _base.Luta._dar_recompensas = _dar_recompensas
