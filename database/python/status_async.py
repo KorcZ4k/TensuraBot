@@ -14,11 +14,7 @@ def _recuperar_vida_apos_recuperacao(user_id: int, guild_id: int, percentual: fl
         "guild_id": str(guild_id)
     })
     if not jogador or jogador.get("Situação") == "morto":
-        return {
-            "vida_recuperada": 0,
-            "vida_atual": 0,
-            "vida_maxima": 0,
-        }
+        return {"vida_recuperada": 0, "vida_atual": 0, "vida_maxima": 0}
 
     vida_atual = jogador.get("Vida", 0)
     vida_maxima = jogador.get("Vida_Maxima", 0)
@@ -26,10 +22,7 @@ def _recuperar_vida_apos_recuperacao(user_id: int, guild_id: int, percentual: fl
     nova_vida = min(vida_maxima, vida_atual + cura)
 
     status_db.jogadores.update_one(
-        {
-            "ID": str(user_id),
-            "guild_id": str(guild_id)
-        },
+        {"ID": str(user_id), "guild_id": str(guild_id)},
         {"$set": {"Vida": nova_vida}}
     )
 
@@ -103,7 +96,6 @@ async def recuperar_mana(user_id: int, guild_id: int, tipo: str):
     if not resultado.get("sucesso"):
         return resultado
 
-    # A porcentagem sorteada para mana também determina a cura de vida.
     vida = await run_db(
         _recuperar_vida_apos_recuperacao,
         user_id,
@@ -111,6 +103,10 @@ async def recuperar_mana(user_id: int, guild_id: int, tipo: str):
         resultado.get("percentual", 0) / 100,
     )
     resultado.update(vida)
+    resultado["mensagem"] += (
+        f"\n❤️ Vida recuperada: +{vida['vida_recuperada']} "
+        f"({vida['vida_atual']}/{vida['vida_maxima']})"
+    )
     return resultado
 
 
