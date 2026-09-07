@@ -7,10 +7,11 @@ from database.python.mongodb import db, run_db
 
 
 CANAL_LEVEL_UP_ID = 1543041026158100480
+ATRIBUTOS_POR_NIVEL = ("Força", "Defesa", "Velocidade", "Destreza", "Magia", "Sorte")
 
 
 def _processar_niveis():
-    """Processa toda a varredura do Mongo em uma thread, nunca no event loop."""
+    """Processa a varredura do Mongo em uma thread e aplica o crescimento de nível."""
     jogadores = db["Jogadores"]
     jogadores_com_xp = jogadores.find({"Situação": "ativo"})
     level_ups = []
@@ -23,21 +24,37 @@ def _processar_niveis():
 
         xp_atual = int(jogador.get("XP", 0) or 0)
         nivel_atual = int(jogador.get("Nivel", 1) or 1)
+        nivel_inicial = nivel_atual
         xp_maximo = int(jogador.get("XP_maximo", 100) or 100)
-        subiu_nivel = False
 
         while xp_atual >= xp_maximo:
             xp_atual -= xp_maximo
             nivel_anterior = nivel_atual
             nivel_atual += 1
             xp_maximo = math.ceil(xp_maximo * 1.75)
-            subiu_nivel = True
             level_ups.append((user_id, guild_id, nivel_anterior, nivel_atual))
 
-        if subiu_nivel:
+        if nivel_atual > nivel_inicial:
+            quantidade_niveis = nivel_atual - nivel_inicial
+            atualizacoes = {
+                "XP": xp_atual,
+                "Nivel": nivel_atual,
+                "XP_maximo": xp_maximo,
+            }
+
+            # Cada nível aumenta cada atributo existente em 10%, de forma
+            # cumulativa. Ex.: 100 -> 110 -> 121.
+            for atributo in ATRIBUTOS_POR_NIVEL:
+                if atributo not in jogador:
+                    continue
+                valor = float(jogador.get(atributo, 0) or 0)
+                for _ in range(quantidade_niveis):
+                    valor *= 1.10
+                atualizacoes[atributo] = max(1, math.floor(valor))
+
             jogadores.update_one(
                 {"_id": jogador["_id"]},
-                {"$set": {"XP": xp_atual, "Nivel": nivel_atual, "XP_maximo": xp_maximo}},
+                {"$set": atualizacoes},
             )
         else:
             jogadores.update_one(
