@@ -12,7 +12,6 @@ from . import luta_sync as _base
 
 Luta = _base.Luta
 _RESOLVER_ATAQUE_ORIGINAL = _base.Luta._resolver_ataque
-_CALCULAR_MAGIA_ORIGINAL = _base.Luta._calcular_dano_magia
 _USAR_MAGIA_ORIGINAL = _base.Luta.usar_magia_no_combate
 _ATAQUE_JOGADOR_ORIGINAL = _base.Luta._ataque_jogador
 
@@ -42,11 +41,7 @@ async def _criar_participante(user_id, guild_id):
         participante["dano_arma"] = float(jogador.get("dano_arma", jogador.get("Dano_Arma", jogador.get("arma_dano", 0))) or 0)
         participante["arma_nome"] = jogador.get("arma_nome", jogador.get("Arma", "")) or ""
     else:
-        participante["Defesa"] = 10
-        participante["Magia"] = 0
-        participante["Inteligencia"] = 0
-        participante["dano_arma"] = 0
-        participante["arma_nome"] = ""
+        participante.update({"Defesa": 10, "Magia": 0, "Inteligencia": 0, "dano_arma": 0, "arma_nome": ""})
     return participante
 
 
@@ -63,9 +58,7 @@ def _agendar_db(self, operation, *args, **kwargs):
 def _encontrar_monstro(self, nome):
     nome_normalizado = _normalizar_nome(nome)
     for monstro_id, dados in luta_db.MONSTROS.items():
-        if _normalizar_nome(monstro_id) == nome_normalizado:
-            return monstro_id
-        if _normalizar_nome(dados.get("nome", "")) == nome_normalizado:
+        if _normalizar_nome(monstro_id) == nome_normalizado or _normalizar_nome(dados.get("nome", "")) == nome_normalizado:
             return monstro_id
     return None
 
@@ -85,81 +78,75 @@ def _cog_unload(self):
 
 
 def _atualizar_situacao(self, user_id, guild_id, situacao):
-    if db is None:
-        return
-    return _agendar_db(self, db["Jogadores"].update_one,
-                       {"ID": str(user_id), "guild_id": str(guild_id)},
-                       {"$set": {"Situação": situacao}})
+    if db is not None:
+        return _agendar_db(self, db["Jogadores"].update_one,
+                           {"ID": str(user_id), "guild_id": str(guild_id)},
+                           {"$set": {"Situação": situacao}})
 
 
 def _dar_recompensas(self, user_id, guild_id, xp, hunos):
     if db is None:
         return
-    xp = int(xp or 0)
-    hunos = int(hunos or 0)
-    if xp > 0:
+    if int(xp or 0) > 0:
         _agendar_db(self, db["Jogadores"].update_one,
                     {"ID": str(user_id), "guild_id": str(guild_id)},
-                    {"$inc": {"XP": xp}})
-    if hunos > 0:
+                    {"$inc": {"XP": int(xp)}})
+    if int(hunos or 0) > 0:
         _agendar_db(self, db["Hunos"].update_one,
                     {"ID": str(user_id), "guild_id": str(guild_id)},
-                    {"$inc": {"carteira": hunos}}, upsert=True)
+                    {"$inc": {"carteira": int(hunos)}}, upsert=True)
 
 
 def _salvar_participantes(self, combate, situacao_padrao="ativo", morto_id=None):
     if db is None:
         return
-    guild_id = combate["guild_id"]
     for participante in combate["participantes"]:
         if participante["tipo"] != "jogador":
             continue
-        situacao = situacao_padrao
-        if morto_id is not None and str(participante["id"]) == str(morto_id):
-            situacao = "morto"
+        situacao = "morto" if morto_id is not None and str(participante["id"]) == str(morto_id) else situacao_padrao
         _agendar_db(self, db["Jogadores"].update_one,
-                    {"ID": str(participante["id"]), "guild_id": str(guild_id)},
-                    {"$set": {"Vida": int(participante.get("vida", 0)),
-                               "Mana": int(participante.get("mana", 0)),
-                               "Situação": situacao}})
+                    {"ID": str(participante["id"]), "guild_id": str(combate["guild_id"])},
+                    {"$set": {"Vida": int(participante.get("vida", 0)), "Mana": int(participante.get("mana", 0)), "Situação": situacao}})
 
 
 def _obter_golpe_monstro(monstro):
     configuracao = luta_db.MONSTROS.get(str(monstro.get("id", "")), {})
-    golpes_ids = configuracao.get("golpes", [])
-    disponiveis = [luta_db.GOLPES[g] for g in golpes_ids if g in luta_db.GOLPES]
-    return random.choice(disponiveis) if disponiveis else {"nome": "Ataque do Monstro", "emoji": "👹", "efeito": {}}
+    ids = configuracao.get("golpes", [])
+    disponiveis = [luta_db.GOLPES[g] for g in ids if g in luta_db.GOLPES]
+    return random.choice(disponiveis) if disponiveis else {"nome": "Ataque do Monstro", "emoji": "👹", "efeito": {}, "dano_base": 0}
 
 
-def _resistencia_defensor(defensor):
+def _resistencia_efeito(defensor):
+    # Efeitos usam os atributos puros, nunca a defesa composta usada pelo
+    # cálculo legado de dano.
     if defensor.get("defesa_magica_ativa"):
         return float(defensor.get("Magia", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
-    return float(defensor.get("Defesa", 0) or 0) + float(defensor.get("defesa", 0) or 0)
+    return float(defensor.get("Defesa", 0) or 0)
 
 
 def _preparar_efeito(efeito, atacante, defensor, tipo_ataque):
-    if not isinstance(efeito, dict):
+    if not isinstance(efeito, dict) or not efeito.get("nome"):
         return {}
     efeito = dict(efeito)
-    nome = _normalizar_nome(efeito.get("nome", ""))
-    if not nome:
-        return {}
     if "turnos_min" in efeito or "turnos_max" in efeito:
         minimo = int(efeito.get("turnos_min", 1) or 1)
         maximo = int(efeito.get("turnos_max", minimo) or minimo)
         efeito["turnos"] = random.randint(minimo, maximo)
+
+    nome = _normalizar_nome(efeito.get("nome"))
     if nome == "sangramento" and tipo_ataque == "ataque_monstro":
-        if (defensor.get("tipo") == "jogador" and not defensor.get("defesa_ativa", False)
-                and float(atacante.get("Força", 0) or 0) > float(defensor.get("Defesa", 0) or 0)):
-            efeito["valor"] = 10
-            return efeito
-        return {}
+        if defensor.get("tipo") != "jogador" or defensor.get("defesa_ativa"):
+            return {}
+        if float(atacante.get("Força", 0) or 0) <= float(defensor.get("Defesa", 0) or 0):
+            return {}
+        efeito["valor"] = 10
+        return efeito
+
     if tipo_ataque == "magia":
         poder = float(atacante.get("Magia", 0) or 0) + float(atacante.get("Inteligencia", 0) or 0)
     else:
-        poder = float(atacante.get("Força", 0) or 0) + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
-    resistencia = _resistencia_defensor(defensor)
-    valor = int(poder - resistencia)
+        poder = float(atacante.get("Força", 0) or 0) + float(atacante.get("Velocidade", 0) or 0)
+    valor = int(poder - _resistencia_efeito(defensor))
     if valor <= 0:
         return {}
     efeito["valor"] = valor
@@ -175,77 +162,59 @@ async def _ataque_monstro(self, ctx):
     if atacante["tipo"] != "monstro":
         return
     golpe = _obter_golpe_monstro(atacante)
-    efeito = _preparar_efeito(golpe.get("efeito", {}), atacante, defensor, "ataque_monstro")
-    combate["ataque_pendente"] = {
-        "tipo": "ataque_monstro",
-        "nome": f"{golpe.get('emoji', '👹')} {golpe.get('nome', 'Ataque do Monstro')}",
-        "atacante_id": atacante.get("id"),
-        "defensor_id": defensor.get("id"),
-        "magia": False,
-        "dano_base": float(golpe.get("dano_base", 0) or 0),
-        "efeito": efeito,
-        "com_arma": False,
+    ataque = {
+        "tipo": "ataque_monstro", "nome": f"{golpe.get('emoji', '👹')} {golpe.get('nome', 'Ataque do Monstro')}",
+        "atacante_id": atacante.get("id"), "defensor_id": defensor.get("id"), "magia": False,
+        "dano_base": float(golpe.get("dano_base", 0) or 0), "efeito": _preparar_efeito(golpe.get("efeito", {}), atacante, defensor, "ataque_monstro"),
+        "com_arma": bool(golpe.get("com_arma", False)),
     }
+    combate["ataque_pendente"] = ataque
     combate["fase"] = "defesa"
     await self._anunciar_ataque(ctx)
 
 
-def _calcular_dano_fisico(atacante, defensor, ataque):
+def _calcular_dano_fisico(atacante, defensor):
+    ataque = atacante.get("_ataque_atual", {})
     if defensor.get("esquiva_ativa"):
         if random.random() < 0.40:
             defensor["esquiva_ativa"] = False
             return 0, "esquivou"
         defensor["esquiva_ativa"] = False
-    forca = float(atacante.get("Força", 0) or 0)
-    destreza = float(atacante.get("Destreza", 0) or 0)
-    base = float(ataque.get("dano_base", 0) or 0)
-    arma = float(atacante.get("dano_arma", 0) or 0) if ataque.get("com_arma") else 0
-    dano = forca + destreza + base + arma
-    dano -= float(defensor.get("Defesa", 0) or 0)
+    dano = (float(atacante.get("Força", 0) or 0)
+            + float(atacante.get("Destreza", 0) or 0)
+            + float(ataque.get("dano_base", 0) or 0))
+    if ataque.get("com_arma"):
+        dano += float(atacante.get("dano_arma", 0) or 0)
     if defensor.get("defesa_ativa"):
         dano *= 0.50
         defensor["defesa_ativa"] = False
-    if defensor.get("defesa_magica_ativa"):
-        dano -= float(defensor.get("defesa_magica_valor", 0) or 0)
-        defensor["defesa_magica_ativa"] = False
     return max(1, int(dano)), "normal"
+
+
+async def _ataque_jogador(self, ctx, tipo_ataque):
+    # O motor original cria o ataque e anuncia. O metadata é preenchido antes
+    # da resolução através de _resolver_ataque, que ocorre dentro da chamada.
+    await _ATAQUE_JOGADOR_ORIGINAL(self, ctx, tipo_ataque)
 
 
 def _calcular_dano_magia(self, atacante, defensor, ataque):
     if defensor.get("esquiva_ativa"):
         velocidade = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
-        chance = min(0.75, 0.10 + velocidade / 500)
-        if random.random() < chance:
+        if random.random() < min(0.75, 0.10 + velocidade / 500):
             defensor["esquiva_ativa"] = False
             return 0, "esquivou"
         defensor["esquiva_ativa"] = False
-    magia = float(atacante.get("Magia", atacante.get("magia", 0)) or 0)
-    inteligencia = float(atacante.get("Inteligencia", atacante.get("inteligencia", 0)) or 0)
-    base = float(ataque.get("dano_base", 0) or 0)
-    arma = float(atacante.get("dano_arma", 0) or 0) if ataque.get("com_arma") else 0
-    dano = magia + inteligencia + base + arma
+    magia = float(atacante.get("Magia", 0) or 0)
+    inteligencia = float(atacante.get("Inteligencia", 0) or 0)
+    dano = magia + inteligencia + float(ataque.get("dano_base", 0) or 0)
+    if ataque.get("com_arma"):
+        dano += float(atacante.get("dano_arma", 0) or 0)
     if defensor.get("defesa_magica_ativa"):
         dano -= float(defensor.get("Magia", 0) or 0)
         dano -= float(defensor.get("Defesa", 0) or 0)
         dano -= float(defensor.get("defesa_magica_valor", 0) or 0)
         defensor["defesa_magica_ativa"] = False
-    else:
-        dano -= float(defensor.get("Defesa", 0) or 0)
     return max(1, int(dano)), "atingiu"
-
-
-async def _ataque_jogador(self, ctx, tipo_ataque):
-    await _ATAQUE_JOGADOR_ORIGINAL(self, ctx, tipo_ataque)
-    combate = self._obter_combate(ctx.channel.id)
-    if not combate or not combate.get("ataque_pendente"):
-        return
-    ataque = combate["ataque_pendente"]
-    if ataque.get("tipo") != tipo_ataque:
-        return
-    golpe = luta_db.GOLPES.get(tipo_ataque, {})
-    ataque["dano_base"] = float(golpe.get("dano_base", 0) or 0)
-    ataque["com_arma"] = bool(golpe.get("com_arma", False))
-    ataque["efeito"] = golpe.get("efeito", {}) if isinstance(golpe.get("efeito"), dict) else {}
 
 
 async def _usar_magia_no_combate(self, ctx, dados_magia):
@@ -286,12 +255,17 @@ async def _resolver_ataque(self, ctx):
                 return
             ataque["efeito"] = _preparar_efeito(ataque.get("efeito", {}), atacante, defensor, "magia")
         else:
+            golpe = luta_db.GOLPES.get(ataque.get("tipo"), {})
+            ataque["dano_base"] = float(golpe.get("dano_base", 0) or 0)
+            ataque["com_arma"] = bool(golpe.get("com_arma", False))
             ataque["efeito"] = _preparar_efeito(ataque.get("efeito", {}), atacante, defensor, ataque.get("tipo", ""))
+        atacante["_ataque_atual"] = ataque
     await _RESOLVER_ATAQUE_ORIGINAL(self, ctx)
+    if combate:
+        for participante in combate.get("participantes", []):
+            participante.pop("_ataque_atual", None)
 
 
-_base.Luta.luta_pve.callback = None
-_base.Luta.luta_pvp.callback = None
 _base.Luta._ataque_monstro = _ataque_monstro
 _base.Luta._ataque_jogador = _ataque_jogador
 _base.Luta._resolver_ataque = _resolver_ataque
@@ -324,16 +298,12 @@ async def luta_pve(self, ctx, monstro_tipo: str):
     if not jogador:
         await ctx.send("❌ Você não possui um personagem registrado.")
         return
-    jogador["nome"] = jogador.get("nome") or ctx.author.display_name
     monstro = luta_db.criar_monstro(monstro_id, 1)
     if not monstro:
         await ctx.send("❌ Não foi possível criar esse monstro.")
         return
     participantes = sorted([jogador, monstro], key=lambda p: p.get("velocidade", 0), reverse=True)
-    self.combates[ctx.channel.id] = {"participantes": participantes, "turno": 0, "numero_turno": 1,
-        "fase": "ataque", "ativo": True, "pvp": False, "guild_id": guild_id,
-        "ataque_pendente": None, "historico": [], "aguardando_finalizacao": False,
-        "vencedor_id": None, "perdedor_id": None}
+    self.combates[ctx.channel.id] = {"participantes": participantes, "turno": 0, "numero_turno": 1, "fase": "ataque", "ativo": True, "pvp": False, "guild_id": guild_id, "ataque_pendente": None, "historico": [], "aguardando_finalizacao": False, "vencedor_id": None, "perdedor_id": None}
     _atualizar_situacao(self, jogador["id"], guild_id, "ativo_combate")
     await self._mostrar_inicio(ctx)
 
@@ -356,18 +326,14 @@ async def luta_pvp(self, ctx, membro: discord.Member):
         if not verificacao.get("pode", False):
             await ctx.send(f"❌ {usuario.display_name}: {verificacao.get('mensagem', 'não pode lutar.')}")
             return
-    jogador_1 = await _criar_participante(str(ctx.author.id), guild_id)
-    jogador_2 = await _criar_participante(str(membro.id), guild_id)
-    if not jogador_1 or not jogador_2:
+    jogadores = [await _criar_participante(str(u.id), guild_id) for u in (ctx.author, membro)]
+    if not all(jogadores):
         await ctx.send("❌ Um dos jogadores não possui personagem registrado.")
         return
-    jogador_1["nome"] = jogador_1.get("nome") or ctx.author.display_name
-    jogador_2["nome"] = jogador_2.get("nome") or membro.display_name
-    participantes = sorted([jogador_1, jogador_2], key=lambda p: p.get("velocidade", 0), reverse=True)
-    self.combates[ctx.channel.id] = {"participantes": participantes, "turno": 0, "numero_turno": 1,
-        "fase": "ataque", "ativo": True, "pvp": True, "guild_id": guild_id,
-        "ataque_pendente": None, "historico": [], "aguardando_finalizacao": False,
-        "vencedor_id": None, "perdedor_id": None}
+    for jogador, usuario in zip(jogadores, (ctx.author, membro)):
+        jogador["nome"] = jogador.get("nome") or usuario.display_name
+    participantes = sorted(jogadores, key=lambda p: p.get("velocidade", 0), reverse=True)
+    self.combates[ctx.channel.id] = {"participantes": participantes, "turno": 0, "numero_turno": 1, "fase": "ataque", "ativo": True, "pvp": True, "guild_id": guild_id, "ataque_pendente": None, "historico": [], "aguardando_finalizacao": False, "vencedor_id": None, "perdedor_id": None}
     for jogador in participantes:
         _atualizar_situacao(self, jogador["id"], guild_id, "ativo_combate")
     await self._mostrar_inicio(ctx)
@@ -375,6 +341,10 @@ async def luta_pvp(self, ctx, membro: discord.Member):
 
 _base.Luta.luta_pve.callback = luta_pve
 _base.Luta.luta_pvp.callback = luta_pvp
+
+
+# Substitui também o calculador importado diretamente pelo motor legado.
+_base.calcular_dano = _calcular_dano_fisico
 
 
 async def setup(bot):
