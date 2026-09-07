@@ -8,6 +8,38 @@ from database.python.mongodb import run_db
 from database.python import status as status_db
 
 
+def _recuperar_vida_apos_recuperacao(user_id: int, guild_id: int, percentual: float):
+    jogador = status_db.jogadores.find_one({
+        "ID": str(user_id),
+        "guild_id": str(guild_id)
+    })
+    if not jogador or jogador.get("Situação") == "morto":
+        return {
+            "vida_recuperada": 0,
+            "vida_atual": 0,
+            "vida_maxima": 0,
+        }
+
+    vida_atual = jogador.get("Vida", 0)
+    vida_maxima = jogador.get("Vida_Maxima", 0)
+    cura = max(0, int(vida_maxima * percentual))
+    nova_vida = min(vida_maxima, vida_atual + cura)
+
+    status_db.jogadores.update_one(
+        {
+            "ID": str(user_id),
+            "guild_id": str(guild_id)
+        },
+        {"$set": {"Vida": nova_vida}}
+    )
+
+    return {
+        "vida_recuperada": nova_vida - vida_atual,
+        "vida_atual": nova_vida,
+        "vida_maxima": vida_maxima,
+    }
+
+
 async def obter_status(user_id: int, guild_id: int):
     return await run_db(status_db.obter_status, user_id, guild_id)
 
@@ -65,8 +97,21 @@ async def aplicar_cura(user_id: int, guild_id: int, cura: int):
 
 
 async def recuperar_mana(user_id: int, guild_id: int, tipo: str):
-    """Recupera mana usando o mesmo tipo esperado pela implementação atual."""
-    return await run_db(status_db.recuperar_mana, user_id, guild_id, tipo)
+    """Recupera mana e vida usando o mesmo cooldown de descanso/meditação."""
+    resultado = await run_db(status_db.recuperar_mana, user_id, guild_id, tipo)
+
+    if not resultado.get("sucesso"):
+        return resultado
+
+    # A porcentagem sorteada para mana também determina a cura de vida.
+    vida = await run_db(
+        _recuperar_vida_apos_recuperacao,
+        user_id,
+        guild_id,
+        resultado.get("percentual", 0) / 100,
+    )
+    resultado.update(vida)
+    return resultado
 
 
 async def get_cooldown_recuperacao(user_id: str, guild_id: str, tipo: str):
