@@ -1,156 +1,112 @@
 {
-    "monstros": {
-        "slime": {
-            "nome": "Slime",
-            "emoji": "🟢",
-            "vida_base": 50,
-            "nivel_minimo": 1,
-            "nivel_maximo": 10,
-            "atributos_base": {
-                "Força": 5,
-                "Defesa": 2,
-                "Velocidade": 10,
-                "Destreza": 5
-            },
-            "dano_base": 8,
-            "xp_recompensa": 20,
-            "hunos_recompensa": 20
-        },
-
-        "goblin": {
-            "nome": "Goblin",
-            "emoji": "👺",
-            "vida_base": 80,
-            "nivel_minimo": 2,
-            "nivel_maximo": 15,
-            "atributos_base": {
-                "Força": 10,
-                "Defesa": 5,
-                "Velocidade": 30,
-                "Destreza": 15
-            },
-            "dano_base": 12,
-            "xp_recompensa": 40,
-            "hunos_recompensa": 30
-        },
-
-        "lobo": {
-            "nome": "Lobo",
-            "emoji": "🐺",
-            "vida_base": 100,
-            "nivel_minimo": 4,
-            "nivel_maximo": 20,
-            "atributos_base": {
-                "Força": 15,
-                "Defesa": 8,
-                "Velocidade": 50,
-                "Destreza": 25
-            },
-            "dano_base": 15,
-            "xp_recompensa": 60,
-            "hunos_recompensa": 40
-        },
-
-        "orc": {
-            "nome": "Orc",
-            "emoji": "👹",
-            "vida_base": 150,
-            "nivel_minimo": 6,
-            "nivel_maximo": 25,
-            "atributos_base": {
-                "Força": 30,
-                "Defesa": 15,
-                "Velocidade": 25,
-                "Destreza": 12
-            },
-            "dano_base": 20,
-            "xp_recompensa": 80,
-            "hunos_recompensa": 60
-        },
-
-        "esqueleto": {
-            "nome": "Esqueleto",
-            "emoji": "💀",
-            "vida_base": 120,
-            "nivel_minimo": 5,
-            "nivel_maximo": 25,
-            "atributos_base": {
-                "Força": 18,
-                "Defesa": 10,
-                "Velocidade": 35,
-                "Destreza": 20
-            },
-            "dano_base": 18,
-            "xp_recompensa": 70,
-            "hunos_recompensa": 50
-        },
-
-        "dragao": {
-            "nome": "Dragão",
-            "emoji": "🐉",
-            "vida_base": 500,
-            "nivel_minimo": 15,
-            "nivel_maximo": 50,
-            "atributos_base": {
-                "Força": 50,
-                "Defesa": 30,
-                "Velocidade": 20,
-                "Destreza": 15
-            },
-            "dano_base": 40,
-            "xp_recompensa": 300,
-            "hunos_recompensa": 200
-        },
-
-        "demonio": {
-            "nome": "Demônio",
-            "emoji": "😈",
-            "vida_base": 400,
-            "nivel_minimo": 12,
-            "nivel_maximo": 45,
-            "atributos_base": {
-                "Força": 35,
-                "Defesa": 25,
-                "Velocidade": 45,
-                "Destreza": 30
-            },
-            "dano_base": 35,
-            "xp_recompensa": 300,
-            "hunos_recompensa": 200
-        },
-
-        "titan": {
-            "nome": "Titã",
-            "emoji": "🗿",
-            "vida_base": 800,
-            "nivel_minimo": 20,
-            "nivel_maximo": 60,
-            "atributos_base": {
-                "Força": 60,
-                "Defesa": 50,
-                "Velocidade": 10,
-                "Destreza": 8
-            },
-            "dano_base": 50,
-            "xp_recompensa": 500,
-            "hunos_recompensa": 350
-        },
-
-        "fenix": {
-            "nome": "Fênix",
-            "emoji": "🔥",
-            "vida_base": 300,
-            "nivel_minimo": 10,
-            "nivel_maximo": 40,
-            "atributos_base": {
-                "Força": 20,
-                "Defesa": 15,
-                "Velocidade": 60,
-                "Destreza": 40
-            },
-            "dano_base": 30,
-            "xp_recompensa": 400,
-            "hunos_recompensa": 350
-        }
+  "monstros": {
+    "slime": {
+      "nome": "Slime",
+      "emoji": "🟢",
+      "vida_base": 50,
+      "nivel_minimo": 1,
+      "nivel_maximo": 10,
+      "atributos_base": {"Força": 5, "Defesa": 2, "Velocidade": 10, "Destreza": 5},
+      "dano_base": 8,
+      "xp_recompensa": 20,
+      "hunos_recompensa": 20,
+      "golpes": ["pancada", "investida"]
+    },
+    "goblin": {
+      "nome": "Goblin",
+      "emoji": "👺",
+      "vida_base": 80,
+      "nivel_minimo": 2,
+      "nivel_maximo": 15,
+      "atributos_base": {"Força": 10, "Defesa": 5, "Velocidade": 30, "Destreza": 15},
+      "dano_base": 12,
+      "xp_recompensa": 40,
+      "hunos_recompensa": 30,
+      "golpes": ["corte", "estocada"]
+    },
+    "lobo": {
+      "nome": "Lobo",
+      "emoji": "🐺",
+      "vida_base": 100,
+      "nivel_minimo": 4,
+      "nivel_maximo": 20,
+      "atributos_base": {"Força": 15, "Defesa": 8, "Velocidade": 50, "Destreza": 25},
+      "dano_base": 15,
+      "xp_recompensa": 60,
+      "hunos_recompensa": 40,
+      "golpes": ["mordida", "arranhar"]
+    },
+    "orc": {
+      "nome": "Orc",
+      "emoji": "👹",
+      "vida_base": 150,
+      "nivel_minimo": 6,
+      "nivel_maximo": 25,
+      "atributos_base": {"Força": 30, "Defesa": 15, "Velocidade": 25, "Destreza": 12},
+      "dano_base": 20,
+      "xp_recompensa": 80,
+      "hunos_recompensa": 60,
+      "golpes": ["machadada", "esmagamento"]
+    },
+    "esqueleto": {
+      "nome": "Esqueleto",
+      "emoji": "💀",
+      "vida_base": 120,
+      "nivel_minimo": 5,
+      "nivel_maximo": 25,
+      "atributos_base": {"Força": 18, "Defesa": 10, "Velocidade": 35, "Destreza": 20},
+      "dano_base": 18,
+      "xp_recompensa": 70,
+      "hunos_recompensa": 50,
+      "golpes": ["golpe_osseo", "estocada"]
+    },
+    "dragao": {
+      "nome": "Dragão",
+      "emoji": "🐉",
+      "vida_base": 500,
+      "nivel_minimo": 15,
+      "nivel_maximo": 50,
+      "atributos_base": {"Força": 50, "Defesa": 30, "Velocidade": 20, "Destreza": 15},
+      "dano_base": 40,
+      "xp_recompensa": 300,
+      "hunos_recompensa": 200,
+      "golpes": ["garras", "arranhar", "mordida", "sopro_de_fogo"]
+    },
+    "demonio": {
+      "nome": "Demônio",
+      "emoji": "😈",
+      "vida_base": 400,
+      "nivel_minimo": 12,
+      "nivel_maximo": 45,
+      "atributos_base": {"Força": 35, "Defesa": 25, "Velocidade": 45, "Destreza": 30},
+      "dano_base": 35,
+      "xp_recompensa": 300,
+      "hunos_recompensa": 200,
+      "golpes": ["garra_sombria", "corte", "chama_sombria"]
+    },
+    "titan": {
+      "nome": "Titã",
+      "emoji": "🗿",
+      "vida_base": 800,
+      "nivel_minimo": 20,
+      "nivel_maximo": 60,
+      "atributos_base": {"Força": 60, "Defesa": 50, "Velocidade": 10, "Destreza": 8},
+      "dano_base": 50,
+      "xp_recompensa": 500,
+      "hunos_recompensa": 350,
+      "golpes": ["soco_colossal", "esmagamento"]
+    },
+    "fenix": {
+      "nome": "Fênix",
+      "emoji": "🔥",
+      "vida_base": 300,
+      "nivel_minimo": 10,
+      "nivel_maximo": 40,
+      "atributos_base": {"Força": 20, "Defesa": 15, "Velocidade": 60, "Destreza": 40},
+      "dano_base": 30,
+      "xp_recompensa": 400,
+      "hunos_recompensa": 350,
+      "golpes": ["bicada_flamejante", "asas_flamejantes"]
     }
+  }
 }
