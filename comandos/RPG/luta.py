@@ -1,8 +1,4 @@
-"""Camada não bloqueante do sistema de combate.
-
-O motor legado fica em ``luta_sync.py``. Este módulo substitui somente os
-pontos que acessam MongoDB, mantendo os comandos e regras do combate.
-"""
+"""Camada não bloqueante do sistema de combate."""
 
 import asyncio
 import random
@@ -116,7 +112,11 @@ def _salvar_participantes(self, combate, situacao_padrao="ativo", morto_id=None)
 
 
 def _obter_golpe_monstro(monstro):
-    golpes_ids = monstro.get("golpes", [])
+    # A lista de golpes vem da configuração do tipo do monstro, não do
+    # participante de combate. Assim, um golpe só pode ser usado se estiver
+    # explicitamente permitido para aquele monstro.
+    configuracao = luta_db.MONSTROS.get(str(monstro.get("id", "")), {})
+    golpes_ids = configuracao.get("golpes", [])
     disponiveis = [
         luta_db.GOLPES[g]
         for g in golpes_ids
@@ -140,7 +140,7 @@ async def _ataque_monstro(self, ctx):
 
     golpe = _obter_golpe_monstro(atacante)
     efeito = dict(golpe.get("efeito", {})) if isinstance(golpe.get("efeito"), dict) else {}
-    if efeito.get("nome") == "sangramento":
+    if _normalizar_nome(efeito.get("nome", "")) == "sangramento":
         efeito["turnos"] = random.randint(
             int(efeito.get("turnos_min", 1) or 1),
             int(efeito.get("turnos_max", 3) or 3),
@@ -168,8 +168,8 @@ async def _resolver_ataque(self, ctx):
         efeito = ataque.get("efeito") or {}
 
         if _normalizar_nome(efeito.get("nome", "")) == "sangramento":
-            # O participante guarda a defesa total como (Força + Defesa) * 2.
-            # Recalculamos a Defesa pura para aplicar a regra pedida.
+            # No motor atual, defesa_total = (Força + Defesa) * 2.
+            # Recuperamos a Defesa pura para a comparação solicitada.
             forca_jogador = float(defensor.get("Força", 0) or 0)
             defesa_total = float(defensor.get("defesa", 0) or 0)
             defesa_base = max(0.0, defesa_total / 2 - forca_jogador)
