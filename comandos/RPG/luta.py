@@ -364,3 +364,7 @@ async def luta_pvp(self, ctx, membro):
 
 _base.Luta.luta_pve.callback = luta_pve
 _base.Luta.luta_pvp.callback = luta_pvp
+
+
+async def setup(bot):
+    await bot.add_cog(Luta(bot))
