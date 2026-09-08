@@ -22,7 +22,6 @@ def _calcular_dano_fisico_defesa_acao(atacante, defensor):
         if random.random() < 0.40:
             defensor["esquiva_ativa"] = False
             return 0, "esquivou"
-        # Esquiva falhou: consome a ação e recebe o dano integral.
         defensor["esquiva_ativa"] = False
 
     forca_atacante = float(atacante.get("Força", 0) or 0)
@@ -71,9 +70,6 @@ class CorrecoesLuta(commands.Cog):
         if getattr(luta, "_magia_defensiva_corrigida", False):
             return True
 
-        # O motor legado importa `calcular_dano` diretamente. Como este cog
-        # carrega depois de Luta, esta substituição garante que a regra nova
-        # seja usada por jogadores e monstros.
         _base.calcular_dano = _calcular_dano_fisico_defesa_acao
 
         original_usar_magia = luta.usar_magia_no_combate
@@ -82,15 +78,67 @@ class CorrecoesLuta(commands.Cog):
         async def usar_magia_corrigida(cog, ctx, dados_magia):
             if not self._eh_magia_defensiva(dados_magia):
                 return await original_usar_magia(ctx, dados_magia)
+
             combate = cog._obter_combate(ctx.channel.id)
             if not combate or not combate.get("ativo"):
                 return False
             if combate.get("aguardando_finalizacao"):
                 await ctx.send("❌ O combate está aguardando a finalização.")
                 return True
-            if combate.get("fase") != "ataque":
-                await ctx.send("❌ Você não pode conjurar uma defesa durante outra ação pendente.")
-                return True
+
+            # Quando já existe um ataque pendente, a barreira é a própria
+            # ação de DEFESA. Ela não deve ser tratada como uma nova ação de
+            # ataque, portanto não pode ser bloqueada pela fase "defesa".
+            if combate.get("fase") == "defesa":
+                defensor = cog._obter_defensor(combate)
+                if defensor.get("tipo") != "jogador" or str(defensor.get("id")) != str(ctx.author.id):
+                    await ctx.send(f"❌ É **{defensor['nome']}** quem deve defender.")
+                    return True
+
+                mana_base = int(float(dados_magia.get("mana_base", 0) or 0))
+                mana_atual = int(float(defensor.get("mana", 0) or 0))
+                if mana_atual < mana_base:
+                    await ctx.send(f"❌ Mana insuficiente. Necessário: {mana_base}.")
+                    return True
+
+                efeito = dados_magia.get("efeito", {})
+                if not isinstance(efeito, dict):
+                    efeito = {}
+                defesa_base = float(dados_magia.get("defesa_base", 0) or 0)
+                valor = int(float(defensor.get("Magia", 0) or 0) + float(defensor.get("Inteligencia", 0) or 0) + defesa_base)
+                if valor <= 0:
+                    await ctx.send("❌ Essa magia não possui força suficiente para criar uma barreira.")
+                    return True
+
+                defensor["mana"] = mana_atual - mana_base
+                defensor["defesa_magica_ativa"] = True
+                defensor["defesa_magica_valor"] = valor
+                defensor["defesa_ativa"] = False
+                defensor["esquiva_ativa"] = False
+
+                nome = dados_magia.get("nome", "Magia Defensiva")
+                descricao = (
+                    f"✨ **{defensor['nome']}** conjurou **{nome}** como reação defensiva.\n"
+                    f"🛡️ Barreira mágica: **{valor}**\n"
+                    f"💙 Mana gasta: **{mana_base}**"
+                )
+                if efeito.get("nome"):
+                    descricao += f"\n🔮 Efeito: **{str(efeito['nome']).title()}**"
+                embed = discord.Embed(
+                    title="🛡️ Barreira Mágica",
+                    description=descricao,
+                    color=discord.Color.blue(),
+                    timestamp=discord.utils.utcnow(),
+                )
+                await ctx.send(embed=embed)
+                await asyncio.sleep(0.5)
+
+                # Resolve o ATAQUE QUE JÁ ESTAVA PENDENTE contra a barreira.
+                # Não cria uma nova ação e não troca a vez do defensor.
+                return await original_resolver(ctx)
+
+            # Se ainda estamos na fase de ataque, a barreira é uma ação
+            # defensiva antecipada e segue o comportamento normal.
             usuario = cog._obter_atacante(combate)
             if usuario.get("tipo") != "jogador":
                 await ctx.send("❌ Não é a vez de um jogador usar magia.")
@@ -107,46 +155,41 @@ class CorrecoesLuta(commands.Cog):
             if not isinstance(efeito, dict):
                 efeito = {}
             defesa_base = int(float(dados_magia.get("defesa_base", 0) or 0))
-            if defesa_base <= 0:
-                defesa_base = int(float(efeito.get("valor", 0) or 0))
             usuario["mana"] = mana_atual - mana_base
-            usuario["defesa_bonus_magica"] = max(0, defesa_base)
-            usuario["defesa_ativa"] = True
+            usuario["defesa_magica_ativa"] = True
+            usuario["defesa_magica_valor"] = max(0, int(float(usuario.get("Magia", 0) or 0) + float(usuario.get("Inteligencia", 0) or 0) + defesa_base))
+            usuario["defesa_ativa"] = False
             usuario["esquiva_ativa"] = False
-            usuario["magia_defensiva_ativa"] = True
             nome = dados_magia.get("nome", "Magia Defensiva")
-            nome_efeito = str(efeito.get("nome", "")).strip()
             descricao = (
                 f"✨ **{usuario['nome']}** conjurou **{nome}** como defesa.\n"
-                f"🛡️ Bônus de defesa: **+{max(0, defesa_base)}**\n"
+                f"🛡️ Barreira mágica: **{usuario['defesa_magica_valor']}**\n"
                 f"💙 Mana gasta: **{mana_base}**"
             )
-            if nome_efeito:
-                descricao += f"\n🔮 Efeito: **{nome_efeito}**"
-            embed = discord.Embed(title="🛡️ Defesa Mágica", description=descricao, color=discord.Color.blue(), timestamp=discord.utils.utcnow())
+            if efeito.get("nome"):
+                descricao += f"\n🔮 Efeito: **{str(efeito['nome']).title()}**"
+            embed = discord.Embed(title="🛡️ Barreira Mágica", description=descricao, color=discord.Color.blue(), timestamp=discord.utils.utcnow())
             await ctx.send(embed=embed)
             await asyncio.sleep(0.5)
             await cog._proximo_turno(ctx)
             return True
 
         async def resolver_corrigido(cog, ctx):
+            # Mantém compatibilidade com a correção antiga de defesa física.
             combate = cog._obter_combate(ctx.channel.id)
             defensor = cog._obter_defensor(combate) if combate else None
             bonus = 0.0
-            if defensor and defensor.get("magia_defensiva_ativa"):
+            if defensor and defensor.get("magia_defensiva_ativa") and defensor.get("defesa_bonus_magica"):
                 bonus = float(defensor.get("defesa_bonus_magica", 0) or 0)
-                if bonus:
-                    defesa_atual = float(defensor.get("defesa", 0) or 0)
-                    defensor["defesa"] = defesa_atual + bonus
+                defesa_atual = float(defensor.get("defesa", 0) or 0)
+                defensor["defesa"] = defesa_atual + bonus
             try:
                 return await original_resolver(ctx)
             finally:
-                if defensor and defensor.get("magia_defensiva_ativa"):
-                    if bonus:
-                        defesa_atual = float(defensor.get("defesa", 0) or 0)
-                        defensor["defesa"] = max(0, defesa_atual - bonus)
+                if defensor and defensor.get("magia_defensiva_ativa") and bonus:
+                    defesa_atual = float(defensor.get("defesa", 0) or 0)
+                    defensor["defesa"] = max(0, defesa_atual - bonus)
                     defensor.pop("defesa_bonus_magica", None)
-                    defensor.pop("magia_defensiva_ativa", None)
 
         luta.usar_magia_no_combate = types.MethodType(usar_magia_corrigida, luta)
         luta._resolver_ataque = types.MethodType(resolver_corrigido, luta)
