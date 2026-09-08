@@ -55,4 +55,9 @@ class LutaAdmin(commands.Cog):
 
 
 async def setup(bot):
+    # O comando pode já existir em outra extensão do bot. Nesse caso,
+    # não tentamos registrá-lo novamente, evitando CommandRegistrationError.
+    if bot.get_command("rluta") is not None:
+        print("[ADMIN][INFO] Comando rluta já registrado; extensão luta_admin ignorada.")
+        return
     await bot.add_cog(LutaAdmin(bot))
