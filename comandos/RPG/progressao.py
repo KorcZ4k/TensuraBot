@@ -1,5 +1,4 @@
 import asyncio
-import types
 
 import discord
 from discord.ext import commands
@@ -8,21 +7,11 @@ from database.python.mongodb import db, run_db
 
 
 ATRIBUTOS_VALIDOS = {
-    "forca": "Força",
-    "força": "Força",
-    "defesa": "Defesa",
-    "vitalidade": "Vitalidade",
-    "velocidade": "Velocidade",
-    "destreza": "Destreza",
-    "magia": "Magia",
-    "sorte": "Sorte",
-    "inteligencia": "inteligencia",
-    "inteligência": "inteligencia",
+    "forca": "Força", "força": "Força", "defesa": "Defesa",
+    "vitalidade": "Vitalidade", "velocidade": "Velocidade",
+    "destreza": "Destreza", "magia": "Magia", "sorte": "Sorte",
+    "inteligencia": "inteligencia", "inteligência": "inteligencia",
 }
-
-TP_TREINO = {"leve": 1, "medio": 2, "pesado": 3, "supremo": 5}
-TP_POR_NIVEL = 5
-MANA_POR_NIVEL = 10
 
 
 def _normalizar_atributo(valor):
@@ -78,33 +67,14 @@ def aumentar_atributo_com_tp(user_id, guild_id, atributo, quantidade=1):
     if resultado.modified_count == 0:
         raise ValueError("Não foi possível aplicar o aumento de atributo. Tente novamente.")
 
-    return {
-        "atributo": atributo,
-        "novo_valor": novo_valor,
-        "tp_restante": tp - quantidade,
-        "vida_maxima": atualizacoes.get("Vida_Maxima"),
-        "vida": atualizacoes.get("Vida"),
-    }
-
-
-def _sincronizar_mana_nivel(jogador, nivel_novo):
-    nivel_antigo = int(jogador.get("Nivel", 1) or 1)
-    diferenca = max(0, int(nivel_novo) - nivel_antigo)
-    mana_total = float(jogador.get("Mana Total", jogador.get("Mana", 0)) or 0)
-    mana_atual = float(jogador.get("Mana", 0) or 0)
-    if diferenca:
-        mana_total += diferenca * MANA_POR_NIVEL
-        mana_atual = min(mana_total, mana_atual + diferenca * MANA_POR_NIVEL)
-    return mana_atual, mana_total
+    return {"atributo": atributo, "novo_valor": novo_valor, "tp_restante": tp - quantidade,
+            "vida_maxima": atualizacoes.get("Vida_Maxima"), "vida": atualizacoes.get("Vida")}
 
 
 class Progressao(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._luta_patched = False
-
-    async def cog_load(self):
-        self._patch_luta()
 
     def _patch_luta(self):
         if self._luta_patched:
@@ -117,10 +87,10 @@ class Progressao(commands.Cog):
         if original is None or getattr(original, "_tp_patch", False):
             return
 
-        async def wrapper(cog, user_id, guild_id, xp, hunos):
+        def wrapper(cog, user_id, guild_id, xp, hunos):
             resultado = original(cog, user_id, guild_id, xp, hunos)
             tp = max(1, int(xp or 0) // 50)
-            await run_db(adicionar_tp, user_id, guild_id, tp, "monstro")
+            asyncio.create_task(run_db(adicionar_tp, user_id, guild_id, tp, "monstro"))
             return resultado
 
         wrapper._tp_patch = True
@@ -130,33 +100,19 @@ class Progressao(commands.Cog):
     @commands.command(name="aumentar")
     async def aumentar(self, ctx, atributo: str, quantidade: int = 1):
         try:
-            resultado = await run_db(
-                aumentar_atributo_com_tp,
-                str(ctx.author.id),
-                str(ctx.guild.id),
-                atributo,
-                quantidade,
-            )
+            resultado = await run_db(aumentar_atributo_com_tp, str(ctx.author.id), str(ctx.guild.id), atributo, quantidade)
         except ValueError as erro:
             await ctx.send(f"❌ {erro}")
             return
 
-        nome = resultado["atributo"]
-        texto = (
-            f"✅ **{nome}** aumentou para **{resultado['novo_valor']:.0f}**.\n"
-            f"✨ TP restante: **{resultado['tp_restante']}**"
-        )
-        if nome == "Vitalidade":
+        texto = f"✅ **{resultado['atributo']}** aumentou para **{resultado['novo_valor']:.0f}**.\n✨ TP restante: **{resultado['tp_restante']}**"
+        if resultado["atributo"] == "Vitalidade":
             texto += f"\n❤️ Vida: **{resultado['vida']:.0f}/{resultado['vida_maxima']:.0f}**"
         await ctx.send(texto)
 
     @commands.command(name="tp", aliases=["pontos", "pontostreinamento"])
     async def tp(self, ctx):
-        jogador = await run_db(
-            db["Jogadores"].find_one,
-            {"ID": str(ctx.author.id), "guild_id": str(ctx.guild.id)},
-            {"TP": 1, "_id": 0},
-        )
+        jogador = await run_db(db["Jogadores"].find_one, {"ID": str(ctx.author.id), "guild_id": str(ctx.guild.id)}, {"TP": 1, "_id": 0})
         if not jogador:
             await ctx.send("❌ Você não possui um personagem registrado.")
             return
