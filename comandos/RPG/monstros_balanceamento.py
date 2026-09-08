@@ -72,7 +72,7 @@ def criar_monstro_balanceado(tipo: str, nivel: int = 1):
         "Magia": magia,
         "Sorte": atributos["Sorte"],
         "Inteligencia": atributos["Inteligencia"],
-        "defesa": (forca + defesa) * 2,
+        "defesa": forca + defesa,
         "velocidade": atributos["Velocidade"],
         "dano_base": int(float(dados.get("dano_base", forca) or forca) * fator),
         "xp_recompensa": tp_recompensa,
@@ -134,6 +134,7 @@ async def _pve_corrigido(self, ctx, *partes_monstro):
         return
 
     jogador["nome"] = jogador.get("nome") or ctx.author.display_name
+    jogador["defesa"] = float(jogador.get("Força", 0) or 0) + float(jogador.get("Defesa", 0) or 0)
     monstro = criar_monstro_balanceado(monstro_id, 1)
     if not monstro:
         await ctx.send("❌ Não foi possível criar esse monstro.")
@@ -166,8 +167,6 @@ def _instalar_pve_corrigido(bot):
         print("[MONSTROS][ERRO] Não foi possível instalar o comando PvE: cog Luta não carregado.")
         return False
 
-    # Não remova/recrie o comando. O objeto original já pertence ao Group
-    # e ao Cog; substituir somente o callback evita perder o vínculo de invocação.
     comando = grupo.get_command("pve")
     if comando is None:
         print("[MONSTROS][ERRO] Comando PvE não encontrado no grupo luta.")
