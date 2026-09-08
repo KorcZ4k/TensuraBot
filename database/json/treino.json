@@ -5,44 +5,46 @@
       "emoji": "🏃",
       "nivel_minimo": 1,
       "cooldown_horas": 12,
-      "min_aumento": 0.1,
-      "max_aumento": 0.25,
-      "descricao": "Um treino básico para iniciantes"
+      "tp_minimo": 100,
+      "tp_maximo": 200,
+      "descricao": "Um treino básico para iniciantes. Concede entre 100 e 200 TP."
     },
     "medio": {
       "nome": "Treino Médio",
       "emoji": "💪",
       "nivel_minimo": 10,
       "cooldown_horas": 15,
-      "min_aumento": 0.2,
-      "max_aumento": 0.4,
-      "descricao": "Um treino moderado para aventureiros experientes"
+      "tp_minimo": 200,
+      "tp_maximo": 500,
+      "descricao": "Um treino moderado. Concede entre 200 e 500 TP."
     },
     "pesado": {
       "nome": "Treino Pesado",
       "emoji": "🏋️",
       "nivel_minimo": 20,
       "cooldown_horas": 20,
-      "min_aumento": 0.4,
-      "max_aumento": 0.6,
-      "descricao": "Um treino intenso para guerreiros veteranos"
+      "tp_minimo": 500,
+      "tp_maximo": 1000,
+      "descricao": "Um treino intenso. Concede entre 500 e 1000 TP."
     },
     "supremo": {
       "nome": "Treino Supremo",
       "emoji": "🔥",
       "nivel_minimo": 50,
       "cooldown_horas": 24,
-      "min_aumento": 0.7,
-      "max_aumento": 0.7,
-      "descricao": "O treino definitivo para lendas vivas"
+      "tp_minimo": 2000,
+      "tp_maximo": 2000,
+      "descricao": "O treino definitivo. Concede exatamente 2000 TP."
     }
   },
   "atributos": [
     "Força",
     "Defesa",
+    "Vitalidade",
     "Velocidade",
     "Destreza",
     "Magia",
-    "Sorte"
+    "Sorte",
+    "Inteligencia"
   ]
 }
