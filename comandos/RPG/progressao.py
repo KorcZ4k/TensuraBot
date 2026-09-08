@@ -89,8 +89,10 @@ class Progressao(commands.Cog):
 
         def wrapper(cog, user_id, guild_id, xp, hunos):
             resultado = original(cog, user_id, guild_id, xp, hunos)
-            xp = int(xp or 0)
-            tp = max(100, min(2000, ((xp + 99) // 100) * 100))
+            # Para PVE, o balanceador coloca a recompensa de TP específica
+            # do monstro/nível em xp_recompensa. Não arredondamos mais para
+            # centenas, pois Slime possui recompensas como 20/25/35/50 TP.
+            tp = max(1, min(2000, int(xp or 0)))
             asyncio.create_task(run_db(adicionar_tp, user_id, guild_id, tp, "monstro"))
             return resultado
 
