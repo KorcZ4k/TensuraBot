@@ -1,8 +1,42 @@
 import asyncio
+import random
 import types
 
 import discord
 from discord.ext import commands
+
+from . import luta_sync as _base
+
+
+def _calcular_dano_fisico_defesa_acao(atacante, defensor):
+    """Dano físico: defesa só reduz dano quando a ação DEFENDER foi usada.
+
+    Ataque = Força + Velocidade.
+    Sem defesa ativa: dano cheio.
+    Com defesa ativa: dano = ataque - (Força + Defesa).
+    Esquiva bem-sucedida: 0 dano.
+    Esquiva falha: dano cheio, sem usar Defesa.
+    A regra é idêntica para jogadores e monstros.
+    """
+    if defensor.get("esquiva_ativa"):
+        if random.random() < 0.40:
+            defensor["esquiva_ativa"] = False
+            return 0, "esquivou"
+        # Esquiva falhou: consome a ação e recebe o dano integral.
+        defensor["esquiva_ativa"] = False
+
+    forca_atacante = float(atacante.get("Força", 0) or 0)
+    velocidade_atacante = float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
+    dano = forca_atacante + velocidade_atacante
+
+    if defensor.get("defesa_ativa"):
+        defesa = float(defensor.get("defesa", 0) or 0)
+        if not defesa:
+            defesa = float(defensor.get("Força", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
+        dano -= defesa
+        defensor["defesa_ativa"] = False
+
+    return max(0, int(dano)), "normal"
 
 
 class CorrecoesLuta(commands.Cog):
@@ -36,6 +70,12 @@ class CorrecoesLuta(commands.Cog):
             return False
         if getattr(luta, "_magia_defensiva_corrigida", False):
             return True
+
+        # O motor legado importa `calcular_dano` diretamente. Como este cog
+        # carrega depois de Luta, esta substituição garante que a regra nova
+        # seja usada por jogadores e monstros.
+        _base.calcular_dano = _calcular_dano_fisico_defesa_acao
+
         original_usar_magia = luta.usar_magia_no_combate
         original_resolver = luta._resolver_ataque
 
@@ -111,7 +151,7 @@ class CorrecoesLuta(commands.Cog):
         luta.usar_magia_no_combate = types.MethodType(usar_magia_corrigida, luta)
         luta._resolver_ataque = types.MethodType(resolver_corrigido, luta)
         luta._magia_defensiva_corrigida = True
-        print("✅ Magias defensivas integradas ao sistema de combate.")
+        print("✅ Defesa/esquiva e magias defensivas integradas ao sistema de combate.")
         return True
 
     @commands.Cog.listener()
