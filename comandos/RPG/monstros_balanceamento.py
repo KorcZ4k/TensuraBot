@@ -166,17 +166,17 @@ def _instalar_pve_corrigido(bot):
         print("[MONSTROS][ERRO] Não foi possível instalar o comando PvE: cog Luta não carregado.")
         return False
 
-    grupo.remove_command("pve")
+    # Não remova/recrie o comando. O objeto original já pertence ao Group
+    # e ao Cog; substituir somente o callback evita perder o vínculo de invocação.
+    comando = grupo.get_command("pve")
+    if comando is None:
+        print("[MONSTROS][ERRO] Comando PvE não encontrado no grupo luta.")
+        return False
 
-    async def pve_callback(ctx, *partes_monstro):
-        await _pve_corrigido(cog, ctx, *partes_monstro)
+    async def pve_callback(self, ctx, *partes_monstro):
+        await _pve_corrigido(self, ctx, *partes_monstro)
 
-    comando = commands.Command(
-        pve_callback,
-        name="pve",
-        help="Inicia um combate PvE contra um monstro.",
-    )
-    grupo.add_command(comando)
+    comando.callback = pve_callback
     return True
 
 
