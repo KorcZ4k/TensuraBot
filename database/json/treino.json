@@ -5,9 +5,9 @@
       "emoji": "🏃",
       "nivel_minimo": 1,
       "cooldown_horas": 12,
-      "tp_minimo": 100,
-      "tp_maximo": 200,
-      "descricao": "Um treino básico para iniciantes. Concede entre 100 e 200 TP."
+      "tp_minimo": 50,
+      "tp_maximo": 150,
+      "descricao": "Um treino básico para iniciantes. Concede entre 50 e 150 TP."
     },
     "medio": {
       "nome": "Treino Médio",
@@ -15,17 +15,17 @@
       "nivel_minimo": 10,
       "cooldown_horas": 15,
       "tp_minimo": 200,
-      "tp_maximo": 500,
-      "descricao": "Um treino moderado. Concede entre 200 e 500 TP."
+      "tp_maximo": 350,
+      "descricao": "Um treino moderado. Concede entre 200 e 350 TP."
     },
     "pesado": {
       "nome": "Treino Pesado",
       "emoji": "🏋️",
       "nivel_minimo": 20,
       "cooldown_horas": 20,
-      "tp_minimo": 500,
+      "tp_minimo": 350,
       "tp_maximo": 1000,
-      "descricao": "Um treino intenso. Concede entre 500 e 1000 TP."
+      "descricao": "Um treino intenso. Concede entre 350 e 1000 TP."
     },
     "supremo": {
       "nome": "Treino Supremo",
