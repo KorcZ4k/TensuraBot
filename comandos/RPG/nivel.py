@@ -7,12 +7,12 @@ from database.python.mongodb import db, run_db
 
 
 CANAL_LEVEL_UP_ID = 1543041026158100480
-TP_POR_NIVEL = 500
+TP_POR_NIVEL = 100
 MANA_POR_NIVEL = 10
 
 
 def _processar_niveis():
-    """Sobe níveis sem alterar atributos; nível concede 500 TP e mana."""
+    """Sobe níveis sem alterar atributos; cada nível concede 100 TP e mana."""
     jogadores = db["Jogadores"]
     level_ups = []
     for jogador in jogadores.find({"Situação": "ativo"}):
