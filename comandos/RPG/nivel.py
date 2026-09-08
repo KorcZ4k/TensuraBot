@@ -7,12 +7,12 @@ from database.python.mongodb import db, run_db
 
 
 CANAL_LEVEL_UP_ID = 1543041026158100480
-TP_POR_NIVEL = 5
+TP_POR_NIVEL = 500
 MANA_POR_NIVEL = 10
 
 
 def _processar_niveis():
-    """Sobe níveis sem alterar atributos; nível concede TP e mana."""
+    """Sobe níveis sem alterar atributos; nível concede 500 TP e mana."""
     jogadores = db["Jogadores"]
     level_ups = []
     for jogador in jogadores.find({"Situação": "ativo"}):
@@ -20,19 +20,16 @@ def _processar_niveis():
         guild_id = jogador.get("guild_id")
         if not user_id or not guild_id:
             continue
-
         xp_atual = int(jogador.get("XP", 0) or 0)
         nivel_atual = int(jogador.get("Nivel", 1) or 1)
         nivel_inicial = nivel_atual
         xp_maximo = int(jogador.get("XP_maximo", 100) or 100)
-
         while xp_atual >= xp_maximo:
             xp_atual -= xp_maximo
             nivel_anterior = nivel_atual
             nivel_atual += 1
             xp_maximo = math.ceil(xp_maximo * 1.75)
             level_ups.append((user_id, guild_id, nivel_anterior, nivel_atual))
-
         if nivel_atual > nivel_inicial:
             quantidade_niveis = nivel_atual - nivel_inicial
             mana_total = float(jogador.get("Mana Total", jogador.get("Mana", 0)) or 0) + quantidade_niveis * MANA_POR_NIVEL
@@ -43,10 +40,7 @@ def _processar_niveis():
                  "$inc": {"TP": quantidade_niveis * TP_POR_NIVEL}},
             )
         else:
-            jogadores.update_one(
-                {"_id": jogador["_id"], "XP_maximo": {"$exists": False}},
-                {"$set": {"XP_maximo": xp_maximo}},
-            )
+            jogadores.update_one({"_id": jogador["_id"], "XP_maximo": {"$exists": False}}, {"$set": {"XP_maximo": xp_maximo}})
     return level_ups
 
 
