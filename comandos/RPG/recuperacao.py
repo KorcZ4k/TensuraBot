@@ -32,8 +32,7 @@ class Recuperacao(commands.Cog):
         vida_atual = max(0, int(jogador.get("Vida", 0) or 0))
         mana_atual = max(0, int(jogador.get("Mana", 0) or 0))
 
-        # Os recursos são independentes: estar com Mana cheia não impede a
-        # recuperação da Vida, e estar com Vida cheia não impede a da Mana.
+        # Vida e Mana são independentes: um recurso cheio não bloqueia o outro.
         nova_vida = min(vida_maxima, vida_atual + max(1, vida_maxima // 2)) if vida_atual < vida_maxima else vida_atual
         nova_mana = min(mana_maxima, mana_atual + max(1, mana_maxima // 2)) if mana_atual < mana_maxima else mana_atual
 
@@ -44,26 +43,36 @@ class Recuperacao(commands.Cog):
         if recuperou_vida == 0 and recuperou_mana == 0:
             descricao = "✨ Você já está com Vida e Mana no máximo."
         else:
+            vida_texto = f"+{recuperou_vida}" if recuperou_vida > 0 else "cheia"
+            mana_texto = f"+{recuperou_mana}" if recuperou_mana > 0 else "cheia"
             descricao = (
-                f"❤️ Vida: **+{recuperou_vida}** ({nova_vida}/{vida_maxima})\n"
-                if recuperou_vida > 0 else f"❤️ Vida: **cheia** ({nova_vida}/{vida_maxima})\n"
-            )
-            descricao += (
-                f"💙 Mana: **+{recuperou_mana}** ({nova_mana}/{mana_maxima})"
-                if recuperou_mana > 0 else f"💙 Mana: **cheia** ({nova_mana}/{mana_maxima})"
+                f"❤️ Vida: **{vida_texto}** ({nova_vida}/{vida_maxima})\n"
+                f"💙 Mana: **{mana_texto}** ({nova_mana}/{mana_maxima})"
             )
 
         embed = discord.Embed(title=titulo, description=descricao, color=discord.Color.green())
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
         await ctx.send(embed=embed)
 
-    @commands.command(name="descanso", aliases=["descansar", "rest"])
-    async def descanso(self, ctx):
-        await self._recuperar(ctx, "😴 Descanso")
+    async def _registrar_comando(self, nome, callback, aliases):
+        # Algumas versões anteriores do bot já registravam esses comandos em
+        # outro módulo. Removemos o registro antigo antes de instalar a versão
+        # corrigida, evitando CommandRegistrationError e mantendo um único dono.
+        for nome_comando in [nome, *aliases]:
+            self.bot.remove_command(nome_comando)
 
-    @commands.command(name="meditacao", aliases=["meditação", "meditar", "meditate"])
-    async def meditacao(self, ctx):
-        await self._recuperar(ctx, "🧘 Meditação")
+        comando = commands.Command(callback, name=nome, aliases=aliases)
+        self.bot.add_command(comando)
+
+    async def cog_load(self):
+        async def descanso_callback(ctx):
+            await self._recuperar(ctx, "😴 Descanso")
+
+        async def meditacao_callback(ctx):
+            await self._recuperar(ctx, "🧘 Meditação")
+
+        await self._registrar_comando("descanso", descanso_callback, ["descansar", "rest"])
+        await self._registrar_comando("meditacao", meditacao_callback, ["meditação", "meditar", "meditate"])
 
 
 async def setup(bot):
