@@ -89,7 +89,8 @@ class Progressao(commands.Cog):
 
         def wrapper(cog, user_id, guild_id, xp, hunos):
             resultado = original(cog, user_id, guild_id, xp, hunos)
-            tp = max(1, int(xp or 0) // 50)
+            xp = int(xp or 0)
+            tp = max(100, min(2000, ((xp + 99) // 100) * 100))
             asyncio.create_task(run_db(adicionar_tp, user_id, guild_id, tp, "monstro"))
             return resultado
 
