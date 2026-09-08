@@ -141,18 +141,28 @@ class Status(commands.Cog):
     @commands.has_permissions(manage_roles=True)
     async def desregistrar(self, ctx, membro: discord.Member = None):
         if membro is None:
-            await ctx.send("❌ Você precisa mencionar um jogador.\nUse: `!desregistrar @usuário`")
+            embed = discord.Embed(title="| Desregistrar", description="❌ Você precisa mencionar um jogador.\n\nUse: `!desregistrar @usuário`", color=discord.Color.red(), timestamp=discord.utils.utcnow())
+            embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+            await ctx.send(embed=embed)
             return
         p = db["Jogadores"]
         j = await run_db(p.find_one, {"ID": str(membro.id), "guild_id": str(ctx.guild.id)})
         if j is None or j.get("Situação") != "ativo":
-            await ctx.send("❌ Esse jogador não possui um personagem ativo.")
+            embed = discord.Embed(title="| Desregistrar", description="❌ Esse jogador não possui um personagem ativo.", color=discord.Color.red(), timestamp=discord.utils.utcnow())
+            embed.set_thumbnail(url=membro.display_avatar.url)
+            embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+            await ctx.send(embed=embed)
             return
-        r = await run_db(p.update_one, {"_id": j["_id"], "Situação": "ativo"}, {"$set": {"Nome": None, "Raça": None, "Nivel": 0, "XP": 0, "TP": 0, "Força": 0, "Defesa": 0, "Vitalidade": 0, "Velocidade": 0, "Destreza": 0, "Magia": 0, "Sorte": 0, "Situação": "pendente"}})
+        r = await run_db(p.update_one, {"_id": j["_id"], "Situação": "ativo"}, {"$set": {"Nome": None, "Raça": None, "Nivel": 0, "XP": 0, "XP_maximo": 0, "TP": 0, "Força": 0, "Defesa": 0, "Vitalidade": 0, "Velocidade": 0, "Destreza": 0, "Magia": 0, "Sorte": 0, "inteligencia": 0, "Magiculas": 0, "Vida": 0, "Vida_Maxima": 0, "Mana": 0, "Mana Total": 0, "Situação": "pendente", "ultimo_treino": {}, "ultima_recuperacao": {}}})
         if r.modified_count == 0:
-            await ctx.send("❌ Não foi possível desregistrar esse jogador.")
+            embed = discord.Embed(title="| Desregistrar", description="❌ Não foi possível desregistrar esse jogador.", color=discord.Color.red(), timestamp=discord.utils.utcnow())
+            embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+            await ctx.send(embed=embed)
             return
-        await ctx.send(f"✅ {membro.mention} foi desregistrado com sucesso.")
+        embed = discord.Embed(title="| Desregistro concluído", description=f"🗑️ O personagem de **{membro.mention}** foi desregistrado com sucesso.\n\nA ficha voltou para o estado **pendente** e poderá ser registrada novamente.", color=discord.Color.orange(), timestamp=discord.utils.utcnow())
+        embed.set_thumbnail(url=membro.display_avatar.url)
+        embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+        await ctx.send(embed=embed)
 
     async def _recuperacao(self, ctx, tipo, titulo, cor, footer):
         uid, gid = str(ctx.author.id), str(ctx.guild.id)
