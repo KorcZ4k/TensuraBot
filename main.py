@@ -22,9 +22,6 @@ _cadastro_inicial_concluido = False
 # ============================================================
 # PADRÃO GLOBAL DE RESPOSTAS
 # ============================================================
-# Garante que respostas de comandos feitas com ctx.send("...")
-# também sejam exibidas como Embed. Comandos que já enviam um
-# embed continuam inalterados.
 _context_send_original = commands.Context.send
 
 
@@ -53,7 +50,29 @@ async def on_command_error(ctx, error):
     command = getattr(ctx, "command", None)
     parent = getattr(command, "parent", None)
     param_name = getattr(getattr(error, "param", None), "name", None)
-    if isinstance(error, commands.MissingRequiredArgument) and param_name == "membro" and getattr(command, "name", None) == "pvp" and getattr(parent, "name", None) == "luta":
+
+    # Recupera o nome do monstro diretamente da mensagem caso o parser do
+    # Discord.py reporte o parâmetro como ausente mesmo havendo texto após pve.
+    if (
+        isinstance(error, commands.MissingRequiredArgument)
+        and param_name == "monstro_tipo"
+        and getattr(command, "name", None) == "pve"
+        and getattr(parent, "name", None) == "luta"
+    ):
+        partes = ctx.message.content.split()
+        if len(partes) >= 3 and hasattr(ctx, "cog"):
+            monstro_tipo = " ".join(partes[2:]).strip()
+            await command.callback(ctx.cog, ctx, monstro_tipo)
+            return
+        await ctx.send("❌ Informe o nome do monstro. Exemplo: `!luta pve slime`")
+        return
+
+    if (
+        isinstance(error, commands.MissingRequiredArgument)
+        and param_name == "membro"
+        and getattr(command, "name", None) == "pvp"
+        and getattr(parent, "name", None) == "luta"
+    ):
         mencoes = [m for m in ctx.message.mentions if not m.bot]
         membro = next((m for m in mencoes if m.id != ctx.author.id), None)
         if membro is not None and hasattr(ctx, "cog"):
@@ -61,6 +80,7 @@ async def on_command_error(ctx, error):
             return
         await ctx.send("❌ Mencione um membro válido. Exemplo: `!luta pvp @jogador`")
         return
+
     if isinstance(error, commands.CommandNotFound):
         return
     raise error
