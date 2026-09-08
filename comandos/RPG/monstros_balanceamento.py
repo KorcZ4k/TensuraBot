@@ -84,8 +84,6 @@ def criar_monstro_balanceado(tipo: str, nivel: int = 1):
     }
 
 
-# O luta_sync importou criar_monstro diretamente. Atualizamos as duas
-# referências para que o PvE use sempre o balanceamento atual.
 base_luta.criar_monstro = criar_monstro_balanceado
 luta_db.criar_monstro = criar_monstro_balanceado
 
@@ -101,9 +99,6 @@ def _encontrar_monstro(nome):
 
 
 async def _pve_corrigido(self, ctx, *partes_monstro):
-    """Entrada robusta do PvE: aceita o nome do monstro e não dispara
-    MissingRequiredArgument quando o argumento estiver ausente.
-    """
     if not ctx.guild:
         return
 
@@ -171,9 +166,6 @@ def _instalar_pve_corrigido(bot):
         print("[MONSTROS][ERRO] Não foi possível instalar o comando PvE: cog Luta não carregado.")
         return False
 
-    # Remove o callback antigo e instala um callback ligado à instância do Cog.
-    # Sem essa ligação, o primeiro argumento recebido seria o Context em vez do
-    # objeto Luta, fazendo o PvE quebrar ao acessar _combate_ativo/combates.
     grupo.remove_command("pve")
 
     async def pve_callback(ctx, *partes_monstro):
@@ -182,7 +174,6 @@ def _instalar_pve_corrigido(bot):
     comando = commands.Command(
         pve_callback,
         name="pve",
-        aliases=["pve"],
         help="Inicia um combate PvE contra um monstro.",
     )
     grupo.add_command(comando)
