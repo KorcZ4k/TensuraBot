@@ -11,6 +11,7 @@ ATRIBUTOS_VALIDOS = {
     "vitalidade": "Vitalidade", "velocidade": "Velocidade",
     "destreza": "Destreza", "magia": "Magia", "sorte": "Sorte",
     "inteligencia": "inteligencia", "inteligência": "inteligencia",
+    "magiculas": "Magiculas", "magículas": "Magiculas", "magicula": "Magiculas", "magícula": "Magiculas",
 }
 
 
@@ -34,7 +35,7 @@ def aumentar_atributo_com_tp(user_id, guild_id, atributo, quantidade=1):
     atributo = _normalizar_atributo(atributo)
     quantidade = int(quantidade)
     if atributo is None:
-        raise ValueError("Atributo inválido. Use Força, Defesa, Vitalidade, Velocidade, Destreza, Magia, Sorte ou Inteligência.")
+        raise ValueError("Atributo inválido. Use Força, Defesa, Vitalidade, Velocidade, Destreza, Magia, Sorte, Inteligência ou Magiculas.")
     if quantidade <= 0:
         raise ValueError("A quantidade deve ser maior que zero.")
 
@@ -89,9 +90,6 @@ class Progressao(commands.Cog):
 
         def wrapper(cog, user_id, guild_id, xp, hunos):
             resultado = original(cog, user_id, guild_id, xp, hunos)
-            # Para PVE, o balanceador coloca a recompensa de TP específica
-            # do monstro/nível em xp_recompensa. Não arredondamos mais para
-            # centenas, pois Slime possui recompensas como 20/25/35/50 TP.
             tp = max(1, min(2000, int(xp or 0)))
             asyncio.create_task(run_db(adicionar_tp, user_id, guild_id, tp, "monstro"))
             return resultado
