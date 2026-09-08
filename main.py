@@ -19,6 +19,10 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, case_insensitive=True)
 _cadastro_inicial_concluido = False
 
+# Canal exclusivo para registro/desregistro.
+CANAL_REGISTRO_ID = 1543040925788413982
+COMANDOS_REGISTRO_PERMITIDOS = {"registrar", "desregistrar"}
+
 
 # ============================================================
 # PADRÃO GLOBAL DE RESPOSTAS
@@ -43,8 +47,19 @@ commands.Context.send = _context_send_com_embed
 
 @bot.check
 async def verificar_canal_de_comandos(ctx):
-    """Impede comandos em canais configurados como canais sem comandos."""
+    """Bloqueia comandos em canais configurados e aplica o canal exclusivo de registro."""
     if ctx.guild is None:
+        return True
+
+    # Este canal é uma exceção rígida: somente registrar/desregistrar podem ser usados.
+    # A regra vale inclusive para administradores.
+    if ctx.channel.id == CANAL_REGISTRO_ID:
+        comando = getattr(ctx.command, "name", "").casefold()
+        if comando not in COMANDOS_REGISTRO_PERMITIDOS:
+            await ctx.send(
+                "🚫 Neste canal, apenas os comandos `!registrar` e `!desregistrar` estão disponíveis."
+            )
+            return False
         return True
 
     # Administradores continuam podendo executar comandos para configurar o servidor.
@@ -70,13 +85,17 @@ async def on_command_error(ctx, error):
     param_name = getattr(getattr(error, "param", None), "name", None)
 
     if isinstance(error, commands.CheckFailure):
-        # A verificação global já informa o usuário quando o canal está bloqueado.
-        if ctx.guild is not None and not ctx.author.guild_permissions.administrator:
-            try:
-                if await canal_bloqueado(ctx.guild.id, ctx.channel.id):
-                    return
-            except Exception:
-                pass
+        # As verificações globais já informam o usuário; não deixe o erro ser
+        # propagado nem gere uma segunda mensagem.
+        if ctx.guild is not None:
+            if ctx.channel.id == CANAL_REGISTRO_ID:
+                return
+            if not ctx.author.guild_permissions.administrator:
+                try:
+                    if await canal_bloqueado(ctx.guild.id, ctx.channel.id):
+                        return
+                except Exception:
+                    pass
 
     if (
         isinstance(error, commands.MissingRequiredArgument)
