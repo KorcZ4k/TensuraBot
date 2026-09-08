@@ -166,13 +166,23 @@ async def _pve_corrigido(self, ctx, *partes_monstro):
 
 def _instalar_pve_corrigido(bot):
     grupo = bot.get_command("luta")
-    if grupo is None:
+    cog = bot.get_cog("Luta")
+    if grupo is None or cog is None:
+        print("[MONSTROS][ERRO] Não foi possível instalar o comando PvE: cog Luta não carregado.")
         return False
 
+    # Remove o callback antigo e instala um callback ligado à instância do Cog.
+    # Sem essa ligação, o primeiro argumento recebido seria o Context em vez do
+    # objeto Luta, fazendo o PvE quebrar ao acessar _combate_ativo/combates.
     grupo.remove_command("pve")
+
+    async def pve_callback(ctx, *partes_monstro):
+        await _pve_corrigido(cog, ctx, *partes_monstro)
+
     comando = commands.Command(
-        _pve_corrigido,
+        pve_callback,
         name="pve",
+        aliases=["pve"],
         help="Inicia um combate PvE contra um monstro.",
     )
     grupo.add_command(comando)
