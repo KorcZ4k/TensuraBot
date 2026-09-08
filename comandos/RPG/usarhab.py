@@ -60,7 +60,7 @@ class UsarHabilidade(commands.Cog):
         return False
 
     def _tem_habilidade(self, participante, combate, nome):
-        if participante.get("tipo") != "jogador") or not combate.get("guild_id"):
+        if participante.get("tipo") != "jogador" or not combate.get("guild_id"):
             return False
         habilidade = self._buscar_habilidade_por_nome(nome)
         return bool(habilidade and self._jogador_possui(participante.get("id"), combate.get("guild_id"), habilidade.get("id")))
@@ -143,12 +143,12 @@ class UsarHabilidade(commands.Cog):
         original = luta._resolver_ataque
         cog = self
 
-        async def resolver_corte(ctx, combate, ataque, atacante, defensor):
+        async def resolver_corte(ctx, combate, atacante, defensor):
             if not cog._arma_cortante(atacante):
                 await ctx.send("❌ `!corte` exige uma arma cortante equipada.")
                 combate["fase"] = "ataque"
                 combate["ataque_pendente"] = None
-                return True
+                return
             dano = float(atacante.get("Força", 0) or 0) + float(atacante.get("Velocidade", 0) or 0)
             if defensor.get("defesa_ativa"):
                 dano -= float(defensor.get("defesa", 0) or 0)
@@ -178,14 +178,12 @@ class UsarHabilidade(commands.Cog):
             else:
                 await asyncio.sleep(1)
                 await luta._proximo_turno(ctx)
-            return True
 
         async def resolvedor(ctx):
             combate = luta._obter_combate(ctx.channel.id)
             ataque = combate.get("ataque_pendente") if combate else None
             if not ataque:
                 return await original(ctx)
-
             atacante = luta._obter_atacante(combate)
             defensor = luta._obter_defensor(combate)
 
@@ -204,9 +202,8 @@ class UsarHabilidade(commands.Cog):
                     return
 
             if ataque.get("tipo") == "corte":
-                await resolver_corte(ctx, combate, ataque, atacante, defensor)
+                await resolver_corte(ctx, combate, atacante, defensor)
                 return
-
             if ataque.get("tipo") != "habilidade":
                 return await original(ctx)
 
@@ -222,8 +219,8 @@ class UsarHabilidade(commands.Cog):
                     chance = 0.30 if nome == "gula" else 0.20
                     sorteada = cog._sortear_habilidade(atacante.get("id"), combate.get("guild_id")) if random.random() < chance else None
                     if sorteada:
-                        cog._incorporar_habilidade(atacante.get("id"), combate.get("guild_id"), sorteada)
-                        mensagem = f"🍴 **{atacante['nome']}** executou **{habilidade['nome']}** e incorporou **{sorteada.get('nome')}**!"
+                        incorporou = cog._incorporar_habilidade(atacante.get("id"), combate.get("guild_id"), sorteada)
+                        mensagem = f"🍴 **{atacante['nome']}** executou **{habilidade['nome']}** e incorporou **{sorteada.get('nome')}**!" if incorporou else f"🍴 **{atacante['nome']}** executou **{habilidade['nome']}**, mas não foi possível incorporar a habilidade sorteada."
                     else:
                         mensagem = f"🍴 **{atacante['nome']}** executou **{habilidade['nome']}** e devorou **{defensor['nome']}**, mas não incorporou uma habilidade."
                     combate["historico"].append(mensagem)
@@ -250,14 +247,13 @@ class UsarHabilidade(commands.Cog):
                     defensor["defesa_magica_ativa"] = False
                     defensor["defesa_magica_valor"] = 0
 
-                # Falsificador recebe dano adicional.
                 if nome == "falsificador" and dano > 0:
                     dano += 20
 
                 defensor["vida"] = max(0, int(defensor.get("vida", 0)) - dano)
                 mensagem = f"✨ **{atacante['nome']}** causou **{dano} de dano** com **{habilidade['nome']}**!"
-
                 efeitos_aplicados = []
+
                 if nome == "comandante":
                     if combate.get("party"):
                         if cog._aplicar_buff_comandante(atacante, combate):
@@ -275,10 +271,6 @@ class UsarHabilidade(commands.Cog):
                         atacante["defesa_magica_ativa"] = True
                         atacante["defesa_magica_valor"] = int(valor or 0)
                         efeitos_aplicados.append(f"escudo {int(valor or 0)}")
-                    elif enome == "cura_por_dano":
-                        cura = int(dano * float(valor or 0))
-                        atacante["vida"] = min(int(atacante.get("vida_maxima", atacante.get("vida", 0))), int(atacante.get("vida", 0)) + cura)
-                        efeitos_aplicados.append(f"cura {cura}")
                     elif enome.startswith("buff_"):
                         chave = {"forca": "Força", "defesa": "Defesa", "velocidade": "Velocidade", "destreza": "Destreza"}.get(enome.removeprefix("buff_"))
                         if chave:
@@ -324,7 +316,6 @@ class UsarHabilidade(commands.Cog):
                 combate["ativo"] = False
                 await luta._finalizar(ctx, motivo="vida")
                 return
-
             await asyncio.sleep(1)
             await luta._proximo_turno(ctx)
 
@@ -337,13 +328,10 @@ class UsarHabilidade(commands.Cog):
         if not luta:
             await ctx.send("❌ Sistema de luta não está carregado.")
             return
-        if ctx.channel.id not in getattr(luta, "combates", {}):
-            await ctx.send("❌ `!corte` só pode ser usado durante uma batalha.")
-            return
         self._instalar_resolvedor(luta)
         combate = luta._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
-            await ctx.send("❌ Não há combate ativo.")
+            await ctx.send("❌ `!corte` só pode ser usado durante uma batalha.")
             return
         if combate.get("fase") != "ataque":
             await ctx.send("❌ O ataque anterior ainda precisa ser resolvido.")
@@ -356,10 +344,7 @@ class UsarHabilidade(commands.Cog):
             await ctx.send("❌ Você precisa estar equipado com uma arma cortante para usar `!corte`.")
             return
         defensor = luta._obter_defensor(combate)
-        combate["ataque_pendente"] = {
-            "tipo": "corte", "nome": "⚔️ Corte", "atacante_id": atacante.get("id"),
-            "defensor_id": defensor.get("id"), "magia": False, "com_arma": True,
-        }
+        combate["ataque_pendente"] = {"tipo": "corte", "nome": "⚔️ Corte", "atacante_id": atacante.get("id"), "defensor_id": defensor.get("id"), "magia": False, "com_arma": True}
         combate["fase"] = "defesa"
         await luta._anunciar_ataque(ctx)
 
@@ -371,7 +356,6 @@ class UsarHabilidade(commands.Cog):
         if ctx.guild is None:
             await ctx.send("❌ Este comando só pode ser usado em um servidor.")
             return
-
         habilidade = self._buscar_habilidade_por_nome(nome)
         if not habilidade:
             await ctx.send(f"❌ Não encontrei nenhuma habilidade chamada **{nome}**.")
@@ -384,7 +368,6 @@ class UsarHabilidade(commands.Cog):
         if not self._jogador_possui(ctx.author.id, ctx.guild.id, habilidade["id"]):
             await ctx.send("❌ Você não possui essa habilidade.")
             return
-
         luta = self.bot.get_cog("Luta")
         if not luta:
             await ctx.send("❌ Sistema de luta não está carregado.")
@@ -402,7 +385,6 @@ class UsarHabilidade(commands.Cog):
         if atacante.get("tipo") != "jogador" or str(atacante.get("id")) != str(ctx.author.id):
             await ctx.send(f"❌ Não é sua vez. Agora é a vez de **{atacante.get('nome', 'outro participante')}**.")
             return
-
         configuracao = self._configuracao(habilidade)
         mana = int(float(atacante.get("mana", 0) or 0))
         gasto = int(float(configuracao.get("gasto_mana", 0) or 0))
@@ -412,12 +394,10 @@ class UsarHabilidade(commands.Cog):
         atacante["mana"] = mana - gasto
         efeitos = self._efeitos_para_combate(configuracao)
         combate["ataque_pendente"] = {
-            "tipo": "habilidade", "nome": f"✨ {habilidade['nome']}",
-            "atacante_id": atacante["id"], "defensor_id": defensor["id"],
-            "magia": False, "habilidade": habilidade,
-            "dano_base": int(float(configuracao.get("dano", 0) or 0)),
-            "chance_acerto": float(configuracao.get("chance_acerto", 1.0) or 1.0),
-            "efeitos": efeitos, "efeito": efeitos[0] if efeitos else {}, "com_arma": False,
+            "tipo": "habilidade", "nome": f"✨ {habilidade['nome']}", "atacante_id": atacante["id"], "defensor_id": defensor["id"],
+            "magia": False, "habilidade": habilidade, "dano_base": int(float(configuracao.get("dano", 0) or 0)),
+            "chance_acerto": float(configuracao.get("chance_acerto", 1.0) or 1.0), "efeitos": efeitos,
+            "efeito": efeitos[0] if efeitos else {}, "com_arma": False,
         }
         combate["fase"] = "defesa"
         embed = discord.Embed(
