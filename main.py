@@ -37,16 +37,6 @@ async def on_command_error(ctx, error):
             return
         await ctx.send("❌ Mencione um membro válido. Exemplo: `!luta pvp @jogador`")
         return
-    if isinstance(error, commands.MissingRequiredArgument) and param_name == "monstro_tipo" and getattr(command, "name", None) == "pve" and parent is not None and getattr(parent, "name", None) == "luta":
-        partes = ctx.message.content.strip().split()
-        indice_pve = next((i for i, parte in enumerate(partes) if parte.lower() == "pve"), None)
-        if indice_pve is not None:
-            monstro_tipo = " ".join(partes[indice_pve + 1:]).strip()
-            if monstro_tipo:
-                await command.callback(ctx.cog, ctx, monstro_tipo)
-                return
-        await ctx.send("❌ Informe o monstro. Use `!luta pve slime`.")
-        return
     if isinstance(error, commands.CommandNotFound):
         return
     raise error
@@ -87,6 +77,7 @@ async def on_ready():
 async def carregar_extensoes():
     extensoes = [
         "comandos.RPG.luta",
+        "comandos.RPG.monstros_balanceamento",
         "comandos.RPG.party",
         "comandos.RPG.treino",
         "comandos.RPG.magias",
