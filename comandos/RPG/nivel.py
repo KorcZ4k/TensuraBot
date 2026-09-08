@@ -7,16 +7,15 @@ from database.python.mongodb import db, run_db
 
 
 CANAL_LEVEL_UP_ID = 1543041026158100480
-ATRIBUTOS_POR_NIVEL = ("Força", "Defesa", "Velocidade", "Destreza", "Magia", "Sorte")
+TP_POR_NIVEL = 5
+MANA_POR_NIVEL = 10
 
 
 def _processar_niveis():
-    """Processa a varredura do Mongo em uma thread e aplica o crescimento de nível."""
+    """Sobe níveis sem alterar atributos; nível concede TP e mana."""
     jogadores = db["Jogadores"]
-    jogadores_com_xp = jogadores.find({"Situação": "ativo"})
     level_ups = []
-
-    for jogador in jogadores_com_xp:
+    for jogador in jogadores.find({"Situação": "ativo"}):
         user_id = jogador.get("ID")
         guild_id = jogador.get("guild_id")
         if not user_id or not guild_id:
@@ -36,32 +35,18 @@ def _processar_niveis():
 
         if nivel_atual > nivel_inicial:
             quantidade_niveis = nivel_atual - nivel_inicial
-            atualizacoes = {
-                "XP": xp_atual,
-                "Nivel": nivel_atual,
-                "XP_maximo": xp_maximo,
-            }
-
-            # Cada nível aumenta cada atributo existente em 10%, de forma
-            # cumulativa. Ex.: 100 -> 110 -> 121.
-            for atributo in ATRIBUTOS_POR_NIVEL:
-                if atributo not in jogador:
-                    continue
-                valor = float(jogador.get(atributo, 0) or 0)
-                for _ in range(quantidade_niveis):
-                    valor *= 1.10
-                atualizacoes[atributo] = max(1, math.floor(valor))
-
+            mana_total = float(jogador.get("Mana Total", jogador.get("Mana", 0)) or 0) + quantidade_niveis * MANA_POR_NIVEL
+            mana_atual = min(mana_total, float(jogador.get("Mana", 0) or 0) + quantidade_niveis * MANA_POR_NIVEL)
             jogadores.update_one(
                 {"_id": jogador["_id"]},
-                {"$set": atualizacoes},
+                {"$set": {"XP": xp_atual, "Nivel": nivel_atual, "XP_maximo": xp_maximo, "Mana": mana_atual, "Mana Total": mana_total},
+                 "$inc": {"TP": quantidade_niveis * TP_POR_NIVEL}},
             )
         else:
             jogadores.update_one(
                 {"_id": jogador["_id"], "XP_maximo": {"$exists": False}},
                 {"$set": {"XP_maximo": xp_maximo}},
             )
-
     return level_ups
 
 
@@ -86,18 +71,11 @@ class Nivel(commands.Cog):
                 canal = await self.bot.fetch_channel(CANAL_LEVEL_UP_ID)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 return
-
         if str(canal.guild.id) != str(guild_id):
             return
-
         membro = canal.guild.get_member(int(user_id))
         jogador = membro.mention if membro is not None else f"<@{user_id}>"
-        embed = discord.Embed(
-            title="🎉 | Subiu de nível!",
-            description=f"{jogador} subiu de nível.\n\n**{nivel_anterior} → {nivel_novo}**",
-            color=discord.Color.gold(),
-            timestamp=discord.utils.utcnow(),
-        )
+        embed = discord.Embed(title="🎉 | Subiu de nível!", description=f"{jogador} subiu de nível.\n\n**{nivel_anterior} → {nivel_novo}**\n✨ TP ganho: **+{(nivel_novo - nivel_anterior) * TP_POR_NIVEL}**\n💧 Mana máxima: **+{(nivel_novo - nivel_anterior) * MANA_POR_NIVEL}**", color=discord.Color.gold(), timestamp=discord.utils.utcnow())
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
         if membro is not None:
             embed.set_thumbnail(url=membro.display_avatar.url)
