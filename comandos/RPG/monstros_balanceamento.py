@@ -81,6 +81,8 @@ def criar_monstro_balanceado(tipo: str, nivel: int = 1):
         "golpes": list(dados.get("golpes", [])),
         "defesa_ativa": False,
         "esquiva_ativa": False,
+        "defesa_magica_ativa": False,
+        "defesa_magica_valor": 0,
     }
 
 
@@ -96,6 +98,25 @@ def _encontrar_monstro(nome):
         if str(dados.get("nome", "")).strip().casefold() == nome:
             return monstro_id
     return None
+
+
+def _preencher_atributos_jogador(jogador, dados):
+    """Garante que o participante de combate tenha todos os atributos da ficha."""
+    jogador["Força"] = float(dados.get("Força", 0) or 0)
+    jogador["Defesa"] = float(dados.get("Defesa", 0) or 0)
+    jogador["Vitalidade"] = float(dados.get("Vitalidade", 0) or 0)
+    jogador["Velocidade"] = float(dados.get("Velocidade", 0) or 0)
+    jogador["Destreza"] = float(dados.get("Destreza", 0) or 0)
+    jogador["Magia"] = float(dados.get("Magia", 0) or 0)
+    jogador["Sorte"] = float(dados.get("Sorte", 0) or 0)
+    jogador["Inteligencia"] = float(
+        dados.get("Inteligencia", dados.get("inteligencia", dados.get("Inteligência", 0))) or 0
+    )
+    jogador["defesa"] = jogador["Força"] + jogador["Defesa"]
+    jogador["velocidade"] = jogador["Velocidade"]
+    jogador["defesa_magica_ativa"] = False
+    jogador["defesa_magica_valor"] = 0
+    return jogador
 
 
 async def _pve_corrigido(self, ctx, *partes_monstro):
@@ -133,15 +154,21 @@ async def _pve_corrigido(self, ctx, *partes_monstro):
         await ctx.send("❌ Você não possui um personagem registrado.")
         return
 
+    dados_jogador = luta_db.obter_jogador(user_id, guild_id)
+    if not dados_jogador:
+        await ctx.send("❌ Não foi possível carregar os atributos do personagem.")
+        return
+
+    jogador = _preencher_atributos_jogador(jogador, dados_jogador)
     jogador["nome"] = jogador.get("nome") or ctx.author.display_name
-    jogador["defesa"] = float(jogador.get("Força", 0) or 0) + float(jogador.get("Defesa", 0) or 0)
+
     monstro = criar_monstro_balanceado(monstro_id, 1)
     if not monstro:
         await ctx.send("❌ Não foi possível criar esse monstro.")
         return
 
     participantes = [jogador, monstro]
-    participantes.sort(key=lambda p: p.get("velocidade", 0), reverse=True)
+    participantes.sort(key=lambda p: p.get("Velocidade", p.get("velocidade", 0)), reverse=True)
     self.combates[ctx.channel.id] = {
         "participantes": participantes,
         "turno": 0,
