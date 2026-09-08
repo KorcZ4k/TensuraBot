@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from database.python.users import cadastro_async
 from database.python.mongodb import db, close_db
 from database.python.mongo_indexes import ensure_indexes
+from database.python.canais_comandos import canal_bloqueado
 
 load_dotenv()
 
@@ -40,6 +41,23 @@ async def _context_send_com_embed(self, content=None, *, embed=None, **kwargs):
 commands.Context.send = _context_send_com_embed
 
 
+@bot.check
+async def verificar_canal_de_comandos(ctx):
+    """Impede comandos em canais configurados como canais sem comandos."""
+    if ctx.guild is None:
+        return True
+
+    # Administradores continuam podendo executar comandos para configurar o servidor.
+    if ctx.author.guild_permissions.administrator:
+        return True
+
+    if await canal_bloqueado(ctx.guild.id, ctx.channel.id):
+        await ctx.send("🚫 Este canal não permite o uso de comandos.")
+        return False
+
+    return True
+
+
 @bot.event
 async def on_member_join(member):
     await cadastro_async([member])
@@ -50,6 +68,15 @@ async def on_command_error(ctx, error):
     command = getattr(ctx, "command", None)
     parent = getattr(command, "parent", None)
     param_name = getattr(getattr(error, "param", None), "name", None)
+
+    if isinstance(error, commands.CheckFailure):
+        # A verificação global já informa o usuário quando o canal está bloqueado.
+        if ctx.guild is not None and not ctx.author.guild_permissions.administrator:
+            try:
+                if await canal_bloqueado(ctx.guild.id, ctx.channel.id):
+                    return
+            except Exception:
+                pass
 
     if (
         isinstance(error, commands.MissingRequiredArgument)
@@ -124,6 +151,7 @@ async def carregar_extensoes():
         "comandos.ADMINISTRACAO.autorole_commands",
         "comandos.ADMINISTRACAO.autorole",
         "comandos.ADMINISTRACAO.configurações",
+        "comandos.ADMINISTRACAO.canais_comandos",
         "comandos.ADMINISTRACAO.moderacao",
         "comandos.ADMINISTRACAO.automod",
         "comandos.ADMINISTRACAO.boas_vindas",
