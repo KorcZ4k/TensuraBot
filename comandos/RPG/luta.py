@@ -42,6 +42,7 @@ async def _criar_participante(user_id, guild_id):
         participante["arma_nome"] = jogador.get("arma_nome", jogador.get("Arma", "")) or ""
     else:
         participante.update({"Defesa": 10, "Magia": 0, "Inteligencia": 0, "dano_arma": 0, "arma_nome": ""})
+    participante["defesa"] = participante["Força"] + participante["Defesa"]
     return participante
 
 
@@ -117,8 +118,7 @@ def _obter_golpe_monstro(monstro):
 
 
 def _resistencia_efeito(defensor):
-    # Efeitos usam os atributos puros, nunca a defesa composta usada pelo
-    # cálculo legado de dano.
+    # Efeitos usam os atributos puros, nunca a defesa composta usada pelo cálculo legado de dano.
     if defensor.get("defesa_magica_ativa"):
         return float(defensor.get("Magia", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
     return float(defensor.get("Defesa", 0) or 0)
@@ -174,26 +174,39 @@ async def _ataque_monstro(self, ctx):
 
 
 def _calcular_dano_fisico(atacante, defensor):
-    ataque = atacante.get("_ataque_atual", {})
+    """Calcula dano físico pela fórmula oficial do RPG.
+
+    Ataque físico = Força + Velocidade.
+    Defesa física = Força + Defesa.
+    Dano tomado = Ataque - Defesa.
+    A mesma fórmula vale para jogadores e monstros.
+    """
     if defensor.get("esquiva_ativa"):
         if random.random() < 0.40:
             defensor["esquiva_ativa"] = False
             return 0, "esquivou"
         defensor["esquiva_ativa"] = False
-    dano = (float(atacante.get("Força", 0) or 0)
-            + float(atacante.get("Destreza", 0) or 0)
-            + float(ataque.get("dano_base", 0) or 0))
-    if ataque.get("com_arma"):
-        dano += float(atacante.get("dano_arma", 0) or 0)
+
+    ataque = atacante.get("_ataque_atual", {})
+    forca = float(atacante.get("Força", 0) or 0)
+    velocidade = float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
+    dano = forca + velocidade
+
+    # Defesa ativa continua sendo uma ação defensiva adicional:
+    # ela reduz pela metade o dano já calculado pela fórmula base.
     if defensor.get("defesa_ativa"):
         dano *= 0.50
         defensor["defesa_ativa"] = False
-    return max(1, int(dano)), "normal"
+
+    defesa = float(defensor.get("defesa", 0) or 0)
+    if not defesa:
+        defesa = float(defensor.get("Força", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
+
+    dano = dano - defesa
+    return max(0, int(dano)), "normal"
 
 
 async def _ataque_jogador(self, ctx, tipo_ataque):
-    # O motor original cria o ataque e anuncia. O metadata é preenchido antes
-    # da resolução através de _resolver_ataque, que ocorre dentro da chamada.
     await _ATAQUE_JOGADOR_ORIGINAL(self, ctx, tipo_ataque)
 
 
