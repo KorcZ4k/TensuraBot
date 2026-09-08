@@ -43,6 +43,8 @@ async def _criar_participante(user_id, guild_id):
     else:
         participante.update({"Defesa": 10, "Magia": 0, "Inteligencia": 0, "dano_arma": 0, "arma_nome": ""})
     participante["defesa"] = participante["Força"] + participante["Defesa"]
+    participante.setdefault("defesa_magica_ativa", False)
+    participante.setdefault("defesa_magica_valor", 0)
     return participante
 
 
@@ -119,7 +121,7 @@ def _obter_golpe_monstro(monstro):
 
 def _resistencia_efeito(defensor):
     if defensor.get("defesa_magica_ativa"):
-        return float(defensor.get("Magia", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
+        return float(defensor.get("Magia", 0) or 0) + float(defensor.get("Defesa", 0) or 0) + float(defensor.get("defesa_magica_valor", 0) or 0)
     return float(defensor.get("Defesa", 0) or 0)
 
 
@@ -173,30 +175,23 @@ async def _ataque_monstro(self, ctx):
 
 
 def _calcular_dano_fisico(atacante, defensor):
-    """Calcula dano físico pela fórmula oficial do RPG.
-
-    Ataque físico = Força + Velocidade.
-    Defesa física = Força + Defesa.
-    Dano tomado = Ataque - Defesa.
-    A mesma fórmula vale para jogadores e monstros.
-    """
+    """Ataque físico = Força + Velocidade; defesa física = Força + Defesa."""
     if defensor.get("esquiva_ativa"):
         defensor["esquiva_ativa"] = False
         if random.random() < 0.40:
             return 0, "esquivou"
-        # Esquiva falhou: dano cheio. Não aplicar Defesa.
         defensor["defesa_ativa"] = False
-        return max(0, int(
-            float(atacante.get("Força", 0) or 0)
-            + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
-        )), "esquiva_falhou"
+        return max(0, int(float(atacante.get("Força", 0) or 0) + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0))), "esquiva_falhou"
 
-    dano = (
-        float(atacante.get("Força", 0) or 0)
-        + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
-    )
+    dano = float(atacante.get("Força", 0) or 0) + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
 
-    # Defesa física só funciona se o defensor escolheu defender.
+    # Barreira mágica é uma defesa real e protege também contra ataques físicos.
+    if defensor.get("defesa_magica_ativa"):
+        dano -= float(defensor.get("defesa_magica_valor", 0) or 0)
+        defensor["defesa_magica_ativa"] = False
+        defensor["defesa_magica_valor"] = 0
+        return max(0, int(dano)), "barreira"
+
     if defensor.get("defesa_ativa"):
         defesa = float(defensor.get("defesa", 0) or 0)
         if not defesa:
@@ -212,11 +207,6 @@ async def _ataque_jogador(self, ctx, tipo_ataque):
 
 
 def _pode_esquivar(defensor, atacante):
-    """Verifica a regra de superioridade de Destreza para a esquiva.
-
-    Se a Destreza do atacante for 1,5x ou mais a soma
-    Destreza + Velocidade do defensor, a esquiva é impedida.
-    """
     destreza_atacante = float(atacante.get("Destreza", atacante.get("destreza", 0)) or 0)
     destreza_defensor = float(defensor.get("Destreza", defensor.get("destreza", 0)) or 0)
     velocidade_defensor = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
@@ -227,37 +217,29 @@ def _calcular_dano_magia(self, atacante, defensor, ataque):
     if defensor.get("esquiva_ativa"):
         defensor["esquiva_ativa"] = False
         if not _pode_esquivar(defensor, atacante):
-            return max(1, int(
-                float(atacante.get("Magia", 0) or 0)
-                + float(atacante.get("Inteligencia", 0) or 0)
-                + float(ataque.get("dano_base", 0) or 0)
-                + (float(atacante.get("dano_arma", 0) or 0) if ataque.get("com_arma") else 0)
-            )), "esquiva_bloqueada"
+            return max(1, int(float(atacante.get("Magia", 0) or 0) + float(atacante.get("Inteligencia", 0) or 0) + float(ataque.get("dano_base", 0) or 0) + (float(atacante.get("dano_arma", 0) or 0) if ataque.get("com_arma") else 0))), "esquiva_bloqueada"
         velocidade = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
         if random.random() < min(0.75, 0.10 + velocidade / 500):
             return 0, "esquivou"
-        # Falhou: dano cheio, sem Defesa.
         defensor["defesa_ativa"] = False
-        return max(1, int(
-            float(atacante.get("Magia", 0) or 0)
-            + float(atacante.get("Inteligencia", 0) or 0)
-            + float(ataque.get("dano_base", 0) or 0)
-            + (float(atacante.get("dano_arma", 0) or 0) if ataque.get("com_arma") else 0)
-        )), "esquiva_falhou"
+        return max(1, int(float(atacante.get("Magia", 0) or 0) + float(atacante.get("Inteligencia", 0) or 0) + float(ataque.get("dano_base", 0) or 0) + (float(atacante.get("dano_arma", 0) or 0) if ataque.get("com_arma") else 0))), "esquiva_falhou"
+
     magia = float(atacante.get("Magia", 0) or 0)
     inteligencia = float(atacante.get("Inteligencia", 0) or 0)
     dano = magia + inteligencia + float(ataque.get("dano_base", 0) or 0)
     if ataque.get("com_arma"):
         dano += float(atacante.get("dano_arma", 0) or 0)
+
     if defensor.get("defesa_magica_ativa"):
-        dano -= float(defensor.get("Magia", 0) or 0)
-        dano -= float(defensor.get("Defesa", 0) or 0)
         dano -= float(defensor.get("defesa_magica_valor", 0) or 0)
         defensor["defesa_magica_ativa"] = False
+        defensor["defesa_magica_valor"] = 0
+
     return max(1, int(dano)), "atingiu"
 
 
 async def _usar_magia_no_combate(self, ctx, dados_magia):
+    # A implementação original cria a ação pendente, valida turno e desconta mana.
     resultado = await _USAR_MAGIA_ORIGINAL(self, ctx, dados_magia)
     if not resultado:
         return resultado
@@ -287,6 +269,7 @@ async def _resolver_ataque(self, ctx):
                 valor = int(magia + inteligencia + float(ataque["defesa_base"]))
                 atacante["defesa_magica_ativa"] = True
                 atacante["defesa_magica_valor"] = valor
+                atacante["defesa_ativa"] = False
                 await ctx.send(f"🛡️ **{atacante['nome']}** criou uma defesa mágica de **{valor}**!")
                 combate["ataque_pendente"] = None
                 combate["fase"] = "ataque"
@@ -338,51 +321,46 @@ async def luta_pve(self, ctx, monstro_tipo: str):
     if not jogador:
         await ctx.send("❌ Você não possui um personagem registrado.")
         return
-    monstro = luta_db.criar_monstro(monstro_id, 1)
+    jogador["nome"] = jogador.get("nome") or ctx.author.display_name
+    monstro = await run_db(luta_db.criar_monstro, monstro_id, 1)
     if not monstro:
         await ctx.send("❌ Não foi possível criar esse monstro.")
         return
-    participantes = sorted([jogador, monstro], key=lambda p: p.get("velocidade", 0), reverse=True)
+    participantes = [jogador, monstro]
+    participantes.sort(key=lambda p: p.get("Velocidade", p.get("velocidade", 0)), reverse=True)
     self.combates[ctx.channel.id] = {"participantes": participantes, "turno": 0, "numero_turno": 1, "fase": "ataque", "ativo": True, "pvp": False, "guild_id": guild_id, "ataque_pendente": None, "historico": [], "aguardando_finalizacao": False, "vencedor_id": None, "perdedor_id": None}
-    _atualizar_situacao(self, jogador["id"], guild_id, "ativo_combate")
+    self._atualizar_situacao(jogador["id"], guild_id, "ativo_combate")
     await self._mostrar_inicio(ctx)
 
 
-async def luta_pvp(self, ctx, membro: discord.Member):
+async def luta_pvp(self, ctx, membro):
     if not ctx.guild:
         return
-    if not isinstance(membro, discord.Member):
-        await ctx.send("❌ Mencione um membro válido. Exemplo: `!luta pvp @jogador`")
-        return
     if membro.bot or membro.id == ctx.author.id:
-        await ctx.send("❌ Alvo de PvP inválido.")
+        await ctx.send("❌ Alvo inválido para PvP.")
         return
     if self._combate_ativo(ctx.channel.id):
         await ctx.send("❌ Já existe um combate ativo neste canal.")
         return
     guild_id = str(ctx.guild.id)
+    jogadores = []
     for usuario in (ctx.author, membro):
         verificacao = await _pode_lutar(str(usuario.id), guild_id)
         if not verificacao.get("pode", False):
-            await ctx.send(f"❌ {usuario.display_name}: {verificacao.get('mensagem', 'não pode lutar.')}")
+            await ctx.send(verificacao.get("mensagem", "❌ Você não pode lutar."))
             return
-    jogadores = [await _criar_participante(str(u.id), guild_id) for u in (ctx.author, membro)]
-    if not all(jogadores):
-        await ctx.send("❌ Um dos jogadores não possui personagem registrado.")
-        return
-    for jogador, usuario in zip(jogadores, (ctx.author, membro)):
+        jogador = await _criar_participante(str(usuario.id), guild_id)
+        if not jogador:
+            await ctx.send(f"❌ {usuario.display_name} não possui um personagem registrado.")
+            return
         jogador["nome"] = jogador.get("nome") or usuario.display_name
-    participantes = sorted(jogadores, key=lambda p: p.get("velocidade", 0), reverse=True)
-    self.combates[ctx.channel.id] = {"participantes": participantes, "turno": 0, "numero_turno": 1, "fase": "ataque", "ativo": True, "pvp": True, "guild_id": guild_id, "ataque_pendente": None, "historico": [], "aguardando_finalizacao": False, "vencedor_id": None, "perdedor_id": None}
-    for jogador in participantes:
-        _atualizar_situacao(self, jogador["id"], guild_id, "ativo_combate")
+        jogadores.append(jogador)
+    jogadores.sort(key=lambda p: p.get("Velocidade", p.get("velocidade", 0)), reverse=True)
+    self.combates[ctx.channel.id] = {"participantes": jogadores, "turno": 0, "numero_turno": 1, "fase": "ataque", "ativo": True, "pvp": True, "guild_id": guild_id, "ataque_pendente": None, "historico": [], "aguardando_finalizacao": False, "vencedor_id": None, "perdedor_id": None}
+    for jogador in jogadores:
+        self._atualizar_situacao(jogador["id"], guild_id, "ativo_combate")
     await self._mostrar_inicio(ctx)
 
 
 _base.Luta.luta_pve.callback = luta_pve
 _base.Luta.luta_pvp.callback = luta_pvp
-_base.calcular_dano = _calcular_dano_fisico
-
-
-async def setup(bot):
-    await bot.add_cog(Luta(bot))
