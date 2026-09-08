@@ -9,22 +9,30 @@ from . import luta_sync as _base
 
 
 def _calcular_dano_fisico_defesa_acao(atacante, defensor):
-    """Dano físico: ataque = Força + Velocidade; defesa = Força + Defesa."""
-    if defensor.get("esquiva_ativa"):
-        if random.random() < 0.40:
-            defensor["esquiva_ativa"] = False
-            return 0, "esquivou"
-        defensor["esquiva_ativa"] = False
+    """Calcula exatamente o dano físico usando os atributos do combate.
 
-    dano = float(atacante.get("Força", 0) or 0) + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
+    Ataque = Força + Velocidade.
+    Defesa ativa = Força + Defesa.
+    Dano recebido = Ataque - Defesa.
+    """
+    if defensor.get("esquiva_ativa"):
+        defensor["esquiva_ativa"] = False
+        if random.random() < 0.40:
+            return 0, "esquivou"
+
+    forca_atacante = float(atacante.get("Força", 0) or 0)
+    velocidade_atacante = float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
+    dano = forca_atacante + velocidade_atacante
 
     if defensor.get("defesa_ativa"):
-        defesa = float(defensor.get("defesa", 0) or 0)
-        if not defesa:
-            defesa = float(defensor.get("Força", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
-        dano -= defesa
+        forca_defensor = float(defensor.get("Força", 0) or 0)
+        defesa_defensor = float(defensor.get("Defesa", 0) or 0)
+        defesa_total = forca_defensor + defesa_defensor
+        dano -= defesa_total
         defensor["defesa_ativa"] = False
+        return max(0, int(dano)), "defendeu"
 
+    # Sem defesa ativa, recebe o dano físico integral.
     return max(0, int(dano)), "normal"
 
 
@@ -36,7 +44,7 @@ def _defesa_magica(defensor, defesa_base):
 
 
 def _calcular_dano_magico(atacante, defensor, ataque):
-    """Dano mágico - defesa mágica quando houver barreira ativa."""
+    """Dano mágico menos a barreira mágica ativa."""
     if defensor.get("esquiva_ativa"):
         defensor["esquiva_ativa"] = False
         if random.random() < min(0.75, 0.10 + float(defensor.get("Velocidade", 0) or 0) / 500):
@@ -84,10 +92,16 @@ class CorrecoesLuta(commands.Cog):
 
     def _aplicar_correcoes(self):
         luta = self.bot.get_cog("Luta")
-        if luta is None or getattr(luta, "_magia_defensiva_corrigida", False):
-            return luta is not None
+        if luta is None:
+            return False
 
+        # O resolver do combate importa calcular_dano do módulo luta_sync.
+        # Portanto, substituir o símbolo no próprio módulo garante que a regra
+        # seja usada independentemente de qual camada iniciou o ataque.
         _base.calcular_dano = _calcular_dano_fisico_defesa_acao
+
+        if getattr(luta, "_magia_defensiva_corrigida", False):
+            return True
 
         original_usar_magia = luta.usar_magia_no_combate
         original_resolver = luta._resolver_ataque
