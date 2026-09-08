@@ -19,6 +19,30 @@ bot = commands.Bot(command_prefix="!", intents=intents, case_insensitive=True)
 _cadastro_inicial_concluido = False
 
 
+# ============================================================
+# PADRÃO GLOBAL DE RESPOSTAS
+# ============================================================
+# Garante que respostas de comandos feitas com ctx.send("...")
+# também sejam exibidas como Embed. Comandos que já enviam um
+# embed continuam inalterados.
+_context_send_original = commands.Context.send
+
+
+async def _context_send_com_embed(self, content=None, *, embed=None, **kwargs):
+    if content is not None and embed is None:
+        embed = discord.Embed(
+            description=str(content),
+            color=discord.Color.blurple(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+        content = None
+    return await _context_send_original(self, content=content, embed=embed, **kwargs)
+
+
+commands.Context.send = _context_send_com_embed
+
+
 @bot.event
 async def on_member_join(member):
     await cadastro_async([member])
