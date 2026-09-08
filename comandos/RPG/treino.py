@@ -16,7 +16,8 @@ class Treino(commands.Cog):
         for treino in treinos:
             cooldown = await run_db(get_cooldown_restante, str(ctx.author.id), str(ctx.guild.id), treino["tipo"])
             status = "✅ Disponível" if cooldown == 0 else f"⏰ {int(cooldown)}h restantes"
-            texto += f"{treino['emoji']} **{treino['nome']}** - Nv. {treino['nivel_minimo']}+ - {status}\n"
+            faixa = f"+{treino['tp_minimo']} TP" if treino['tp_minimo'] == treino['tp_maximo'] else f"+{treino['tp_minimo']}–{treino['tp_maximo']} TP"
+            texto += f"{treino['emoji']} **{treino['nome']}** - Nv. {treino['nivel_minimo']}+ - {faixa} - {status}\n"
         embed.add_field(name="📋 Treinos Disponíveis", value=texto or "Nenhum treino disponível.", inline=False)
         embed.add_field(name="📖 Comandos", value="`!treino leve` • `!treino medio` • `!treino pesado` • `!treino supremo`\n`!treino info` • `!treino cooldown`", inline=False)
         await ctx.send(embed=embed)
@@ -54,8 +55,10 @@ class Treino(commands.Cog):
         for tipo, config in CONFIG_TREINO["treinos"].items():
             pode = nivel >= config["nivel_minimo"]
             status = "✅ Disponível" if pode else f"❌ Nv. {config['nivel_minimo']} necessário"
-            tp = {"leve": 1, "medio": 2, "pesado": 3, "supremo": 5}.get(tipo, 1)
-            embed.add_field(name=f"{config['emoji']} {config['nome']}", value=f"**Nível mínimo:** {config['nivel_minimo']}\n**Cooldown:** {config['cooldown_horas']}h\n**TP:** +{tp}\n**Status:** {status}", inline=False)
+            minimo = config.get("tp_minimo", 100)
+            maximo = config.get("tp_maximo", minimo)
+            faixa = f"+{minimo} TP" if minimo == maximo else f"+{minimo}–{maximo} TP"
+            embed.add_field(name=f"{config['emoji']} {config['nome']}", value=f"**Nível mínimo:** {config['nivel_minimo']}\n**Cooldown:** {config['cooldown_horas']}h\n**TP:** {faixa}\n**Status:** {status}", inline=False)
         await ctx.send(embed=embed)
 
     @treino.command(name="cooldown")
