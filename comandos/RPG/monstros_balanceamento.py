@@ -1,5 +1,8 @@
 """Balanceamento centralizado dos atributos e recompensas dos monstros."""
 
+import discord
+from discord.ext import commands
+
 from database.python import luta as luta_db
 from . import luta_sync as base_luta
 
@@ -22,10 +25,7 @@ def _tp_monstro(dados, nivel, nivel_minimo):
         tabela = {1: 20, 2: 25, 3: 35, 4: 50}
         if nivel in tabela:
             return tabela[nivel]
-        # Após o nível 4, mantém crescimento de 25% por nível.
         return int(round(50 * (1.25 ** (nivel - 4))))
-    # Para os demais monstros, o valor informado no JSON é a recompensa no
-    # nível mínimo. Cada nível acima dele aumenta a recompensa em 10%.
     return int(round(base * (1 + 0.10 * max(0, nivel - nivel_minimo))))
 
 
@@ -53,6 +53,7 @@ def criar_monstro_balanceado(tipo: str, nivel: int = 1):
 
     return {
         "id": str(tipo),
+        "monstro_id": str(tipo),
         "nome": dados.get("nome", tipo),
         "emoji": dados.get("emoji", "👹"),
         "tipo": "monstro",
@@ -63,8 +64,8 @@ def criar_monstro_balanceado(tipo: str, nivel: int = 1):
         "vida_maxima": vitalidade * 10,
         "mana": magia,
         "mana_maxima": magia,
-        "Força": forca,
-        "Defesa": defesa,
+        "Força": atributos["Força"],
+        "Defesa": atributos["Defesa"],
         "Vitalidade": vitalidade,
         "Velocidade": atributos["Velocidade"],
         "Destreza": atributos["Destreza"],
@@ -74,9 +75,6 @@ def criar_monstro_balanceado(tipo: str, nivel: int = 1):
         "defesa": (forca + defesa) * 2,
         "velocidade": atributos["Velocidade"],
         "dano_base": int(float(dados.get("dano_base", forca) or forca) * fator),
-        # O motor de progressão usa xp_recompensa para converter a vitória em
-        # TP. Aqui os dois valores ficam iguais para respeitar a recompensa
-        # específica do monstro e do nível.
         "xp_recompensa": tp_recompensa,
         "hunos_recompensa": int(float(dados.get("hunos_recompensa", 10) or 10) * fator),
         "tp_recompensa": tp_recompensa,
@@ -86,9 +84,101 @@ def criar_monstro_balanceado(tipo: str, nivel: int = 1):
     }
 
 
+# O luta_sync importou criar_monstro diretamente. Atualizamos as duas
+# referências para que o PvE use sempre o balanceamento atual.
 base_luta.criar_monstro = criar_monstro_balanceado
 luta_db.criar_monstro = criar_monstro_balanceado
 
 
+def _encontrar_monstro(nome):
+    nome = str(nome or "").strip().casefold()
+    for monstro_id, dados in luta_db.MONSTROS.items():
+        if str(monstro_id).strip().casefold() == nome:
+            return monstro_id
+        if str(dados.get("nome", "")).strip().casefold() == nome:
+            return monstro_id
+    return None
+
+
+async def _pve_corrigido(self, ctx, *partes_monstro):
+    """Entrada robusta do PvE: aceita o nome do monstro e não dispara
+    MissingRequiredArgument quando o argumento estiver ausente.
+    """
+    if not ctx.guild:
+        return
+
+    if self._combate_ativo(ctx.channel.id):
+        await ctx.send("❌ Já existe um combate ativo neste canal.")
+        return
+
+    monstro_tipo = " ".join(str(parte) for parte in partes_monstro).strip()
+    if not monstro_tipo:
+        embed = discord.Embed(
+            title="⚔️ Luta PvE",
+            description="Informe o monstro que deseja enfrentar.\n\nExemplo: `!luta pve slime`",
+            color=discord.Color.red(),
+        )
+        await ctx.send(embed=embed)
+        return
+
+    monstro_id = _encontrar_monstro(monstro_tipo)
+    if not monstro_id:
+        await ctx.send(f"❌ Monstro `{monstro_tipo}` não encontrado. Use `!luta monstros` para ver os disponíveis.")
+        return
+
+    guild_id = str(ctx.guild.id)
+    user_id = str(ctx.author.id)
+    verificacao = luta_db.pode_lutar(user_id, guild_id)
+    if not verificacao.get("pode", False):
+        await ctx.send(verificacao.get("mensagem", "❌ Você não pode lutar."))
+        return
+
+    jogador = luta_db.criar_participante_jogador(user_id, guild_id)
+    if not jogador:
+        await ctx.send("❌ Você não possui um personagem registrado.")
+        return
+
+    jogador["nome"] = jogador.get("nome") or ctx.author.display_name
+    monstro = criar_monstro_balanceado(monstro_id, 1)
+    if not monstro:
+        await ctx.send("❌ Não foi possível criar esse monstro.")
+        return
+
+    participantes = [jogador, monstro]
+    participantes.sort(key=lambda p: p.get("velocidade", 0), reverse=True)
+    self.combates[ctx.channel.id] = {
+        "participantes": participantes,
+        "turno": 0,
+        "numero_turno": 1,
+        "fase": "ataque",
+        "ativo": True,
+        "pvp": False,
+        "guild_id": guild_id,
+        "ataque_pendente": None,
+        "historico": [],
+        "aguardando_finalizacao": False,
+        "vencedor_id": None,
+        "perdedor_id": None,
+    }
+    self._atualizar_situacao(jogador["id"], guild_id, "ativo_combate")
+    await self._mostrar_inicio(ctx)
+
+
+def _instalar_pve_corrigido(bot):
+    grupo = bot.get_command("luta")
+    if grupo is None:
+        return False
+
+    grupo.remove_command("pve")
+    comando = commands.Command(
+        _pve_corrigido,
+        name="pve",
+        help="Inicia um combate PvE contra um monstro.",
+    )
+    grupo.add_command(comando)
+    return True
+
+
 async def setup(bot):
-    print("[MONSTROS] Balanceamento de atributos e TP carregado.")
+    _instalar_pve_corrigido(bot)
+    print("[MONSTROS] Balanceamento de atributos, TP e PvE carregado.")
