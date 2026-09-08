@@ -9,30 +9,27 @@ from . import luta_sync as _base
 
 
 def _calcular_dano_fisico_defesa_acao(atacante, defensor):
-    """Calcula exatamente o dano físico usando os atributos do combate.
-
-    Ataque = Força + Velocidade.
-    Defesa ativa = Força + Defesa.
-    Dano recebido = Ataque - Defesa.
-    """
+    """Ataque físico = Força + Velocidade; defesa física = Força + Defesa."""
     if defensor.get("esquiva_ativa"):
         defensor["esquiva_ativa"] = False
         if random.random() < 0.40:
             return 0, "esquivou"
 
-    forca_atacante = float(atacante.get("Força", 0) or 0)
-    velocidade_atacante = float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
-    dano = forca_atacante + velocidade_atacante
+    dano = float(atacante.get("Força", 0) or 0) + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
+
+    if defensor.get("defesa_magica_ativa"):
+        defesa = float(defensor.get("defesa_magica_valor", 0) or 0)
+        dano -= defesa
+        defensor["defesa_magica_ativa"] = False
+        defensor["defesa_magica_valor"] = 0
+        return max(0, int(dano)), "barreira"
 
     if defensor.get("defesa_ativa"):
-        forca_defensor = float(defensor.get("Força", 0) or 0)
-        defesa_defensor = float(defensor.get("Defesa", 0) or 0)
-        defesa_total = forca_defensor + defesa_defensor
+        defesa_total = float(defensor.get("Força", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
         dano -= defesa_total
         defensor["defesa_ativa"] = False
         return max(0, int(dano)), "defendeu"
 
-    # Sem defesa ativa, recebe o dano físico integral.
     return max(0, int(dano)), "normal"
 
 
@@ -95,9 +92,6 @@ class CorrecoesLuta(commands.Cog):
         if luta is None:
             return False
 
-        # O resolver do combate importa calcular_dano do módulo luta_sync.
-        # Portanto, substituir o símbolo no próprio módulo garante que a regra
-        # seja usada independentemente de qual camada iniciou o ataque.
         _base.calcular_dano = _calcular_dano_fisico_defesa_acao
 
         if getattr(luta, "_magia_defensiva_corrigida", False):
@@ -179,6 +173,15 @@ class CorrecoesLuta(commands.Cog):
             return True
 
         async def resolver_corrigido(cog, ctx):
+            combate = cog._obter_combate(ctx.channel.id)
+            if combate and combate.get("ativo"):
+                defensor = cog._obter_defensor(combate)
+                barreira = float(defensor.get("defesa_magica_valor", 0) or 0) if defensor.get("defesa_magica_ativa") else 0
+                if barreira > 0 and combate.get("ataque_pendente"):
+                    # Marca a barreira para o resolver e também garante que ela
+                    # nunca seja ignorada por uma camada antiga do combate.
+                    defensor["defesa_magica_ativa"] = True
+                    defensor["defesa_magica_valor"] = barreira
             return await original_resolver(ctx)
 
         luta.usar_magia_no_combate = types.MethodType(usar_magia_corrigida, luta)
