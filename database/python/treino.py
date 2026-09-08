@@ -1,6 +1,7 @@
 from database.python.mongodb import db
 import datetime
 import json
+import random
 
 jogadores = db["Jogadores"]
 
@@ -12,15 +13,14 @@ def _carregar_config_treino():
     except Exception as e:
         print(f"❌ Erro ao carregar configuração de treino: {e}")
         return {"treinos": {
-            "leve": {"nome": "Treino Leve", "emoji": "🏃", "nivel_minimo": 1, "cooldown_horas": 12, "min_aumento": 0.1, "max_aumento": 0.25},
-            "medio": {"nome": "Treino Médio", "emoji": "💪", "nivel_minimo": 10, "cooldown_horas": 15, "min_aumento": 0.2, "max_aumento": 0.4},
-            "pesado": {"nome": "Treino Pesado", "emoji": "🏋️", "nivel_minimo": 20, "cooldown_horas": 20, "min_aumento": 0.4, "max_aumento": 0.6},
-            "supremo": {"nome": "Treino Supremo", "emoji": "🔥", "nivel_minimo": 50, "cooldown_horas": 24, "min_aumento": 0.7, "max_aumento": 0.7}},
-            "atributos": ["Força", "Defesa", "Velocidade", "Destreza", "Magia", "Sorte"]}
+            "leve": {"nome": "Treino Leve", "emoji": "🏃", "nivel_minimo": 1, "cooldown_horas": 12, "tp_minimo": 100, "tp_maximo": 200},
+            "medio": {"nome": "Treino Médio", "emoji": "💪", "nivel_minimo": 10, "cooldown_horas": 15, "tp_minimo": 200, "tp_maximo": 500},
+            "pesado": {"nome": "Treino Pesado", "emoji": "🏋️", "nivel_minimo": 20, "cooldown_horas": 20, "tp_minimo": 500, "tp_maximo": 1000},
+            "supremo": {"nome": "Treino Supremo", "emoji": "🔥", "nivel_minimo": 50, "cooldown_horas": 24, "tp_minimo": 2000, "tp_maximo": 2000}},
+            "atributos": ["Força", "Defesa", "Vitalidade", "Velocidade", "Destreza", "Magia", "Sorte", "Inteligencia"]}
 
 
 CONFIG_TREINO = _carregar_config_treino()
-TP_TREINO = {"leve": 1, "medio": 2, "pesado": 3, "supremo": 5}
 
 
 def obter_jogador(user_id: int, guild_id: int):
@@ -53,14 +53,17 @@ def verificar_cooldown(user_id: int, guild_id: int, tipo_treino: str):
 
 
 def realizar_treino(user_id: int, guild_id: int, tipo_treino: str):
-    """Treino agora concede TP; não aumenta atributos diretamente."""
+    """Treino concede TP em centenas; o Supremo concede exatamente 2000 TP."""
     jogador = obter_jogador(user_id, guild_id)
     verificacao = _verificar_cooldown_jogador(jogador, tipo_treino)
     if not verificacao["pode"]:
         return {"sucesso": False, "mensagem": verificacao["mensagem"]}
 
     config = CONFIG_TREINO["treinos"][tipo_treino]
-    tp_ganho = TP_TREINO.get(tipo_treino, 1)
+    minimo = int(config.get("tp_minimo", 100))
+    maximo = int(config.get("tp_maximo", minimo))
+    tp_ganho = minimo if minimo == maximo else random.randrange(minimo, maximo + 1, 100)
+
     ultimo_treino = jogador.get("ultimo_treino", {}).copy()
     ultimo_treino[tipo_treino] = datetime.datetime.utcnow().isoformat()
     resultado = jogadores.update_one(
@@ -70,13 +73,7 @@ def realizar_treino(user_id: int, guild_id: int, tipo_treino: str):
     if resultado.modified_count <= 0:
         return {"sucesso": False, "mensagem": "Erro ao realizar treino."}
     tp_atual = int(jogador.get("TP", 0) or 0) + tp_ganho
-    return {
-        "sucesso": True,
-        "mensagem": f"✅ {config['emoji']} **{config['nome']}** realizado com sucesso!",
-        "tp_ganho": tp_ganho,
-        "tp_atual": tp_atual,
-        "cooldown_horas": config["cooldown_horas"],
-    }
+    return {"sucesso": True, "mensagem": f"✅ {config['emoji']} **{config['nome']}** realizado com sucesso!", "tp_ganho": tp_ganho, "tp_atual": tp_atual, "cooldown_horas": config["cooldown_horas"]}
 
 
 def listar_treinos_disponiveis(user_id: int, guild_id: int):
@@ -84,8 +81,7 @@ def listar_treinos_disponiveis(user_id: int, guild_id: int):
     if not jogador:
         return []
     nivel = jogador.get("Nivel", 1)
-    return [{"tipo": tipo, "nome": config["nome"], "emoji": config["emoji"], "nivel_minimo": config["nivel_minimo"], "cooldown_horas": config["cooldown_horas"], "descricao": config.get("descricao", "")}
-            for tipo, config in CONFIG_TREINO["treinos"].items() if nivel >= config["nivel_minimo"]]
+    return [{"tipo": tipo, "nome": config["nome"], "emoji": config["emoji"], "nivel_minimo": config["nivel_minimo"], "cooldown_horas": config["cooldown_horas"], "descricao": config.get("descricao", ""), "tp_minimo": config.get("tp_minimo", 100), "tp_maximo": config.get("tp_maximo", 100)} for tipo, config in CONFIG_TREINO["treinos"].items() if nivel >= config["nivel_minimo"]]
 
 
 def get_cooldown_restante(user_id: int, guild_id: int, tipo_treino: str):
