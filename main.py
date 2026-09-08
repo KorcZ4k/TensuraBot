@@ -99,6 +99,7 @@ async def carregar_extensoes():
         "comandos.RPG.progressao",
         "comandos.RPG.status_habilidades",
         "comandos.ECONOMIA.Mora",
+        "comandos.ECONOMIA.Hunos",
         "comandos.ADMINISTRACAO.luta_admin",
         "comandos.ADMINISTRACAO.autorole_commands",
         "comandos.ADMINISTRACAO.autorole",
