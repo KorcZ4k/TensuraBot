@@ -51,15 +51,26 @@ def aumentar_atributo_com_tp(user_id, guild_id, atributo, quantidade=1):
 
     valor_atual = float(jogador.get(atributo, 0) or 0)
     novo_valor = valor_atual + quantidade
-    atualizacoes = {atributo: novo_valor, "TP": tp - quantidade}
+    atualizacoes = {atributo: int(novo_valor), "TP": tp - quantidade}
 
     if atributo == "Vitalidade":
         vida_maxima_antiga = float(jogador.get("Vida_Maxima", valor_atual * 10) or 0)
         vida_atual = float(jogador.get("Vida", vida_maxima_antiga) or 0)
         vida_maxima_nova = novo_valor * 10
         aumento_vida = vida_maxima_nova - vida_maxima_antiga
-        atualizacoes["Vida_Maxima"] = vida_maxima_nova
-        atualizacoes["Vida"] = min(vida_maxima_nova, max(0, vida_atual + aumento_vida))
+        atualizacoes["Vida_Maxima"] = int(vida_maxima_nova)
+        atualizacoes["Vida"] = int(min(vida_maxima_nova, max(0, vida_atual + aumento_vida)))
+
+    elif atributo == "Magiculas":
+        # Mana máxima = Magiculas * 0.1. Como o jogo não exibe decimais,
+        # o valor armazenado também é inteiro. Ao aumentar Magiculas,
+        # aumenta a mana máxima e a mana atual pela mesma diferença.
+        mana_total_antiga = float(jogador.get("Mana Total", jogador.get("Mana_Maxima", valor_atual * 0.1)) or 0)
+        mana_atual = float(jogador.get("Mana", mana_total_antiga) or 0)
+        mana_total_nova = novo_valor * 0.1
+        aumento_mana = mana_total_nova - mana_total_antiga
+        atualizacoes["Mana Total"] = int(mana_total_nova)
+        atualizacoes["Mana"] = int(min(mana_total_nova, max(0, mana_atual + aumento_mana)))
 
     resultado = db["Jogadores"].update_one(
         {"_id": jogador["_id"], "TP": {"$gte": quantidade}},
@@ -68,8 +79,15 @@ def aumentar_atributo_com_tp(user_id, guild_id, atributo, quantidade=1):
     if resultado.modified_count == 0:
         raise ValueError("Não foi possível aplicar o aumento de atributo. Tente novamente.")
 
-    return {"atributo": atributo, "novo_valor": novo_valor, "tp_restante": tp - quantidade,
-            "vida_maxima": atualizacoes.get("Vida_Maxima"), "vida": atualizacoes.get("Vida")}
+    return {
+        "atributo": atributo,
+        "novo_valor": int(novo_valor),
+        "tp_restante": tp - quantidade,
+        "vida_maxima": atualizacoes.get("Vida_Maxima"),
+        "vida": atualizacoes.get("Vida"),
+        "mana_total": atualizacoes.get("Mana Total"),
+        "mana": atualizacoes.get("Mana"),
+    }
 
 
 class Progressao(commands.Cog):
@@ -106,9 +124,11 @@ class Progressao(commands.Cog):
             await ctx.send(f"❌ {erro}")
             return
 
-        texto = f"✅ **{resultado['atributo']}** aumentou para **{resultado['novo_valor']:.0f}**.\n✨ TP restante: **{resultado['tp_restante']}**"
+        texto = f"✅ **{resultado['atributo']}** aumentou para **{resultado['novo_valor']}**.\n✨ TP restante: **{resultado['tp_restante']}**"
         if resultado["atributo"] == "Vitalidade":
-            texto += f"\n❤️ Vida: **{resultado['vida']:.0f}/{resultado['vida_maxima']:.0f}**"
+            texto += f"\n❤️ Vida: **{resultado['vida']}/{resultado['vida_maxima']}**"
+        elif resultado["atributo"] == "Magiculas":
+            texto += f"\n💧 Mana: **{resultado['mana']}/{resultado['mana_total']}**"
         await ctx.send(texto)
 
     @commands.command(name="tp", aliases=["pontos", "pontostreinamento"])
