@@ -1,5 +1,6 @@
 """Comandos de status com acesso ao MongoDB fora do event loop."""
 
+import asyncio
 import datetime
 import json
 import random
@@ -47,8 +48,7 @@ class Status(commands.Cog):
 
     @commands.command(name="status")
     async def status(self, ctx, membro: discord.Member = None):
-        if membro is None:
-            membro = ctx.author
+        membro = membro or ctx.author
         jogador = await status_db.obter_status(membro.id, ctx.guild.id)
         if jogador is None:
             embed = discord.Embed(title="| Erro", description=f"**{membro.mention} não possui um personagem registrado.**", color=discord.Color.red(), timestamp=discord.utils.utcnow())
@@ -56,18 +56,28 @@ class Status(commands.Cog):
             embed.set_footer(text="Tensura Moon - Korczak Technologies!")
             await ctx.send(embed=embed)
             return
-        vals = {k: jogador.get(k, d) for k, d in {"Magiculas":0,"Nome":"Não definido","Raça":"Não definida","Nivel":0,"XP":0,"XP_maximo":0,"Força":0,"Defesa":0,"Velocidade":0,"Destreza":0,"Magia":0,"Sorte":0,"Vida":0,"Vida_Maxima":0,"Mana":0,"Mana Total":0,"inteligencia":0,"Situação":"ativo"}.items()}
+
+        vals = {k: jogador.get(k, d) for k, d in {
+            "Magiculas": 0, "TP": 0, "Nome": "Não definido", "Raça": "Não definida", "Nivel": 0,
+            "XP": 0, "XP_maximo": 0, "Força": 0, "Defesa": 0, "Vitalidade": 0, "Velocidade": 0,
+            "Destreza": 0, "Magia": 0, "Sorte": 0, "Vida": 0, "Vida_Maxima": 0,
+            "Mana": 0, "Mana Total": 0, "inteligencia": 0, "Situação": "ativo"
+        }.items()}
         embed = discord.Embed(title="📊 Status do Personagem", color=0x8B0000 if vals["Situação"] != "morto" else discord.Color.red(), timestamp=datetime.datetime.now(fuso))
-        # Mantém o comportamento original: o avatar exibido é o do autor do comando.
-        embed.set_thumbnail(url=ctx.author.display_avatar.url)
+        embed.set_thumbnail(url=membro.display_avatar.url)
         if vals["Situação"] == "morto":
             embed.description = "💀 **Este personagem está morto!**"
         embed.add_field(name="👤 Personagem", value=f"**Nome:** {vals['Nome']}\n**Raça:** {vals['Raça']}\n**Nível:** {vals['Nivel']}\n**Situação:** {vals['Situação']}", inline=False)
         embed.add_field(name=":star: XP", value=f"{barra_xp(vals['XP'], vals['XP_maximo'])}\n**{vals['XP']}/{vals['XP_maximo']}**", inline=False)
         embed.add_field(name="❤️ Vida", value=f"{barra_vida(vals['Vida'], vals['Vida_Maxima'])}\n**{vals['Vida']}/{vals['Vida_Maxima']}**", inline=False)
         embed.add_field(name="💧 Mana", value=f"{barra_mana(vals['Mana'], vals['Mana Total'])}\n**{vals['Mana']}/{vals['Mana Total']}**", inline=False)
-        embed.add_field(name="✨ Magiculas", value=f"**{vals['Magiculas']}**", inline=False)
-        embed.add_field(name="⚔️ Atributos", value=f"**Força:** {vals['Força']}\n**Defesa:** {vals['Defesa']}\n**Destreza:** {vals['Destreza']}\n**Velocidade:** {vals['Velocidade']}\n**Inteligência:** {vals['inteligencia']}\n**Magia:** {vals['Magia']}\n**Sorte:** {vals['Sorte']}", inline=False)
+        embed.add_field(name="✨ Magiculas", value=f"**{vals['Magiculas']}**", inline=True)
+        embed.add_field(name="✨ Pontos de Treinamento", value=f"**{vals['TP']} TP**", inline=True)
+        embed.add_field(name="⚔️ Atributos", value=(
+            f"**Força:** {vals['Força']}\n**Defesa:** {vals['Defesa']}\n**Vitalidade:** {vals['Vitalidade']}\n"
+            f"**Destreza:** {vals['Destreza']}\n**Velocidade:** {vals['Velocidade']}\n**Inteligência:** {vals['inteligencia']}\n"
+            f"**Magia:** {vals['Magia']}\n**Sorte:** {vals['Sorte']}"
+        ), inline=False)
         cd1 = await status_db.get_cooldown_recuperacao(str(membro.id), str(ctx.guild.id), "descanso")
         cd2 = await status_db.get_cooldown_recuperacao(str(membro.id), str(ctx.guild.id), "meditacao")
         fmt = lambda v: "✅ Disponível" if v == 0 else f"⏰ {int(v)}h"
@@ -100,23 +110,29 @@ class Status(commands.Cog):
         if dados_raca is None:
             await ctx.send("❌ Erro: dados da raça não encontrados.")
             return
-        base = {n: sortear_atributo() for n in ("Força","Defesa","Vitalidade","Velocidade","Destreza","Magia","Sorte","inteligencia")}
+        base = {n: sortear_atributo() for n in ("Força", "Defesa", "Vitalidade", "Velocidade", "Destreza", "Magia", "Sorte", "inteligencia")}
         bonus = dados_raca.get("bonus", {})
         a = {n: aplicar_bonus(v, bonus.get(n, 0)) for n, v in base.items()}
         mag = random.randrange(0, 1001, 100)
         vm = a["Vitalidade"] * 10
         mm = mag * 0.1
-        resultado = await run_db(player.update_one, {"_id": jogador["_id"], "Situação": "pendente"}, {"$set": {"Raça": raca, "Nivel": 1, "XP": 0, "Força": a["Força"], "Defesa": a["Defesa"], "Vitalidade": a["Vitalidade"], "Velocidade": a["Velocidade"], "Destreza": a["Destreza"], "Magia": a["Magia"], "Sorte": a["Sorte"], "inteligencia": a["inteligencia"], "Magiculas": mag, "Vida": vm, "Vida_Maxima": vm, "Mana": mm, "Mana Total": mm, "Situação": "ativo", "mortes": 0, "ultimo_treino": {}, "ultima_recuperacao": {}}})
+        resultado = await run_db(player.update_one, {"_id": jogador["_id"], "Situação": "pendente"}, {"$set": {
+            "Raça": raca, "Nivel": 1, "XP": 0, "XP_maximo": 100, "TP": 0,
+            "Força": a["Força"], "Defesa": a["Defesa"], "Vitalidade": a["Vitalidade"], "Velocidade": a["Velocidade"],
+            "Destreza": a["Destreza"], "Magia": a["Magia"], "Sorte": a["Sorte"], "inteligencia": a["inteligencia"],
+            "Magiculas": mag, "Vida": vm, "Vida_Maxima": vm, "Mana": mm, "Mana Total": mm,
+            "Situação": "ativo", "mortes": 0, "ultimo_treino": {}, "ultima_recuperacao": {}
+        }})
         if resultado.modified_count == 0:
             await ctx.send("❌ Não foi possível registrar sua ficha. Ela pode já ter sido registrada.")
             return
         e = discord.Embed(title="| Registro concluído", description=f"**{ctx.author.mention}**, seu personagem foi criado!", color=discord.Color.green(), timestamp=discord.utils.utcnow())
         e.add_field(name="🧬 Raça", value=f"**{raca}**", inline=False)
-        e.add_field(name="❤️ Vida", value=f"`{barra_vida(vm,vm)}`\n**{vm}/{vm}**", inline=False)
-        e.add_field(name="💧 Mana", value=f"`{barra_mana(mm,mm)}`\n**{mm}/{mm}**", inline=False)
+        e.add_field(name="❤️ Vida", value=f"`{barra_vida(vm, vm)}`\n**{vm}/{vm}**", inline=False)
+        e.add_field(name="💧 Mana", value=f"`{barra_mana(mm, mm)}`\n**{mm}/{mm}**", inline=False)
         e.add_field(name="✨ Magículas", value=f"**{mag}**", inline=False)
         e.add_field(name="⚔️ Atributos", value=f"**Força:** {a['Força']}\n**Defesa:** {a['Defesa']}\n**Vitalidade:** {a['Vitalidade']}\n**Velocidade:** {a['Velocidade']}\n**Destreza:** {a['Destreza']}\n**Magia:** {a['Magia']}\n**Sorte:** {a['Sorte']}\n**Inteligência:** {a['inteligencia']}", inline=False)
-        e.add_field(name="📊 Informações", value="**Nível:** 1\n**XP:** 0", inline=False)
+        e.add_field(name="📊 Informações", value="**Nível:** 1\n**XP:** 0\n**TP:** 0", inline=False)
         e.set_thumbnail(url=ctx.author.display_avatar.url)
         e.set_footer(text="Tensura Moon - Korczak Technologies!")
         await ctx.send(embed=e)
@@ -129,22 +145,14 @@ class Status(commands.Cog):
             return
         p = db["Jogadores"]
         j = await run_db(p.find_one, {"ID": str(membro.id), "guild_id": str(ctx.guild.id)})
-        if j is None:
-            await ctx.send("❌ Esse usuário não possui uma ficha.")
+        if j is None or j.get("Situação") != "ativo":
+            await ctx.send("❌ Esse jogador não possui um personagem ativo.")
             return
-        if j.get("Situação") != "ativo":
-            await ctx.send("❌ Esse jogador não está registrado.")
-            return
-        r = await run_db(p.update_one, {"_id": j["_id"], "Situação": "ativo"}, {"$set": {"Nome": None, "Raça": None, "Nivel": 0, "XP": 0, "Força": 0, "Defesa": 0, "Velocidade": 0, "Destreza": 0, "Magia": 0, "Sorte": 0, "Situação": "pendente"}})
+        r = await run_db(p.update_one, {"_id": j["_id"], "Situação": "ativo"}, {"$set": {"Nome": None, "Raça": None, "Nivel": 0, "XP": 0, "TP": 0, "Força": 0, "Defesa": 0, "Vitalidade": 0, "Velocidade": 0, "Destreza": 0, "Magia": 0, "Sorte": 0, "Situação": "pendente"}})
         if r.modified_count == 0:
             await ctx.send("❌ Não foi possível desregistrar esse jogador.")
             return
-        e = discord.Embed(title="| Jogador desregistrado", description=f"**{membro.mention}** foi desregistrado com sucesso.", color=discord.Color.orange(), timestamp=discord.utils.utcnow())
-        e.add_field(name="📋 Situação", value="**Pendente**", inline=False)
-        e.add_field(name="👤 Registrador", value=ctx.author.mention, inline=False)
-        e.set_thumbnail(url=membro.display_avatar.url)
-        e.set_footer(text="Tensura Moon - Korczak Technologies!")
-        await ctx.send(embed=e)
+        await ctx.send(f"✅ {membro.mention} foi desregistrado com sucesso.")
 
     async def _recuperacao(self, ctx, tipo, titulo, cor, footer):
         uid, gid = str(ctx.author.id), str(ctx.guild.id)
@@ -163,20 +171,15 @@ class Status(commands.Cog):
         await ctx.send(embed=e)
 
     @commands.command(name="descanso", aliases=["desc"])
-    async def descanso(self, ctx):
-        await self._recuperacao(ctx, "descanso", "🛌 Descanso", discord.Color.blue(), "Use !meditacao para recuperar mais mana")
+    async def descanso(self, ctx): await self._recuperacao(ctx, "descanso", "🛌 Descanso", discord.Color.blue(), "Use !meditacao para recuperar mais mana")
 
     @commands.command(name="meditacao", aliases=["meditar", "med"])
-    async def meditacao(self, ctx):
-        await self._recuperacao(ctx, "meditacao", "🧘 Meditação", discord.Color.purple(), "Use !descanso para uma recuperação mais rápida")
+    async def meditacao(self, ctx): await self._recuperacao(ctx, "meditacao", "🧘 Meditação", discord.Color.purple(), "Use !descanso para uma recuperação mais rápida")
 
     @commands.command(name="recuperacao", aliases=["rec", "cooldownmana"])
     async def recuperacao(self, ctx):
         uid, gid = str(ctx.author.id), str(ctx.guild.id)
-        a, b = await asyncio.gather(
-            status_db.get_cooldown_recuperacao(uid, gid, "descanso"),
-            status_db.get_cooldown_recuperacao(uid, gid, "meditacao"),
-        )
+        a, b = await asyncio.gather(status_db.get_cooldown_recuperacao(uid, gid, "descanso"), status_db.get_cooldown_recuperacao(uid, gid, "meditacao"))
         fmt = lambda v: "✅ Disponível" if v == 0 else (f"⏰ {int(v*60)} minutos" if v < 1 else f"⏰ {int(v)} horas")
         e = discord.Embed(title="⏰ Cooldowns de Recuperação", description="Tempo restante para cada comando", color=discord.Color.blue(), timestamp=discord.utils.utcnow())
         e.add_field(name="🛌 Descanso", value=fmt(a), inline=True)
