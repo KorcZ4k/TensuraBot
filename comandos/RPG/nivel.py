@@ -9,6 +9,7 @@ from database.python.mongodb import db, run_db
 CANAL_LEVEL_UP_ID = 1543041026158100480
 TP_POR_NIVEL = 100
 MANA_POR_NIVEL = 10
+FATOR_XP_POR_NIVEL = 1.30
 
 
 def _processar_niveis():
@@ -28,7 +29,7 @@ def _processar_niveis():
             xp_atual -= xp_maximo
             nivel_anterior = nivel_atual
             nivel_atual += 1
-            xp_maximo = math.ceil(xp_maximo * 1.75)
+            xp_maximo = math.ceil(xp_maximo * FATOR_XP_POR_NIVEL)
             level_ups.append((user_id, guild_id, nivel_anterior, nivel_atual))
         if nivel_atual > nivel_inicial:
             quantidade_niveis = nivel_atual - nivel_inicial
