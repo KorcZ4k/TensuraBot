@@ -118,7 +118,6 @@ def _obter_golpe_monstro(monstro):
 
 
 def _resistencia_efeito(defensor):
-    # Efeitos usam os atributos puros, nunca a defesa composta usada pelo cálculo legado de dano.
     if defensor.get("defesa_magica_ativa"):
         return float(defensor.get("Magia", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
     return float(defensor.get("Defesa", 0) or 0)
@@ -182,27 +181,29 @@ def _calcular_dano_fisico(atacante, defensor):
     A mesma fórmula vale para jogadores e monstros.
     """
     if defensor.get("esquiva_ativa"):
-        if random.random() < 0.40:
-            defensor["esquiva_ativa"] = False
-            return 0, "esquivou"
         defensor["esquiva_ativa"] = False
+        if random.random() < 0.40:
+            return 0, "esquivou"
+        # Esquiva falhou: dano cheio. Não aplicar Defesa.
+        defensor["defesa_ativa"] = False
+        return max(0, int(
+            float(atacante.get("Força", 0) or 0)
+            + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
+        )), "esquiva_falhou"
 
-    ataque = atacante.get("_ataque_atual", {})
-    forca = float(atacante.get("Força", 0) or 0)
-    velocidade = float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
-    dano = forca + velocidade
+    dano = (
+        float(atacante.get("Força", 0) or 0)
+        + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
+    )
 
-    # Defesa ativa continua sendo uma ação defensiva adicional:
-    # ela reduz pela metade o dano já calculado pela fórmula base.
+    # Defesa física só funciona se o defensor escolheu defender.
     if defensor.get("defesa_ativa"):
-        dano *= 0.50
+        defesa = float(defensor.get("defesa", 0) or 0)
+        if not defesa:
+            defesa = float(defensor.get("Força", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
+        dano -= defesa
         defensor["defesa_ativa"] = False
 
-    defesa = float(defensor.get("defesa", 0) or 0)
-    if not defesa:
-        defesa = float(defensor.get("Força", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
-
-    dano = dano - defesa
     return max(0, int(dano)), "normal"
 
 
@@ -210,13 +211,39 @@ async def _ataque_jogador(self, ctx, tipo_ataque):
     await _ATAQUE_JOGADOR_ORIGINAL(self, ctx, tipo_ataque)
 
 
+def _pode_esquivar(defensor, atacante):
+    """Verifica a regra de superioridade de Destreza para a esquiva.
+
+    Se a Destreza do atacante for 1,5x ou mais a soma
+    Destreza + Velocidade do defensor, a esquiva é impedida.
+    """
+    destreza_atacante = float(atacante.get("Destreza", atacante.get("destreza", 0)) or 0)
+    destreza_defensor = float(defensor.get("Destreza", defensor.get("destreza", 0)) or 0)
+    velocidade_defensor = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
+    return destreza_atacante < 1.5 * (destreza_defensor + velocidade_defensor)
+
+
 def _calcular_dano_magia(self, atacante, defensor, ataque):
     if defensor.get("esquiva_ativa"):
+        defensor["esquiva_ativa"] = False
+        if not _pode_esquivar(defensor, atacante):
+            return max(1, int(
+                float(atacante.get("Magia", 0) or 0)
+                + float(atacante.get("Inteligencia", 0) or 0)
+                + float(ataque.get("dano_base", 0) or 0)
+                + (float(atacante.get("dano_arma", 0) or 0) if ataque.get("com_arma") else 0)
+            )), "esquiva_bloqueada"
         velocidade = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
         if random.random() < min(0.75, 0.10 + velocidade / 500):
-            defensor["esquiva_ativa"] = False
             return 0, "esquivou"
-        defensor["esquiva_ativa"] = False
+        # Falhou: dano cheio, sem Defesa.
+        defensor["defesa_ativa"] = False
+        return max(1, int(
+            float(atacante.get("Magia", 0) or 0)
+            + float(atacante.get("Inteligencia", 0) or 0)
+            + float(ataque.get("dano_base", 0) or 0)
+            + (float(atacante.get("dano_arma", 0) or 0) if ataque.get("com_arma") else 0)
+        )), "esquiva_falhou"
     magia = float(atacante.get("Magia", 0) or 0)
     inteligencia = float(atacante.get("Inteligencia", 0) or 0)
     dano = magia + inteligencia + float(ataque.get("dano_base", 0) or 0)
@@ -354,9 +381,6 @@ async def luta_pvp(self, ctx, membro: discord.Member):
 
 _base.Luta.luta_pve.callback = luta_pve
 _base.Luta.luta_pvp.callback = luta_pvp
-
-
-# Substitui também o calculador importado diretamente pelo motor legado.
 _base.calcular_dano = _calcular_dano_fisico
 
 
