@@ -51,8 +51,6 @@ async def on_command_error(ctx, error):
     parent = getattr(command, "parent", None)
     param_name = getattr(getattr(error, "param", None), "name", None)
 
-    # Recupera o nome do monstro diretamente da mensagem caso o parser do
-    # Discord.py reporte o parâmetro como ausente mesmo havendo texto após pve.
     if (
         isinstance(error, commands.MissingRequiredArgument)
         and param_name == "monstro_tipo"
