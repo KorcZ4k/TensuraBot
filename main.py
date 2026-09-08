@@ -53,20 +53,6 @@ async def on_command_error(ctx, error):
 
     if (
         isinstance(error, commands.MissingRequiredArgument)
-        and param_name == "monstro_tipo"
-        and getattr(command, "name", None) == "pve"
-        and getattr(parent, "name", None) == "luta"
-    ):
-        partes = ctx.message.content.split()
-        if len(partes) >= 3 and hasattr(ctx, "cog"):
-            monstro_tipo = " ".join(partes[2:]).strip()
-            await command.callback(ctx.cog, ctx, monstro_tipo)
-            return
-        await ctx.send("❌ Informe o nome do monstro. Exemplo: `!luta pve slime`")
-        return
-
-    if (
-        isinstance(error, commands.MissingRequiredArgument)
         and param_name == "membro"
         and getattr(command, "name", None) == "pvp"
         and getattr(parent, "name", None) == "luta"
