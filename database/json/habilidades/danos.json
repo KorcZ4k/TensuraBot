@@ -1,6 +1,6 @@
 {
-  "versao": 2,
-  "descricao": "Configuração de combate das habilidades ativas. Efeitos usam somente mecânicas implementadas no combate; habilidades especiais são tratadas pelo resolvedor.",
+  "versao": 3,
+  "descricao": "Configuração de combate das habilidades ativas Comuns e Únicas. Cada habilidade possui dano, custo, precisão, recarga e efeitos usando somente mecânicas implementadas no combate.",
   "padrao": {"dano": 0, "gasto_mana": 0, "chance_acerto": 1.0, "recarga_turnos": 0, "efeitos": [], "cura": 0, "escudo": 0},
   "habilidades": {
     "00001": {"dano": 0, "gasto_mana": 10, "chance_acerto": 0.85, "recarga_turnos": 2, "efeitos": [{"tipo": "stun", "chance": 0.65, "duracao": 1, "valor": 0}]},
@@ -33,6 +33,7 @@
     "00095": {"dano": 0, "gasto_mana": 30, "chance_acerto": 1.0, "recarga_turnos": 5, "efeitos": [{"tipo": "escudo", "chance": 0.7, "duracao": 2, "valor": 20}]},
     "00096": {"dano": 0, "gasto_mana": 28, "chance_acerto": 1.0, "recarga_turnos": 5, "efeitos": [{"tipo": "buff_forca", "chance": 1.0, "duracao": 3, "valor": 0.25}, {"tipo": "buff_defesa", "chance": 1.0, "duracao": 3, "valor": 0.15}]},
     "00097": {"dano": 30, "gasto_mana": 25, "chance_acerto": 1.0, "recarga_turnos": 4, "efeitos": [{"tipo": "debuff_defesa", "chance": 1.0, "duracao": 2, "valor": 0.2}]},
-    "00098": {"dano": 38, "gasto_mana": 24, "chance_acerto": 0.85, "recarga_turnos": 3, "efeitos": [{"tipo": "sangramento", "chance": 0.55, "duracao": 2, "valor": 8}]}
+    "00098": {"dano": 38, "gasto_mana": 24, "chance_acerto": 0.85, "recarga_turnos": 3, "efeitos": [{"tipo": "sangramento", "chance": 0.55, "duracao": 2, "valor": 8}]},
+    "00099": {"dano": 15, "gasto_mana": 18, "chance_acerto": 0.9, "recarga_turnos": 3, "efeitos": [{"tipo": "debuff_velocidade", "chance": 1.0, "duracao": 2, "valor": 0.2}]}
   }
 }
