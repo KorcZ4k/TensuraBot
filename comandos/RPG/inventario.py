@@ -32,7 +32,6 @@ async def _carregar_equipamento_participante(participante, user_id, guild_id):
     catalogo = _carregar_itens()
     equipados = list(doc.get("equipados", []))[:2] if doc else []
     dano_arma = 0
-    nome_arma = ""
     nomes_armas = []
     for item_id in equipados:
         item = catalogo.get(str(item_id))
@@ -43,8 +42,7 @@ async def _carregar_equipamento_participante(participante, user_id, guild_id):
                 participante[destino] = int(float(participante.get(destino, 0) or 0) + float(item[chave] or 0))
         if "dano" in item:
             dano_arma += int(item.get("dano", 0) or 0)
-            nome_arma = item.get("nome", str(item_id))
-            nomes_armas.append(nome_arma)
+            nomes_armas.append(item.get("nome", str(item_id)))
     participante["dano_arma"] = dano_arma
     participante["arma_nome"] = ", ".join(nomes_armas)
     participante["defesa"] = int(float(participante.get("Força", 0) or 0) + float(participante.get("Defesa", 0) or 0))
@@ -97,7 +95,7 @@ class Inventario(commands.Cog):
                             efeitos.append(f"{emoji} {item[chave]}")
                     linhas.append(f"**{item.get('nome', item_id)}**\n{' • '.join(efeitos) if efeitos else 'Equipado'}")
                 valor = "\n\n".join(linhas) if linhas else "Nenhum item equipado."
-                indice = next((i for i, campo in enumerate(embed.fields) if campo.name == "🔄 Recuperação"), len(embed.fields))
+                indice = next((i for i, campo in enumerate(embed.fields) if campo.name == "⚔️ Atributos"), len(embed.fields))
                 embed.insert_field_at(indice, name=f"⚔️ Equipamentos ({len(equipados)}/2)", value=valor, inline=True)
             return await original_send(ctx, content=content, embed=embed, **kwargs)
         commands.Context.send = send_com_equipamentos
@@ -281,11 +279,11 @@ class Inventario(commands.Cog):
         if texto == "corte" and not cortante:
             await ctx.send("❌ Essa arma não possui um ataque de **corte**.")
             return
-        ataque_nome = {"corte": "⚔️ Corte", "estocada": "🗡️ Estocada", "golpe": "🔨 Golpe", "disparo": "🏹 Disparo"}.get(texto, f"⚔️ Ataque com {nome}")
         if texto == "disparo" and not any(x in nome.casefold() for x in ("arco", "besta")):
             await ctx.send("❌ Essa arma não é adequada para **disparo**.")
             return
-        combate["ataque_pendente"] = {"tipo": "soco", "nome": ataque_nome + f" — {nome}", "atacante_id": atacante["id"], "defensor_id": defensor["id"], "magia": False, "usar_arma": True, "arma_id": str(equipados[0])}
+        ataque_nome = {"corte": "⚔️ Corte", "estocada": "🗡️ Estocada", "golpe": "🔨 Golpe", "disparo": "🏹 Disparo"}.get(texto, f"⚔️ Ataque com {nome}")
+        combate["ataque_pendente"] = {"tipo": "soco", "nome": ataque_nome + f" — {nome}", "atacante_id": atacante["id"], "defensor_id": defensor["id"], "magia": False, "usar_arma": True, "arma_id": str(arma.get("id", equipados[0]))}
         atacante["_ataque_atual"] = combate["ataque_pendente"]
         combate["fase"] = "defesa"
         await luta._anunciar_ataque(ctx)
