@@ -18,27 +18,37 @@ PESOS_BASE = {
 }
 
 
-def _peso_hibrido(nome: str) -> float | None:
+def _componentes_hibrido(nome: str) -> tuple[str, str] | None:
     if nome.startswith("Meio-"):
-        partes = nome.split("-", 2)
-        if len(partes) != 3:
-            return None
-        primeiro = f"{partes[0]}-{partes[1]}"
-        segundo = partes[2]
+        corpo = nome[len("Meio-"):]
+        multiplicador = 0.025
     elif nome.startswith("Híbrido "):
         corpo = nome[len("Híbrido "):]
-        if "-" not in corpo:
-            return None
-        primeiro, segundo = corpo.split("-", 1)
+        multiplicador = 0.02
     else:
         return None
 
-    w1 = PESOS_BASE.get(primeiro)
-    w2 = PESOS_BASE.get(segundo)
-    if w1 is None or w2 is None:
-        return None
+    # Procura a divisão correta mesmo quando uma raça componente contém '-'.
+    for primeiro in sorted(PESOS_BASE, key=len, reverse=True):
+        prefixo = primeiro + "-"
+        if not corpo.startswith(prefixo):
+            continue
+        segundo = corpo[len(prefixo):]
+        if segundo in PESOS_BASE:
+            return primeiro, segundo
+    return None
 
-    peso = math.sqrt(w1 * w2) * (0.025 if nome.startswith("Meio-") else 0.02)
+
+def _peso_hibrido(nome: str) -> float | None:
+    componentes = _componentes_hibrido(nome)
+    if componentes is None:
+        return None
+    primeiro, segundo = componentes
+    w1 = PESOS_BASE[primeiro]
+    w2 = PESOS_BASE[segundo]
+    multiplicador = 0.025 if nome.startswith("Meio-") else 0.02
+    peso = math.sqrt(w1 * w2) * multiplicador
+
     if {primeiro, segundo} == {"Dragão", "Demônio"}:
         return 0.000001
     if "Dragão Verdadeiro" in {primeiro, segundo}:
@@ -73,8 +83,6 @@ def sortear_raca(racas: list[dict]) -> str:
 
 
 async def setup(bot):
-    # !registrar está no cog Status. O callback procura sortear_raca no
-    # módulo status em tempo de execução, então basta substituir essa função.
     from comandos.RPG import status
     status.sortear_raca = lambda: sortear_raca(status.carregar_racas())
     print("[RAÇAS][OK] Chances balanceadas por raridade e força de Tensura.")
