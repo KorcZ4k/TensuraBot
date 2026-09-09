@@ -278,7 +278,7 @@
         },
         {
             "nome": "Dragão Verdadeiro",
-            "chance": 100.001,
+            "chance": 0.001,
             "bonus": {
                 "Força": 3.00,
                 "Defesa": 3.00,
