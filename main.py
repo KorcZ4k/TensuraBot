@@ -157,6 +157,7 @@ async def carregar_extensoes():
         "comandos.RPG.magias",
         "comandos.RPG.habs",
         "comandos.RPG.usarhab",
+        "comandos.RPG.habilidades_fases",
         "comandos.RPG.status",
         "comandos.RPG.nivel",
         "comandos.RPG.nascimento",
