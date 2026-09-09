@@ -112,6 +112,7 @@ async def carregar_extensoes():
         "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs", "comandos.RPG.usarhab",
         "comandos.RPG.status", "comandos.RPG.nivel", "comandos.RPG.nascimento", "comandos.RPG.correcoes_luta",
         "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao",
+        "comandos.RPG.habilidades_combate",
         "comandos.ECONOMIA.Mora", "comandos.ECONOMIA.Hunos", "comandos.ADMINISTRACAO.luta_admin",
         "comandos.ADMINISTRACAO.autorole_commands", "comandos.ADMINISTRACAO.autorole", "comandos.ADMINISTRACAO.configurações",
         "comandos.ADMINISTRACAO.canais_comandos", "comandos.ADMINISTRACAO.moderacao", "comandos.ADMINISTRACAO.automod",
