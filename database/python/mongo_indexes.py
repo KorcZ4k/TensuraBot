@@ -25,6 +25,9 @@ _INDEXES = {
     "Recursos": [
         ([('governo_id', 1)], {"name": "idx_governo_id"}),
     ],
+    "Evento": [
+        ([('tipo', 1), ('guild_id', 1), ('canal_id', 1)], {"name": "idx_assentamento"}),
+    ],
 }
 
 
@@ -33,11 +36,7 @@ async def ensure_indexes():
     for collection_name, indexes in _INDEXES.items():
         collection = db[collection_name]
         existing = await run_db(lambda: list(collection.list_indexes()))
-        existing_keys = {
-            tuple(item["key"].items())
-            for item in existing
-        }
-
+        existing_keys = {tuple(item["key"].items()) for item in existing}
         for keys, options in indexes:
             if tuple(keys) in existing_keys:
                 continue
