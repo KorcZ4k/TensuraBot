@@ -1,0 +1,113 @@
+{
+  "moeda": "Hunos",
+  "salario_minimo": 1000,
+  "regra_precos": "Itens básicos devem custar aproximadamente 5 salários mínimos ou mais; equipamentos melhores e itens raros escalam fortemente.",
+  "categorias": {
+    "armas": [
+      {"id":"espada_ferro","nome":"Espada de Ferro","preco":5000,"dano":25},
+      {"id":"espada_aco","nome":"Espada de Aço","preco":10000,"dano":45},
+      {"id":"espada_longa","nome":"Espada Longa","preco":15000,"dano":60},
+      {"id":"katana","nome":"Katana","preco":18000,"dano":65},
+      {"id":"sabre","nome":"Sabre","preco":12000,"dano":45},
+      {"id":"rapiera","nome":"Rapieira","preco":11000,"dano":40},
+      {"id":"adaga","nome":"Adaga","preco":5000,"dano":25},
+      {"id":"adaga_aco","nome":"Adaga de Aço","preco":9000,"dano":40},
+      {"id":"machado","nome":"Machado","preco":7000,"dano":35},
+      {"id":"machado_batalha","nome":"Machado de Batalha","preco":16000,"dano":65},
+      {"id":"lanca","nome":"Lança","preco":6000,"dano":30},
+      {"id":"lanca_aco","nome":"Lança de Aço","preco":12000,"dano":50},
+      {"id":"foice","nome":"Foice","preco":8000,"dano":40},
+      {"id":"martelo","nome":"Martelo de Guerra","preco":9000,"dano":45},
+      {"id":"clava","nome":"Clava","preco":4000,"dano":20},
+      {"id":"arco","nome":"Arco Curto","preco":5000,"dano":25},
+      {"id":"arco_longo","nome":"Arco Longo","preco":9000,"dano":40},
+      {"id":"besta","nome":"Besta","preco":10000,"dano":45},
+      {"id":"cajado","nome":"Cajado de Madeira","preco":5000,"dano":10},
+      {"id":"cajado_mago","nome":"Cajado de Mago","preco":15000,"dano":25}
+    ],
+    "armaduras": [
+      {"id":"roupa","nome":"Roupa Simples","preco":2000,"defesa":5},
+      {"id":"couro","nome":"Armadura de Couro","preco":6000,"defesa":15},
+      {"id":"couro_reforcado","nome":"Couro Reforçado","preco":10000,"defesa":25},
+      {"id":"cota_malha","nome":"Cota de Malha","preco":15000,"defesa":40},
+      {"id":"armadura_ferro","nome":"Armadura de Ferro","preco":25000,"defesa":60},
+      {"id":"armadura_aco","nome":"Armadura de Aço","preco":50000,"defesa":100},
+      {"id":"armadura_cavaleiro","nome":"Armadura de Cavaleiro","preco":75000,"defesa":140},
+      {"id":"manto_mago","nome":"Manto de Mago","preco":20000,"defesa":20,"magia":30},
+      {"id":"manto_encantado","nome":"Manto Encantado","preco":60000,"defesa":50,"magia":80},
+      {"id":"escudo_madeira","nome":"Escudo de Madeira","preco":3000,"defesa":10},
+      {"id":"escudo_ferro","nome":"Escudo de Ferro","preco":12000,"defesa":35},
+      {"id":"escudo_aco","nome":"Escudo de Aço","preco":30000,"defesa":70}
+    ],
+    "consumiveis": [
+      {"id":"pocao_pequena","nome":"Poção de Vida Pequena","preco":1000,"cura":50},
+      {"id":"pocao_media","nome":"Poção de Vida Média","preco":3000,"cura":150},
+      {"id":"pocao_grande","nome":"Poção de Vida Grande","preco":8000,"cura":400},
+      {"id":"pocao_suprema","nome":"Poção de Vida Suprema","preco":25000,"cura":1000},
+      {"id":"pocao_mana_pequena","nome":"Poção de Mana Pequena","preco":1500,"mana":50},
+      {"id":"pocao_mana_media","nome":"Poção de Mana Média","preco":4000,"mana":150},
+      {"id":"pocao_mana_grande","nome":"Poção de Mana Grande","preco":10000,"mana":400},
+      {"id":"antidoto","nome":"Antídoto","preco":2000},
+      {"id":"cura_status","nome":"Remédio de Status","preco":5000},
+      {"id":"comida","nome":"Ração de Aventureiro","preco":1000},
+      {"id":"carne","nome":"Carne Assada","preco":1500},
+      {"id":"agua","nome":"Água Potável","preco":500}
+    ],
+    "acessorios": [
+      {"id":"anel_forca","nome":"Anel da Força","preco":25000,"forca":10},
+      {"id":"anel_defesa","nome":"Anel da Defesa","preco":25000,"defesa":10},
+      {"id":"anel_velocidade","nome":"Anel da Velocidade","preco":30000,"velocidade":10},
+      {"id":"anel_destreza","nome":"Anel da Destreza","preco":30000,"destreza":10},
+      {"id":"anel_magia","nome":"Anel Mágico","preco":35000,"magia":10},
+      {"id":"colar_vitalidade","nome":"Colar da Vitalidade","preco":35000,"vitalidade":15},
+      {"id":"brinco_sorte","nome":"Brincos da Sorte","preco":40000,"sorte":10},
+      {"id":"amuleto_protecao","nome":"Amuleto de Proteção","preco":50000,"defesa":25},
+      {"id":"cinto_guerreiro","nome":"Cinto do Guerreiro","preco":30000,"forca":15}
+    ],
+    "materiais": [
+      {"id":"madeira","nome":"Madeira","preco":500},
+      {"id":"ferro","nome":"Minério de Ferro","preco":1000},
+      {"id":"aco","nome":"Aço","preco":3000},
+      {"id":"prata","nome":"Prata","preco":5000},
+      {"id":"ouro","nome":"Ouro","preco":10000},
+      {"id":"cristal","nome":"Cristal Mágico","preco":15000},
+      {"id":"gema","nome":"Gema Mágica","preco":30000},
+      {"id":"pele_monstro","nome":"Pele de Monstro","preco":2500},
+      {"id":"presa","nome":"Presa de Monstro","preco":2000},
+      {"id":"escama","nome":"Escama de Monstro","preco":5000}
+    ],
+    "ferramentas": [
+      {"id":"picareta","nome":"Picareta","preco":3000},
+      {"id":"machado_lenhador","nome":"Machado de Lenhador","preco":3000},
+      {"id":"kit_aventureiro","nome":"Kit de Aventureiro","preco":7500},
+      {"id":"corda","nome":"Corda","preco":1000},
+      {"id":"tocha","nome":"Tocha","preco":500},
+      {"id":"lanterna","nome":"Lanterna","preco":2000},
+      {"id":"bussola","nome":"Bússola","preco":5000},
+      {"id":"mochila","nome":"Mochila Grande","preco":6000}
+    ],
+    "livros": [
+      {"id":"livro_basico","nome":"Livro de Aventureiro","preco":3000},
+      {"id":"livro_combate","nome":"Manual de Combate","preco":15000},
+      {"id":"livro_magia","nome":"Grimório Básico","preco":20000},
+      {"id":"mapa","nome":"Mapa do Reino","preco":5000},
+      {"id":"mapa_raro","nome":"Mapa de Região Perigosa","preco":20000}
+    ],
+    "raros": [
+      {"id":"espada_mitica","nome":"Espada Mítica","preco":500000,"dano":300},
+      {"id":"armadura_mitica","nome":"Armadura Mítica","preco":750000,"defesa":400},
+      {"id":"cristal_primordial","nome":"Cristal Primordial","preco":1000000},
+      {"id":"gema_dragao","nome":"Gema de Dragão","preco":2000000},
+      {"id":"nucleo_monstro","nome":"Núcleo de Monstro","preco":100000},
+      {"id":"nucleo_raro","nome":"Núcleo de Monstro Raro","preco":500000},
+      {"id":"artefato_lendario","nome":"Artefato Lendário","preco":5000000}
+    ],
+    "servicos": [
+      {"id":"cura","nome":"Cura do Sacerdote","preco":5000},
+      {"id":"identificar","nome":"Identificação de Item","preco":3000},
+      {"id":"reparo","nome":"Reparo de Equipamento","preco":2500},
+      {"id":"encantar","nome":"Encantamento Básico","preco":25000},
+      {"id":"teleporte","nome":"Serviço de Teleporte","preco":50000}
+    ]
+  }
+}
