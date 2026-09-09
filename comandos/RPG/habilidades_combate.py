@@ -57,7 +57,9 @@ def _desviante_esquiva(defensor, atacante):
 def _dano_habilidade_fisica(atacante, defensor, ataque):
     if defensor.get("esquiva_ativa"):
         defensor["esquiva_ativa"] = False
-        if _desviante_esquiva(defensor, atacante):
+        if defensor.get("desviante_ativo") and _desviante_esquiva(defensor, atacante):
+            return 0, "esquivou_desviante"
+        if random.random() < 0.40:
             return 0, "esquivou"
 
     dano = _valor(atacante, "Força") + _valor(atacante, "Velocidade") + _valor(ataque, "dano_base")
@@ -104,8 +106,10 @@ async def _resolver_habilidade(self, ctx, combate, ataque):
                         msg += f"\n🧠 Incorporou **{nova['nome']}** (`{nova['id']}`)."
             return await _finalizar_resultado(self, ctx, combate, atacante, defensor, msg)
 
-    if resultado == "esquivou":
-        mensagem = f"💨 **{defensor['nome']}** desviou de **{nome}** graças ao Desviante!"
+    if resultado == "esquivou_desviante":
+        mensagem = f"💨 **{defensor['nome']}** desviou de **{nome}** graças ao **Desviante**!"
+    elif resultado == "esquivou":
+        mensagem = f"💨 **{defensor['nome']}** esquivou de **{nome}**!"
     else:
         defensor["vida"] = max(0, int(_valor(defensor, "vida") - dano))
         buffs = _aplicar_buffs(atacante, ataque.get("efeitos", []))
@@ -135,6 +139,30 @@ async def _resolver_ataque_com_desviante(self, ctx):
     return await luta_mod._RESOLVER_ATAQUE_ORIGINAL(self, ctx)
 
 
+def _texto_status_com_efeitos(self, participantes):
+    linhas = []
+    for participante in participantes:
+        if participante["tipo"] == "jogador":
+            linha = f"👤 **{participante['nome']}**\n❤️ {int(participante.get('vida', 0))}/{int(participante.get('vida_maxima', 0))}\n💙 {int(participante.get('mana', 0))}"
+        else:
+            linha = f"{participante.get('emoji', '👹')} **{participante['nome']}**\n❤️ {int(participante.get('vida', 0))}/{int(participante.get('vida_maxima', 0))}"
+        efeitos = participante.get("efeitos", [])
+        estados = []
+        for efeito in efeitos:
+            nome = str(efeito.get("nome", "")).strip()
+            turnos = int(efeito.get("turnos", 0) or 0)
+            if nome:
+                estados.append(f"{nome.title()} ({turnos}t)")
+        if participante.get("desviante_ativo"):
+            estados.append("Desviante ativo")
+        if participante.get("defesa_magica_ativa"):
+            estados.append(f"Barreira {int(_valor(participante, 'defesa_magica_valor'))}")
+        if estados:
+            linha += "\n⚠️ " + " • ".join(estados)
+        linhas.append(linha)
+    return "\n\n".join(linhas)
+
+
 async def _resolver_ataque(self, ctx):
     combate = self._obter_combate(ctx.channel.id)
     ataque = combate.get("ataque_pendente") if combate else None
@@ -145,7 +173,9 @@ async def _resolver_ataque(self, ctx):
 
 async def setup(bot):
     base.Luta._resolver_ataque = _resolver_ataque
+    base.Luta._texto_status = _texto_status_com_efeitos
     luta = bot.get_cog("Luta")
     if luta:
         luta._resolver_ataque = _resolver_ataque.__get__(luta, base.Luta)
+        luta._texto_status = _texto_status_com_efeitos.__get__(luta, base.Luta)
     print("✅ Resolver de habilidades integrado ao fluxo de combate.")
