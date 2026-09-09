@@ -6,22 +6,22 @@
       "dano_base": 50, "xp_recompensa": 20, "hunos_recompensa": 20, "tp_recompensa": 20, "golpes": ["pancada", "investida"]
     },
     "goblin": {
-      "nome": "Goblin", "emoji": "👺", "vida_base": 1400, "nivel_minimo": 2, "nivel_maximo": 15,
+      "nome": "Goblin", "emoji": "👺", "vida_base": 1400, "nivel_minimo": 1, "nivel_maximo": 15,
       "atributos_base": {"Força": 140, "Defesa": 140, "Vitalidade": 140, "Velocidade": 140, "Destreza": 140, "Magia": 140, "Sorte": 140, "Inteligencia": 140},
       "dano_base": 140, "xp_recompensa": 75, "hunos_recompensa": 30, "tp_recompensa": 75, "golpes": ["corte", "estocada"]
     },
     "lobo": {
-      "nome": "Lobo", "emoji": "🐺", "vida_base": 1800, "nivel_minimo": 4, "nivel_maximo": 20,
+      "nome": "Lobo", "emoji": "🐺", "vida_base": 1800, "nivel_minimo": 1, "nivel_maximo": 20,
       "atributos_base": {"Força": 180, "Defesa": 180, "Vitalidade": 180, "Velocidade": 180, "Destreza": 180, "Magia": 180, "Sorte": 180, "Inteligencia": 180},
       "dano_base": 180, "xp_recompensa": 90, "hunos_recompensa": 40, "tp_recompensa": 90, "golpes": ["mordida", "arranhar"]
     },
     "orc": {
-      "nome": "Orc", "emoji": "👹", "vida_base": 2500, "nivel_minimo": 6, "nivel_maximo": 25,
+      "nome": "Orc", "emoji": "👹", "vida_base": 2500, "nivel_minimo": 1, "nivel_maximo": 25,
       "atributos_base": {"Força": 250, "Defesa": 250, "Vitalidade": 250, "Velocidade": 250, "Destreza": 250, "Magia": 250, "Sorte": 250, "Inteligencia": 250},
       "dano_base": 250, "xp_recompensa": 100, "hunos_recompensa": 60, "tp_recompensa": 100, "golpes": ["machadada", "esmagamento"]
     },
     "esqueleto": {
-      "nome": "Esqueleto", "emoji": "💀", "vida_base": 3000, "nivel_minimo": 5, "nivel_maximo": 30,
+      "nome": "Esqueleto", "emoji": "💀", "vida_base": 3000, "nivel_minimo": 1, "nivel_maximo": 30,
       "atributos_base": {"Força": 300, "Defesa": 300, "Vitalidade": 300, "Velocidade": 300, "Destreza": 300, "Magia": 300, "Sorte": 300, "Inteligencia": 300},
       "dano_base": 300, "xp_recompensa": 110, "hunos_recompensa": 50, "tp_recompensa": 110, "golpes": ["golpe_osseo", "estocada"]
     },
