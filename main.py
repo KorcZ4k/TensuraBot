@@ -110,7 +110,7 @@ async def carregar_extensoes():
     extensoes = [
         "comandos.RPG.luta", "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
         "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs", "comandos.RPG.usarhab",
-        "comandos.RPG.status", "comandos.RPG.nivel", "comandos.RPG.nascimento", "comandos.RPG.correcoes_luta",
+        "comandos.RPG.status", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento", "comandos.RPG.correcoes_luta",
         "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao",
         "comandos.RPG.habilidades_combate", "comandos.RPG.evento_monstros", "comandos.RPG.assentamentos",
         "comandos.ECONOMIA.Mora", "comandos.ECONOMIA.Hunos", "comandos.ADMINISTRACAO.luta_admin",
