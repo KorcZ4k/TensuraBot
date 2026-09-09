@@ -36,7 +36,6 @@ class UsarHabilidade(commands.Cog):
         if not cog:
             return None
         procurado = self._normalizar(nome)
-        # Permite !usarhab 00001 e !usarhab Coerção.
         for habilidade in cog.cache_habilidades.values():
             if str(habilidade.get("id", "")).strip() == str(nome).strip():
                 return habilidade
@@ -60,12 +59,6 @@ class UsarHabilidade(commands.Cog):
             if str(item).strip() == str(habilidade_id).strip():
                 return True
         return False
-
-    def _tem_habilidade(self, participante, combate, nome):
-        if participante.get("tipo") != "jogador" or not combate.get("guild_id"):
-            return False
-        habilidade = self._buscar_habilidade_por_nome(nome)
-        return bool(habilidade and self._jogador_possui(participante.get("id"), combate.get("guild_id"), habilidade.get("id")))
 
     @staticmethod
     def _arma_cortante(participante):
@@ -163,7 +156,6 @@ class UsarHabilidade(commands.Cog):
         ataques = {"00001", "00002", "00006", "00007", "00074", "00076", "00081", "00082", "00083", "00085", "00086", "00087", "00089", "00090", "00091", "00092", "00093", "00094", "00097", "00098", "00099"}
         defesas = {"00004", "00008", "00075", "00077", "00078", "00079", "00080", "00084", "00088", "00095", "00096"}
 
-        # ATAQUE: habilidades ofensivas somente.
         if combate.get("fase") == "ataque":
             if hid in defesas:
                 await ctx.send(f"❌ **{habilidade['nome']}** é defensiva. Use-a somente no turno de defesa.")
@@ -201,7 +193,6 @@ class UsarHabilidade(commands.Cog):
                 await luta._defesa_monstro(ctx)
             return
 
-        # DEFESA: habilidades defensivas somente.
         if combate.get("fase") == "defesa":
             if hid in ataques:
                 await ctx.send(f"❌ **{habilidade['nome']}** é ofensiva e não pode ser usada na defesa.")
@@ -221,7 +212,6 @@ class UsarHabilidade(commands.Cog):
                 return
             defensor["mana"] = mana - gasto
 
-            efeitos = self._efeitos_para_combate(config)
             nome_norm = self._normalizar(habilidade.get("nome"))
             if hid == "00080":
                 defensor["esquiva_ativa"] = True
@@ -232,7 +222,9 @@ class UsarHabilidade(commands.Cog):
                 efeito_txt = f"Barreira ativa: {defensor['defesa_magica_valor']} de absorção."
             elif hid == "00095":
                 defensor["defesa_magica_ativa"] = True
-                defensor["defesa_magica_valor"] = int(config.get("efeitos", [{}])[0].get("valor", 20) or 20)
+                efeitos_cfg = config.get("efeitos", []) or []
+                valor = efeitos_cfg[0].get("valor", 20) if efeitos_cfg and isinstance(efeitos_cfg[0], dict) else 20
+                defensor["defesa_magica_valor"] = int(valor or 20)
                 efeito_txt = f"Reversão defensiva: {defensor['defesa_magica_valor']} de absorção."
             elif hid == "00078":
                 if not combate.get("party"):
@@ -282,11 +274,6 @@ class UsarHabilidade(commands.Cog):
             return
 
         await ctx.send("❌ O combate não está em uma fase que permita usar habilidades.")
-
-
-@commands.command(name="corte")
-async def _dummy():
-    pass
 
 
 async def setup(bot):
