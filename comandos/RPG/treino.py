@@ -28,7 +28,7 @@ class Treino(commands.Cog):
     @treino.command(name="medio")
     async def treino_medio(self, ctx): await self._executar_treino(ctx, "medio")
 
-    @treino.command(name="pesado")
+    @treino.command(name="pesado", aliases=["dificil", "difícil"])
     async def treino_pesado(self, ctx): await self._executar_treino(ctx, "pesado")
 
     @treino.command(name="supremo")
