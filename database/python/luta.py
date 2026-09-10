@@ -141,6 +141,17 @@ def iniciar_cooldown_monstro(user_id: str, guild_id: str, monstro_id: str):
     return {"sucesso": True, "segundos_restantes": MONSTRO_COOLDOWN_HORAS * 3600, "fim": fim}
 
 
+def cancelar_cooldown_monstro(user_id: str, guild_id: str, monstro_id: str, fim):
+    """Libera somente a reserva criada por esta tentativa, sem apagar outra reserva."""
+    if db is None:
+        return
+    campo = f"Cooldowns_Monstros.{str(monstro_id)}"
+    db["Jogadores"].update_one(
+        {"ID": str(user_id), "guild_id": str(guild_id), campo: fim},
+        {"$unset": {campo: ""}},
+    )
+
+
 def ativar_defesa(participante):
     participante["defesa_ativa"] = True
     participante["esquiva_ativa"] = False
