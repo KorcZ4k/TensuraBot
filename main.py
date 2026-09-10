@@ -22,12 +22,65 @@ CANAL_REGISTRO_ID = 1543040925788413982
 COMANDOS_REGISTRO_PERMITIDOS = {"registrar", "desregistrar"}
 
 _context_send_original = commands.Context.send
+
+def _partes_texto(texto, limite):
+    texto = str(texto)
+    if len(texto) <= limite:
+        return [texto]
+    partes = []
+    restante = texto
+    while restante:
+        corte = restante.rfind("\n", 0, limite + 1)
+        if corte < max(1, limite // 2):
+            corte = restante.rfind(" ", 0, limite + 1)
+        if corte < 1:
+            corte = limite
+        partes.append(restante[:corte])
+        restante = restante[corte:].lstrip()
+    return partes
+
+def _normalizar_embed(embed):
+    if embed is None:
+        return []
+    partes = []
+    base = discord.Embed.from_dict(embed.to_dict())
+    if base.description and len(base.description) > 4096:
+        descricoes = _partes_texto(base.description, 4096)
+        base.description = descricoes[0]
+        partes.extend(descricoes[1:])
+    novos_campos = []
+    for campo in list(base.fields):
+        valores = _partes_texto(campo.value, 1024)
+        for indice, valor in enumerate(valores):
+            nome = campo.name if indice == 0 else f"{campo.name} (continuação)"
+            novos_campos.append((nome[:256], valor, campo.inline))
+    base.clear_fields()
+    for nome, valor, inline in novos_campos[:25]:
+        base.add_field(name=nome, value=valor, inline=inline)
+    embeds = [base]
+    for descricao in partes:
+        extra = discord.Embed(description=descricao, color=base.color.value if base.color else discord.Color.blurple().value)
+        if base.footer and base.footer.text:
+            extra.set_footer(text=base.footer.text)
+        embeds.append(extra)
+    return embeds
+
 async def _context_send_com_embed(self, content=None, *, embed=None, **kwargs):
     if content is not None and embed is None:
-        embed = discord.Embed(description=str(content), color=discord.Color.blurple(), timestamp=discord.utils.utcnow())
-        embed.set_footer(text="Tensura Moon - Korczak Technologies!")
-        content = None
+        textos = _partes_texto(content, 2000)
+        for texto in textos:
+            ultimo = await _context_send_original(self, content=None, embed=discord.Embed(description=texto, color=discord.Color.blurple(), timestamp=discord.utils.utcnow()), **kwargs)
+        return ultimo if textos else None
+    if embed is not None:
+        embeds = _normalizar_embed(embed)
+        if not embeds:
+            return await _context_send_original(self, content=content, embed=embed, **kwargs)
+        ultimo = None
+        for item in embeds:
+            ultimo = await _context_send_original(self, content=content if item is embeds[0] else None, embed=item, **kwargs)
+        return ultimo
     return await _context_send_original(self, content=content, embed=embed, **kwargs)
+
 commands.Context.send = _context_send_com_embed
 
 @bot.check
@@ -76,6 +129,21 @@ async def on_command_error(ctx, error):
             return
         await ctx.send("❌ Mencione um membro válido. Exemplo: `!luta pvp @jogador`")
         return
+    erro_original = getattr(error, "original", error)
+    print(f"[COMANDO][ERRO] {type(erro_original).__name__}: {erro_original}")
+    if ctx.guild is not None:
+        try:
+            luta = bot.get_cog("Luta")
+            combate = luta._obter_combate(ctx.channel.id) if luta else None
+            if combate and combate.get("ativo") and combate.get("fase") == "defesa":
+                ataque = combate.get("ataque_pendente")
+                if ataque and ataque.get("_resolvendo"):
+                    ataque["_resolvendo"] = False
+                    combate["ataque_pendente"] = None
+                    combate["fase"] = "ataque"
+                    await ctx.send("⚠️ A ação falhou e foi cancelada com segurança. O combate continua no turno atual.")
+        except Exception as recuperacao_erro:
+            print(f"[COMANDO][RECUPERACAO][ERRO] {type(recuperacao_erro).__name__}: {recuperacao_erro}")
     raise error
 
 async def _cadastrar_guild(guild):
@@ -130,8 +198,6 @@ async def carregar_extensoes():
         "comandos.RPG.luta", "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
         "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs", "comandos.RPG.usarhab",
         "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento",
-        # habilidades_combate instala o resolver final; correcoes_luta deve ser carregada depois
-        # para poder envolver esse resolver e não ser sobrescrita por ele.
         "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_luta",
         "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao", "comandos.RPG.loja", "comandos.RPG.inventario",
         "comandos.RPG.evento_monstros", "comandos.RPG.assentamentos",
@@ -156,7 +222,7 @@ async def main():
     try:
         async with bot:
             await carregar_extensoes()
-            asyncio.create_task(ensure_indexes())
+            await ensure_indexes()
             await bot.start(TOKEN)
     finally:
         await close_db()
