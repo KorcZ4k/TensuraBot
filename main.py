@@ -76,8 +76,8 @@ async def _context_send_com_embed(self, content=None, *, embed=None, **kwargs):
     if embed is not None:
         ultimo = None
         embeds = _normalizar_embed(embed)
-        for item in embeds:
-            ultimo = await _context_send_original(self, content=content if not embeds.index(item) else None, embed=item, **kwargs)
+        for indice, item in enumerate(embeds):
+            ultimo = await _context_send_original(self, content=content if indice == 0 else None, embed=item, **kwargs)
         return ultimo
     return await _context_send_original(self, content=content, embed=embed, **kwargs)
 
@@ -86,14 +86,11 @@ commands.Context.send = _context_send_com_embed
 @bot.check
 async def verificar_canal_de_comandos(ctx):
     comando = getattr(ctx.command, "name", "").casefold()
-
     if getattr(bot, "em_manutencao", False) and comando != "manutencao":
         await ctx.send(MENSAGEM_MANUTENCAO)
         return False
-
     if ctx.guild is None:
         return True
-
     if ctx.channel.id == CANAL_REGISTRO_ID:
         if comando not in COMANDOS_REGISTRO_PERMITIDOS:
             await ctx.send("🚫 Neste canal, apenas os comandos `!registrar` e `!desregistrar` estão disponíveis.")
