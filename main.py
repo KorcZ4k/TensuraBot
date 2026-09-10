@@ -42,23 +42,22 @@ def _partes_texto(texto, limite):
 def _normalizar_embed(embed):
     if embed is None:
         return []
-    partes = []
+    descricoes = []
     base = discord.Embed.from_dict(embed.to_dict())
     if base.description and len(base.description) > 4096:
-        descricoes = _partes_texto(base.description, 4096)
-        base.description = descricoes[0]
-        partes.extend(descricoes[1:])
+        partes = _partes_texto(base.description, 4096)
+        base.description = partes[0]
+        descricoes.extend(partes[1:])
     novos_campos = []
     for campo in list(base.fields):
-        valores = _partes_texto(campo.value, 1024)
-        for indice, valor in enumerate(valores):
+        for indice, valor in enumerate(_partes_texto(campo.value, 1024)):
             nome = campo.name if indice == 0 else f"{campo.name} (continuação)"
             novos_campos.append((nome[:256], valor, campo.inline))
     base.clear_fields()
     for nome, valor, inline in novos_campos[:25]:
         base.add_field(name=nome, value=valor, inline=inline)
     embeds = [base]
-    for descricao in partes:
+    for descricao in descricoes:
         extra = discord.Embed(description=descricao, color=base.color.value if base.color else discord.Color.blurple().value)
         if base.footer and base.footer.text:
             extra.set_footer(text=base.footer.text)
@@ -67,17 +66,16 @@ def _normalizar_embed(embed):
 
 async def _context_send_com_embed(self, content=None, *, embed=None, **kwargs):
     if content is not None and embed is None:
-        textos = _partes_texto(content, 2000)
-        for texto in textos:
-            ultimo = await _context_send_original(self, content=None, embed=discord.Embed(description=texto, color=discord.Color.blurple(), timestamp=discord.utils.utcnow()), **kwargs)
-        return ultimo if textos else None
-    if embed is not None:
-        embeds = _normalizar_embed(embed)
-        if not embeds:
-            return await _context_send_original(self, content=content, embed=embed, **kwargs)
         ultimo = None
-        for item in embeds:
-            ultimo = await _context_send_original(self, content=content if item is embeds[0] else None, embed=item, **kwargs)
+        for texto in _partes_texto(content, 2000):
+            item = discord.Embed(description=texto, color=discord.Color.blurple(), timestamp=discord.utils.utcnow())
+            item.set_footer(text="Tensura Moon - Korczak Technologies!")
+            ultimo = await _context_send_original(self, content=None, embed=item, **kwargs)
+        return ultimo
+    if embed is not None:
+        ultimo = None
+        for item in _normalizar_embed(embed):
+            ultimo = await _context_send_original(self, content=content if item is embed else None, embed=item, **kwargs)
         return ultimo
     return await _context_send_original(self, content=content, embed=embed, **kwargs)
 
@@ -121,7 +119,7 @@ async def on_command_error(ctx, error):
                     pass
     if isinstance(error, commands.CommandNotFound):
         return
-    if (isinstance(error, commands.MissingRequiredArgument) and param_name == "membro" and getattr(command, "name", None) == "pvp" and getattr(parent, "name", None) == "luta"):
+    if isinstance(error, commands.MissingRequiredArgument) and param_name == "membro" and getattr(command, "name", None) == "pvp" and getattr(parent, "name", None) == "luta":
         mencoes = [m for m in ctx.message.mentions if not m.bot]
         membro = next((m for m in mencoes if m.id != ctx.author.id), None)
         if membro is not None and hasattr(ctx, "cog"):
@@ -196,10 +194,13 @@ async def _carregar_extensao_com_recuperacao_de_conflito(extensao):
 async def carregar_extensoes():
     extensoes = [
         "comandos.RPG.luta", "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
-        "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs", "comandos.RPG.usarhab",
+        "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs",
         "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento",
         "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_luta",
-        "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao", "comandos.RPG.loja", "comandos.RPG.inventario",
+        "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao", "comandos.RPG.loja",
+        # Inventário registra !corte para ataques com arma; carregá-lo antes de UsarHabilidade
+        # permite que o conflito seja resolvido conscientemente e que UsarHabilidade seja o comando final.
+        "comandos.RPG.inventario", "comandos.RPG.usarhab",
         "comandos.RPG.evento_monstros", "comandos.RPG.assentamentos",
         "comandos.ECONOMIA.Mora", "comandos.ECONOMIA.Hunos", "comandos.ADMINISTRACAO.luta_admin",
         "comandos.ADMINISTRACAO.autorole_commands", "comandos.ADMINISTRACAO.autorole", "comandos.ADMINISTRACAO.configurações",
