@@ -17,6 +17,12 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+  MONGODB_URI: ${{ secrets.MONGODB_URI }}
+  MONGODB_DATABASE: ${{ secrets.MONGODB_DATABASE }}
+  PYTHONUNBUFFERED: '1'
+
 jobs:
   run-bot:
     name: Executar Discord Bot
@@ -38,44 +44,27 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
+      - name: Validar configuração do bot
+        run: |
+          test -n "$DISCORD_TOKEN" || { echo 'ERRO: secret DISCORD_TOKEN não configurado.'; exit 1; }
+          test -n "$MONGODB_URI" || { echo 'ERRO: secret MONGODB_URI não configurado.'; exit 1; }
+          test -n "$MONGODB_DATABASE" || { echo 'ERRO: secret MONGODB_DATABASE não configurado.'; exit 1; }
+
       - name: Validar sintaxe Python
         run: python -m compileall -q .
 
       - name: Executar testes automatizados
         run: python -m unittest discover -s tests -p 'test_*.py' -v
 
-      - name: Validar configuração do bot
-        env:
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          MONGODB_DATABASE: ${{ secrets.MONGODB_DATABASE }}
-        run: |
-          test -n "$DISCORD_TOKEN" || { echo 'ERRO: secret DISCORD_TOKEN não configurado.'; exit 1; }
-          test -n "$MONGODB_URI" || { echo 'ERRO: secret MONGODB_URI não configurado.'; exit 1; }
-          test -n "$MONGODB_DATABASE" || { echo 'ERRO: secret MONGODB_DATABASE não configurado.'; exit 1; }
-
       - name: Executar Bot do Discord
-        env:
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          MONGODB_DATABASE: ${{ secrets.MONGODB_DATABASE }}
-          PYTHONUNBUFFERED: '1'
         run: |
           # O runner do GitHub tem limite de duração. O loop reinicia o bot
           # automaticamente se o processo encerrar inesperadamente.
-          # A execução agendada a cada 5 horas garante uma nova instância
-          # antes do limite máximo do runner.
           set +e
           while true; do
             echo "[WORKFLOW] Iniciando Discord Bot..."
             python main.py
             exit_code=$?
-
-            if [ "$exit_code" -eq 0 ]; then
-              echo "[WORKFLOW] main.py encerrou normalmente; reiniciando em 10s..."
-            else
-              echo "[WORKFLOW] main.py encerrou com código $exit_code; reiniciando em 10s..."
-            fi
-
+            echo "[WORKFLOW] main.py encerrou com código $exit_code; reiniciando em 10s..."
             sleep 10
           done
