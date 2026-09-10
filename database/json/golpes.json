@@ -22,7 +22,7 @@
     "soco_colossal": {"nome": "Soco Colossal", "emoji": "🗿", "tipo": "monstro", "dano_base": 20, "efeito": {"nome": "stun", "turnos": 1, "valor": 0}, "descricao": "Um soco gigantesco que pode atordoar."},
     "bicada_flamejante": {"nome": "Bicada Flamejante", "emoji": "🔥", "tipo": "monstro", "dano_base": 12, "efeito": {"nome": "queimadura", "valor": 10, "turnos_min": 1, "turnos_max": 3}, "descricao": "Uma bicada envolta em chamas."},
     "asas_flamejantes": {"nome": "Asas Flamejantes", "emoji": "🪽", "tipo": "monstro", "dano_base": 15, "efeito": {"nome": "queimadura", "valor": 10, "turnos_min": 1, "turnos_max": 3}, "descricao": "Um golpe de asas cobertas por fogo."},
-    "pancada": {"nome": "Pancada", "emoji": "🟢", "tipo": "monstro", "dano_base": 4, "efeito": {"nome": "stun", "turnos": 1, "valor": 0}, "descricao": "Uma pancada de corpo inteiro."},
-    "investida": {"nome": "Investida", "emoji": "💨", "tipo": "monstro", "dano_base": 6, "efeito": {"nome": "stun", "turnos": 1, "valor": 0}, "descricao": "Uma investida que pode atordoar."}
+    "pancada": {"nome": "Pancada", "emoji": "🟢", "tipo": "monstro", "dano_base": 4, "descricao": "Uma pancada de corpo inteiro."},
+    "investida": {"nome": "Investida", "emoji": "💨", "tipo": "monstro", "dano_base": 6, "descricao": "Uma investida do Slime sem efeito de controle."}
   }
 }
