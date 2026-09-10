@@ -17,6 +17,7 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, case_insensitive=True)
 _cadastro_inicial_concluido = False
+_online_notificado = False
 CANAL_REGISTRO_ID = 1543040925788413982
 COMANDOS_REGISTRO_PERMITIDOS = {"registrar", "desregistrar"}
 
@@ -94,15 +95,18 @@ async def _cadastro_inicial_background():
 
 @bot.event
 async def on_ready():
-    global _cadastro_inicial_concluido
+    global _cadastro_inicial_concluido, _online_notificado
     fuso_horario = datetime.timezone(datetime.timedelta(hours=-3))
     agora = datetime.datetime.now(fuso_horario)
     canal = bot.get_channel(1543040912912031775)
     print(f"Bot conectado como {bot.user}")
-    if canal is not None:
+    # on_ready pode ser disparado novamente após uma reconexão. Não envie
+    # várias mensagens "Online" para o mesmo processo.
+    if canal is not None and not _online_notificado:
         embed = discord.Embed(title="🟢 | Online", description="Moon Tensura está online e pronto para o RPG", colour=0x1CAA00, timestamp=agora)
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
         await canal.send(embed=embed)
+        _online_notificado = True
     if not _cadastro_inicial_concluido:
         asyncio.create_task(_cadastro_inicial_background())
 
