@@ -20,6 +20,7 @@ _cadastro_inicial_concluido = False
 _online_notificado = False
 CANAL_REGISTRO_ID = 1543040925788413982
 COMANDOS_REGISTRO_PERMITIDOS = {"registrar", "desregistrar"}
+MENSAGEM_MANUTENCAO = "O bot está em manutenção nesse momento, aguarde até ser reativado."
 
 _context_send_original = commands.Context.send
 
@@ -85,8 +86,20 @@ commands.Context.send = _context_send_com_embed
 async def verificar_canal_de_comandos(ctx):
     if ctx.guild is None:
         return True
+
+    comando = getattr(ctx.command, "name", "").casefold()
+
+    # O próprio comando de manutenção permanece disponível para administradores,
+    # mesmo enquanto a manutenção está ativa, para permitir a reativação do bot.
+    if getattr(bot, "em_manutencao", False) and comando != "manutencao":
+        if not ctx.author.guild_permissions.administrator:
+            await ctx.send(MENSAGEM_MANUTENCAO)
+            return False
+        # Administradores também recebem o bloqueio: a única exceção é !manutencao.
+        await ctx.send(MENSAGEM_MANUTENCAO)
+        return False
+
     if ctx.channel.id == CANAL_REGISTRO_ID:
-        comando = getattr(ctx.command, "name", "").casefold()
         if comando not in COMANDOS_REGISTRO_PERMITIDOS:
             await ctx.send("🚫 Neste canal, apenas os comandos `!registrar` e `!desregistrar` estão disponíveis.")
             return False
@@ -198,14 +211,13 @@ async def carregar_extensoes():
         "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento",
         "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_luta",
         "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao", "comandos.RPG.loja",
-        # Inventário registra !corte para ataques com arma; carregá-lo antes de UsarHabilidade
-        # permite que o conflito seja resolvido conscientemente e que UsarHabilidade seja o comando final.
         "comandos.RPG.inventario", "comandos.RPG.usarhab",
         "comandos.RPG.evento_monstros", "comandos.RPG.assentamentos",
         "comandos.ECONOMIA.Mora", "comandos.ECONOMIA.Hunos", "comandos.ADMINISTRACAO.luta_admin",
         "comandos.ADMINISTRACAO.autorole_commands", "comandos.ADMINISTRACAO.autorole", "comandos.ADMINISTRACAO.configurações",
         "comandos.ADMINISTRACAO.canais_comandos", "comandos.ADMINISTRACAO.moderacao", "comandos.ADMINISTRACAO.automod",
         "comandos.ADMINISTRACAO.boas_vindas", "comandos.ADMINISTRACAO.logs", "comandos.ADMINISTRACAO.ajuda",
+        "comandos.ADMINISTRACAO.manutencao",
     ]
     for extensao in extensoes:
         try:
