@@ -167,7 +167,13 @@ async def _resolver_ataque_com_desviante(self, ctx):
                 await ctx.send(embed=discord.Embed(title="💨 Desviante", description=combate["historico"][-1], color=discord.Color.green()))
                 await asyncio.sleep(1)
                 return await self._proximo_turno(ctx)
-    return await luta_mod._RESOLVER_ATAQUE_ORIGINAL(self, ctx)
+
+    # Não pule a camada de regras de luta (luta.py). Ela prepara dano,
+    # efeitos, armas e ataques de monstros. A versão anterior chamava
+    # diretamente o resolver mais antigo e podia deixar o estado do combate
+    # inconsistente depois de uma reação defensiva.
+    return await luta_mod._resolver_ataque(self, ctx)
+
 
 
 def _texto_status_com_efeitos(self, participantes):
