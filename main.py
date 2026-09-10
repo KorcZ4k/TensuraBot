@@ -110,8 +110,11 @@ async def _carregar_extensao_com_recuperacao_de_conflito(extensao):
     try:
         await bot.load_extension(extensao)
         return
-    except commands.CommandRegistrationError as erro:
-        nome = getattr(erro, "name", None)
+    except commands.ExtensionFailed as erro:
+        original = getattr(erro, "original", None) or getattr(erro, "__cause__", None)
+        if not isinstance(original, commands.CommandRegistrationError):
+            raise
+        nome = getattr(original, "name", None)
         if not nome:
             raise
         removido = bot.remove_command(nome)
