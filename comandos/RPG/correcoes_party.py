@@ -109,6 +109,9 @@ async def _proximo_turno(self, ctx):
         ),
         1,
     )
+    # _PROXIMO_TURNO_ORIGINAL incrementa o índice exatamente uma vez.
+    # Posicionamos o cursor imediatamente antes do participante escolhido,
+    # evitando pular um membro vivo.
     combate["turno"] = (atual + proximo - 1) % len(participantes)
     return await _PROXIMO_TURNO_ORIGINAL(self, ctx)
 
