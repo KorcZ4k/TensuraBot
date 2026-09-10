@@ -47,30 +47,16 @@ class Recuperacao(commands.Cog):
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
         await ctx.send(embed=embed)
 
-    async def _cmd_descanso(self, ctx):
+    @commands.command(name="descanso", aliases=["descansar", "rest"])
+    async def descanso(self, ctx):
         await self._recuperar(ctx, "descanso", "😴 Descanso")
 
-    async def _cmd_meditacao(self, ctx):
+    @commands.command(
+        name="meditacao",
+        aliases=["meditação", "meditar", "meditate"],
+    )
+    async def meditacao(self, ctx):
         await self._recuperar(ctx, "meditacao", "🧘 Meditação")
-
-    async def _registrar_comando(self, nome, callback, aliases):
-        for nome_comando in (nome, *aliases):
-            self.bot.remove_command(nome_comando)
-        self.bot.add_command(
-            commands.Command(callback, name=nome, aliases=aliases)
-        )
-
-    async def cog_load(self):
-        await self._registrar_comando(
-            "descanso",
-            self._cmd_descanso,
-            ["descansar", "rest"],
-        )
-        await self._registrar_comando(
-            "meditacao",
-            self._cmd_meditacao,
-            ["meditação", "meditar", "meditate"],
-        )
 
 
 async def setup(bot):
