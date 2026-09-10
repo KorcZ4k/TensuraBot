@@ -14,7 +14,6 @@ class Manutencao(commands.Cog):
     @commands.guild_only()
     async def manutencao(self, ctx):
         self.bot.em_manutencao = not getattr(self.bot, "em_manutencao", False)
-        estado = "ativada" if self.bot.em_manutencao else "desativada"
         if self.bot.em_manutencao:
             embed = discord.Embed(
                 title="🔧 Manutenção",
