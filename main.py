@@ -84,20 +84,17 @@ commands.Context.send = _context_send_com_embed
 
 @bot.check
 async def verificar_canal_de_comandos(ctx):
-    if ctx.guild is None:
-        return True
-
     comando = getattr(ctx.command, "name", "").casefold()
 
-    # O próprio comando de manutenção permanece disponível para administradores,
-    # mesmo enquanto a manutenção está ativa, para permitir a reativação do bot.
+    # Durante a manutenção, nenhum comando é executado. A única exceção é
+    # !manutencao, que permanece disponível para que um administrador possa
+    # encerrar a manutenção. Eventos não passam por este check.
     if getattr(bot, "em_manutencao", False) and comando != "manutencao":
-        if not ctx.author.guild_permissions.administrator:
-            await ctx.send(MENSAGEM_MANUTENCAO)
-            return False
-        # Administradores também recebem o bloqueio: a única exceção é !manutencao.
         await ctx.send(MENSAGEM_MANUTENCAO)
         return False
+
+    if ctx.guild is None:
+        return True
 
     if ctx.channel.id == CANAL_REGISTRO_ID:
         if comando not in COMANDOS_REGISTRO_PERMITIDOS:
