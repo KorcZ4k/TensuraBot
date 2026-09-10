@@ -96,7 +96,7 @@ def _dano_habilidade_fisica(atacante, defensor, ataque):
 
 
 def _dano_ataque_fisico(atacante, defensor, ataque):
-    """Resolve soco/chute/ataque de monstro sem voltar para a cadeia de monkeypatches."""
+    """Resolve ataque físico sem retornar para métodos monkeypatched."""
     if defensor.get("esquiva_ativa"):
         defensor["esquiva_ativa"] = False
         if defensor.get("desviante_ativo") and _desviante_esquiva(defensor, atacante):
@@ -208,9 +208,6 @@ async def _resolver_ataque_com_desviante(self, ctx):
         await asyncio.sleep(1)
         return await self._proximo_turno(ctx)
 
-    # Ataques físicos são resolvidos aqui de forma direta. Antes eles voltavam
-    # para a cadeia de métodos monkeypatched (habilidades -> luta -> sync),
-    # o que podia deixar o combate parado logo após a reação "defesa".
     if ataque.get("tipo") != "magia":
         dano, resultado = _dano_ataque_fisico(atacante, defensor, ataque)
         if resultado == "esquivou_desviante":
@@ -227,9 +224,6 @@ async def _resolver_ataque_com_desviante(self, ctx):
                     mensagem += "\n⚠️ Efeito aplicado: " + ", ".join(x.title() for x in aplicados) + "."
         return await _finalizar_resultado(self, ctx, combate, atacante, defensor, mensagem)
 
-    # Magias especiais (cura/barreira) continuam passando pela camada que
-    # prepara esses estados. Magias ofensivas comuns também são resolvidas
-    # diretamente para evitar reentrada desnecessária.
     if ataque.get("cura_base", 0) > 0:
         cura = int(_valor(atacante, "Magia") + _valor(atacante, "Inteligencia") + _valor(ataque, "cura_base"))
         atacante["vida"] = min(_valor(atacante, "vida_maxima", atacante.get("vida", 0)), _valor(atacante, "vida") + cura)
@@ -265,7 +259,28 @@ async def _defesa_monstro_corrigida(self, ctx):
     combate_atual = self._obter_combate(ctx.channel.id)
     if not combate_atual or not combate_atual.get("ativo") or combate_atual.get("fase") != "defesa" or not combate_atual.get("ataque_pendente"):
         return
-    await self._resolver_ataque(ctx)
+    # IMPORTANTE: chamar a função canônica diretamente. Não usar
+    # self._resolver_ataque(), pois correcoes_concorrencia/correcoes_luta
+    # podem instalar wrappers de instância que reentram neste mesmo fluxo.
+    await _resolver_ataque(self, ctx)
+
+
+async def _defesa_jogador_corrigida(self, ctx, acao):
+    combate = self._obter_combate(ctx.channel.id)
+    if not combate or combate.get("fase") != "defesa":
+        await ctx.send("❌ Não existe um ataque para defender.")
+        return
+    defensor = self._obter_defensor(combate)
+    if defensor.get("tipo") != "jogador" or str(defensor.get("id")) != str(ctx.author.id):
+        await ctx.send(f"❌ É **{defensor.get('nome', 'Defensor')}** quem deve defender.")
+        return
+    defensor["defesa_ativa"] = acao == "defesa"
+    defensor["esquiva_ativa"] = acao == "esquiva"
+    titulo = "🛡️ Defesa" if acao == "defesa" else "💨 Esquiva"
+    await ctx.send(embed=discord.Embed(title=titulo, description=f"**{defensor.get('nome', 'Defensor')}** escolheu {acao}.", color=discord.Color.blue()))
+    await asyncio.sleep(0.5)
+    # Mesmo caminho canônico usado pela defesa de monstros.
+    await _resolver_ataque(self, ctx)
 
 
 def _obter_defensor_corrigido(self, combate):
@@ -332,12 +347,14 @@ def _texto_status_com_efeitos(self, participantes):
 async def setup(bot):
     base.Luta._resolver_ataque = _resolver_ataque
     base.Luta._defesa_monstro = _defesa_monstro_corrigida
+    base.Luta._defesa_jogador = _defesa_jogador_corrigida
     base.Luta._obter_defensor = _obter_defensor_corrigido
     base.Luta._texto_status = _texto_status_com_efeitos
     luta = bot.get_cog("Luta")
     if luta:
         luta._resolver_ataque = _resolver_ataque.__get__(luta, base.Luta)
         luta._defesa_monstro = _defesa_monstro_corrigida.__get__(luta, base.Luta)
+        luta._defesa_jogador = _defesa_jogador_corrigida.__get__(luta, base.Luta)
         luta._obter_defensor = _obter_defensor_corrigido.__get__(luta, base.Luta)
         luta._texto_status = _texto_status_com_efeitos.__get__(luta, base.Luta)
-    print("✅ Resolver de habilidades, defesa PvE e alvos de party integrados ao fluxo de combate.")
+    print("✅ Resolver de habilidades, defesa PvE/PvP e alvos de party integrados ao fluxo de combate.")
