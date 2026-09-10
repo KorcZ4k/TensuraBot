@@ -77,6 +77,37 @@ def _dano_habilidade_fisica(atacante, defensor, ataque):
     return max(0, int(dano)), "atingiu"
 
 
+async def _finalizar_resultado(self, ctx, combate, atacante, defensor, mensagem):
+    """Finaliza uma habilidade exatamente como o motor base finaliza ataques."""
+    combate["historico"].append(mensagem)
+    defensor["defesa_ativa"] = False
+    defensor["esquiva_ativa"] = False
+
+    embed = discord.Embed(title="💥 Resultado", description=mensagem, color=discord.Color.red())
+    embed.add_field(name="📋 Status", value=self._texto_status(combate["participantes"]), inline=False)
+    await ctx.send(embed=embed)
+
+    if defensor["vida"] <= 0:
+        if combate.get("pvp"):
+            combate["aguardando_finalizacao"] = True
+            combate["vencedor_id"] = atacante["id"]
+            combate["perdedor_id"] = defensor["id"]
+            combate["fase"] = "finalizacao"
+            await ctx.send(
+                f"⚠️ **{defensor['nome']}** está incapacitado!\n\n"
+                f"🏆 **{atacante['nome']}**, escolha:\n"
+                "`!matar`\n"
+                "`!desmaiar`"
+            )
+            return
+        combate["ativo"] = False
+        await self._finalizar(ctx, motivo="vida")
+        return
+
+    await asyncio.sleep(1)
+    await self._proximo_turno(ctx)
+
+
 async def _resolver_habilidade(self, ctx, combate, ataque):
     atacante = self._obter_atacante(combate)
     defensor = self._obter_defensor(combate)
