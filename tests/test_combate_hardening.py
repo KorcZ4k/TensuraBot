@@ -66,6 +66,22 @@ class CombatHardeningTests(unittest.TestCase):
             for golpe in monstro.get("golpes", []):
                 self.assertIn(golpe, golpes, f"Monstro {nome} referencia golpe inexistente: {golpe}")
 
+    def test_monster_cooldown_is_six_hours_and_per_monster(self):
+        text = source("database/python/luta.py")
+        self.assertIn("MONSTRO_COOLDOWN_HORAS = 6", text)
+        self.assertIn("Cooldowns_Monstros", text)
+        self.assertIn("iniciar_cooldown_monstro", text)
+        self.assertIn("cancelar_cooldown_monstro", text)
+        self.assertIn('timedelta(hours=MONSTRO_COOLDOWN_HORAS)', text)
+
+    def test_pve_command_enforces_monster_cooldown(self):
+        text = source("comandos/RPG/correcoes_monstros.py")
+        self.assertIn("class CooldownMonstros(commands.Cog)", text)
+        self.assertIn("pve.add_check", text)
+        self.assertIn("verificar_cooldown_monstro", text)
+        self.assertIn("iniciar_cooldown_monstro", text)
+        self.assertIn("⏳", text)
+
     def test_hardening_modules_remain_valid_python(self):
         for relative in (
             "database/python/luta.py",
@@ -76,6 +92,7 @@ class CombatHardeningTests(unittest.TestCase):
             "comandos/RPG/correcoes_luta.py",
             "comandos/RPG/correcoes_concorrencia.py",
             "comandos/RPG/correcoes_party.py",
+            "comandos/RPG/correcoes_monstros.py",
             "comandos/RPG/habilidades_combate.py",
             "main.py",
         ):
