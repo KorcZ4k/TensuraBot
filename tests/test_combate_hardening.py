@@ -26,7 +26,7 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("class Luta(commands.Cog)", text)
         self.assertIn("async def _resolver_ataque", text)
         self.assertIn("ataque.get(\"defensor_id\")", text)
-        self.assertNotIn("monkeypatch", text.lower())
+        self.assertEqual(text.count("async def _resolver_ataque"), 1)
 
     def test_legacy_patch_modules_do_not_override_canonical_resolver(self):
         for relative in (
