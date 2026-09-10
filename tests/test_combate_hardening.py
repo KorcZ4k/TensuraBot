@@ -5,27 +5,28 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class CombatHardeningTests(unittest.TestCase):
-    def _source(self, relative):
-        return (ROOT / relative).read_text(encoding="utf-8")
+def source(relative):
+    return (ROOT / relative).read_text(encoding="utf-8")
 
+
+class CombatHardeningTests(unittest.TestCase):
     def test_async_combat_facade_uses_real_mongo_collection(self):
-        source = self._source("database/python/luta_async.py")
-        self.assertNotIn("luta_db.jogadores", source)
-        self.assertIn('luta_db.db["Jogadores"].update_one', source)
+        text = source("database/python/luta_async.py")
+        self.assertNotIn("luta_db.jogadores", text)
+        self.assertIn('luta_db.db["Jogadores"].update_one', text)
 
     def test_party_invites_have_expiration_and_are_not_consumed_during_combat(self):
-        source = self._source("comandos/RPG/party.py")
-        self.assertIn("CONVITE_EXPIRA_EM", source)
-        self.assertIn("_limpar_convites_expirados", source)
-        self.assertIn("Tente novamente quando o combate terminar", source)
+        text = source("comandos/RPG/party.py")
+        self.assertIn("CONVITE_EXPIRA_EM", text)
+        self.assertIn("_limpar_convites_expirados", text)
+        self.assertIn("Tente novamente quando o combate terminar", text)
 
     def test_combat_has_one_canonical_resolver(self):
-        source = self._source("comandos/RPG/luta.py")
-        self.assertIn("class Luta(commands.Cog)", source)
-        self.assertIn("async def _resolver_ataque", source)
-        self.assertIn("ataque.get(\"defensor_id\")", source)
-        self.assertNotIn("monkeypatch", source.lower())
+        text = source("comandos/RPG/luta.py")
+        self.assertIn("class Luta(commands.Cog)", text)
+        self.assertIn("async def _resolver_ataque", text)
+        self.assertIn("ataque.get(\"defensor_id\")", text)
+        self.assertNotIn("monkeypatch", text.lower())
 
     def test_legacy_patch_modules_do_not_override_canonical_resolver(self):
         for relative in (
@@ -34,14 +35,14 @@ class CombatHardeningTests(unittest.TestCase):
             "comandos/RPG/correcoes_party.py",
             "comandos/RPG/habilidades_combate.py",
         ):
-            source = self._source(relative)
-            self.assertNotIn("_resolver_ataque =", source)
-            self.assertNotIn("_proximo_turno =", source)
+            text = source(relative)
+            self.assertNotIn("_resolver_ataque =", text)
+            self.assertNotIn("_proximo_turno =", text)
 
     def test_global_command_error_handler_does_not_reraise(self):
-        source = self._source("main.py")
-        self.assertNotIn("raise error", source)
-        self.assertIn("[COMANDO][ERRO]", source)
+        text = source("main.py")
+        self.assertNotIn("raise error", text)
+        self.assertIn("[COMANDO][ERRO]", text)
 
     def test_hardening_modules_remain_valid_python(self):
         for relative in (
@@ -56,7 +57,7 @@ class CombatHardeningTests(unittest.TestCase):
             "comandos/RPG/habilidades_combate.py",
             "main.py",
         ):
-            ast.parse(self._source(relative), filename=relative)
+            ast.parse(source(relative), filename=relative)
 
 
 class TurnOrderTests(unittest.TestCase):
@@ -94,9 +95,9 @@ class TurnOrderTests(unittest.TestCase):
         self.assertEqual(ordem, ["A", "C", "D"])
 
     def test_pending_defender_is_the_one_who_must_defend(self):
-        source = self._source("comandos/RPG/luta.py")
-        self.assertIn('"defensor_id": defensor.get("id")', source)
-        self.assertIn('str(defensor.get("id")) != str(ctx.author.id)', source)
+        text = source("comandos/RPG/luta.py")
+        self.assertIn('"defensor_id": defensor.get("id")', text)
+        self.assertIn('str(defensor.get("id")) != str(ctx.author.id)', text)
 
 
 if __name__ == "__main__":
