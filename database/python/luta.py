@@ -93,9 +93,18 @@ def criar_monstro(tipo: str, nivel: int = 1):
         "Inteligencia": int(atributos_base.get("Inteligencia", 0) or 0),
         "dano_base": dano_base, "xp_recompensa": xp_recompensa, "hunos_recompensa": hunos_recompensa,
         "golpes": list(dados.get("golpes", [])),
+        "cooldown_horas": max(1, int(dados.get("cooldown_horas", MONSTRO_COOLDOWN_HORAS))),
         "defesa_ativa": False, "esquiva_ativa": False,
         "defesa_magica_ativa": False, "defesa_magica_valor": 0,
     }
+
+
+def _cooldown_horas(monstro_id: str):
+    dados = MONSTROS.get(str(monstro_id), {})
+    try:
+        return max(1, int(dados.get("cooldown_horas", MONSTRO_COOLDOWN_HORAS)))
+    except (TypeError, ValueError):
+        return MONSTRO_COOLDOWN_HORAS
 
 
 def verificar_cooldown_monstro(user_id: str, guild_id: str, monstro_id: str):
@@ -113,11 +122,12 @@ def verificar_cooldown_monstro(user_id: str, guild_id: str, monstro_id: str):
 
 
 def iniciar_cooldown_monstro(user_id: str, guild_id: str, monstro_id: str):
-    """Reserva atomicamente 6h para este jogador contra este monstro."""
+    """Reserva atomicamente o cooldown definido para este monstro."""
     if db is None:
         return {"sucesso": False, "segundos_restantes": 0, "fim": None}
+    horas = _cooldown_horas(monstro_id)
     agora = datetime.now(timezone.utc)
-    fim = agora + timedelta(hours=MONSTRO_COOLDOWN_HORAS)
+    fim = agora + timedelta(hours=horas)
     campo = f"Cooldowns_Monstros.{str(monstro_id)}"
     jogador = db["Jogadores"].find_one_and_update(
         {
@@ -138,7 +148,7 @@ def iniciar_cooldown_monstro(user_id: str, guild_id: str, monstro_id: str):
             "segundos_restantes": verificacao["segundos_restantes"],
             "fim": verificacao["fim"],
         }
-    return {"sucesso": True, "segundos_restantes": MONSTRO_COOLDOWN_HORAS * 3600, "fim": fim}
+    return {"sucesso": True, "segundos_restantes": horas * 3600, "fim": fim}
 
 
 def cancelar_cooldown_monstro(user_id: str, guild_id: str, monstro_id: str, fim):
