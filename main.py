@@ -106,6 +106,20 @@ async def on_ready():
     if not _cadastro_inicial_concluido:
         asyncio.create_task(_cadastro_inicial_background())
 
+async def _carregar_extensao_com_recuperacao_de_conflito(extensao):
+    try:
+        await bot.load_extension(extensao)
+        return
+    except commands.CommandRegistrationError as erro:
+        nome = getattr(erro, "name", None)
+        if not nome:
+            raise
+        removido = bot.remove_command(nome)
+        if removido is None:
+            raise
+        print(f"[EXTENSÃO][CONFLITO] {extensao}: comando '{nome}' já existia; registro anterior removido, tentando novamente.")
+        await bot.load_extension(extensao)
+
 async def carregar_extensoes():
     extensoes = [
         "comandos.RPG.luta", "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
@@ -120,7 +134,7 @@ async def carregar_extensoes():
     ]
     for extensao in extensoes:
         try:
-            await bot.load_extension(extensao)
+            await _carregar_extensao_com_recuperacao_de_conflito(extensao)
             print(f"[EXTENSÃO][OK] {extensao}")
         except Exception as erro:
             print(f"[EXTENSÃO][ERRO] {extensao}: {type(erro).__name__}: {erro}")
