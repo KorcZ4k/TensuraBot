@@ -9,58 +9,42 @@ from . import luta_sync as _base
 
 
 def _calcular_dano_fisico_defesa_acao(atacante, defensor):
-    """Ataque físico = Força + Velocidade; defesa física = Força + Defesa."""
+    """Ataque físico = Força + Velocidade; uma única camada de defesa é aplicada."""
     if defensor.get("esquiva_ativa"):
         defensor["esquiva_ativa"] = False
         if random.random() < 0.40:
             return 0, "esquivou"
-
     dano = float(atacante.get("Força", 0) or 0) + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
-
     if defensor.get("defesa_magica_ativa"):
-        defesa = float(defensor.get("defesa_magica_valor", 0) or 0)
-        dano -= defesa
+        dano -= float(defensor.get("defesa_magica_valor", 0) or 0)
         defensor["defesa_magica_ativa"] = False
         defensor["defesa_magica_valor"] = 0
         return max(0, int(dano)), "barreira"
-
     if defensor.get("defesa_ativa"):
-        defesa_total = float(defensor.get("Força", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
-        dano -= defesa_total
+        dano -= float(defensor.get("Força", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
         defensor["defesa_ativa"] = False
         return max(0, int(dano)), "defendeu"
-
     return max(0, int(dano)), "normal"
 
 
 def _defesa_magica(defensor, defesa_base):
-    """Defesa mágica = Magia + Defesa + Defesa Base."""
     magia = float(defensor.get("Magia", 0) or 0)
     defesa = float(defensor.get("Defesa", 0) or 0)
     return max(0, int(magia + defesa + float(defesa_base or 0)))
 
 
 def _calcular_dano_magico(atacante, defensor, ataque):
-    """Dano mágico menos a barreira mágica ativa."""
     if defensor.get("esquiva_ativa"):
         defensor["esquiva_ativa"] = False
         if random.random() < min(0.75, 0.10 + float(defensor.get("Velocidade", 0) or 0) / 500):
             return 0, "esquivou"
-
-    dano = (
-        float(atacante.get("Magia", 0) or 0)
-        + float(atacante.get("Inteligencia", 0) or 0)
-        + float(ataque.get("dano_base", 0) or 0)
-    )
+    dano = float(atacante.get("Magia", 0) or 0) + float(atacante.get("Inteligencia", 0) or 0) + float(ataque.get("dano_base", 0) or 0)
     if ataque.get("com_arma"):
         dano += float(atacante.get("dano_arma", 0) or 0)
-
     if defensor.get("defesa_magica_ativa"):
-        defesa = float(defensor.get("defesa_magica_valor", 0) or 0)
-        dano -= defesa
+        dano -= float(defensor.get("defesa_magica_valor", 0) or 0)
         defensor["defesa_magica_ativa"] = False
         defensor["defesa_magica_valor"] = 0
-
     return max(0, int(dano)), "normal"
 
 
@@ -79,50 +63,37 @@ class CorrecoesLuta(commands.Cog):
         efeito = dados_magia.get("efeito", {})
         nome_efeito = str(efeito.get("nome", "")).strip().lower() if isinstance(efeito, dict) else ""
         defesa_base = float(dados_magia.get("defesa_base", 0) or 0)
-        return (
-            "defesa" in tipos
-            or "protecao" in tipos
-            or "proteção" in tipos
-            or defesa_base > 0
-            or nome_efeito in {"barreira", "escudo", "proteção", "protecao"}
-        )
+        return "defesa" in tipos or "protecao" in tipos or "proteção" in tipos or defesa_base > 0 or nome_efeito in {"barreira", "escudo", "proteção", "protecao"}
 
     def _aplicar_correcoes(self):
         luta = self.bot.get_cog("Luta")
         if luta is None:
             return False
-
         _base.calcular_dano = _calcular_dano_fisico_defesa_acao
-
         if getattr(luta, "_magia_defensiva_corrigida", False):
             return True
-
         original_usar_magia = luta.usar_magia_no_combate
         original_resolver = luta._resolver_ataque
 
         async def usar_magia_corrigida(cog, ctx, dados_magia):
             if not self._eh_magia_defensiva(dados_magia):
                 return await original_usar_magia(ctx, dados_magia)
-
             combate = cog._obter_combate(ctx.channel.id)
             if not combate or not combate.get("ativo"):
                 return False
             if combate.get("aguardando_finalizacao"):
                 await ctx.send("❌ O combate está aguardando a finalização.")
                 return True
-
             if combate.get("fase") == "defesa":
                 defensor = cog._obter_defensor(combate)
                 if defensor.get("tipo") != "jogador" or str(defensor.get("id")) != str(ctx.author.id):
-                    await ctx.send(f"❌ É **{defensor['nome']}** quem deve defender.")
+                    await ctx.send(f"❌ É **{defensor.get('nome', 'Defensor')}** quem deve defender.")
                     return True
-
                 mana_base = int(float(dados_magia.get("mana_base", 0) or 0))
                 mana_atual = int(float(defensor.get("mana", 0) or 0))
                 if mana_atual < mana_base:
                     await ctx.send(f"❌ Mana insuficiente. Necessário: {mana_base}.")
                     return True
-
                 efeito = dados_magia.get("efeito", {})
                 if not isinstance(efeito, dict):
                     efeito = {}
@@ -131,28 +102,18 @@ class CorrecoesLuta(commands.Cog):
                 if valor <= 0:
                     await ctx.send("❌ Essa magia não possui força suficiente para criar uma barreira.")
                     return True
-
                 defensor["mana"] = mana_atual - mana_base
                 defensor["defesa_magica_ativa"] = True
                 defensor["defesa_magica_valor"] = valor
                 defensor["defesa_ativa"] = False
                 defensor["esquiva_ativa"] = False
-
                 nome = dados_magia.get("nome", "Magia Defensiva")
-                descricao = (
-                    f"✨ **{defensor['nome']}** conjurou **{nome}** como reação defensiva.\n"
-                    f"🛡️ Defesa mágica: **{valor}**\n"
-                    f"📐 Magia: **{int(defensor.get('Magia', 0) or 0)}** + "
-                    f"Defesa: **{int(defensor.get('Defesa', 0) or 0)}** + "
-                    f"Base: **{int(defesa_base)}**\n"
-                    f"💙 Mana gasta: **{mana_base}**"
-                )
+                descricao = f"✨ **{defensor.get('nome', 'Defensor')}** conjurou **{nome}** como reação defensiva.\n🛡️ Defesa mágica: **{valor}**\n📐 Magia: **{int(float(defensor.get('Magia', 0) or 0))}** + Defesa: **{int(float(defensor.get('Defesa', 0) or 0))}** + Base: **{int(defesa_base)}**\n💙 Mana gasta: **{mana_base}**"
                 if efeito.get("nome"):
                     descricao += f"\n🔮 Efeito: **{str(efeito['nome']).title()}**"
                 await ctx.send(embed=discord.Embed(title="🛡️ Barreira Mágica", description=descricao, color=discord.Color.blue(), timestamp=discord.utils.utcnow()))
                 await asyncio.sleep(0.5)
                 return await original_resolver(ctx)
-
             usuario = cog._obter_atacante(combate)
             if usuario.get("tipo") != "jogador" or str(usuario.get("id")) != str(ctx.author.id):
                 await ctx.send("❌ Não é sua vez de agir.")
@@ -162,12 +123,16 @@ class CorrecoesLuta(commands.Cog):
                 await ctx.send(f"❌ Mana insuficiente. Necessário: {mana_base}.")
                 return True
             defesa_base = float(dados_magia.get("defesa_base", 0) or 0)
-            usuario["mana"] = int(usuario.get("mana", 0) or 0) - mana_base
+            valor = _defesa_magica(usuario, defesa_base)
+            if valor <= 0:
+                await ctx.send("❌ Essa magia não possui força suficiente para criar uma barreira.")
+                return True
+            usuario["mana"] = int(float(usuario.get("mana", 0) or 0)) - mana_base
             usuario["defesa_magica_ativa"] = True
-            usuario["defesa_magica_valor"] = _defesa_magica(usuario, defesa_base)
+            usuario["defesa_magica_valor"] = valor
             usuario["defesa_ativa"] = False
             usuario["esquiva_ativa"] = False
-            await ctx.send(f"🛡️ **{usuario['nome']}** criou uma defesa mágica de **{usuario['defesa_magica_valor']}**!")
+            await ctx.send(f"🛡️ **{usuario.get('nome', 'Jogador')}** criou uma defesa mágica de **{valor}**!")
             await asyncio.sleep(0.5)
             await cog._proximo_turno(ctx)
             return True
@@ -178,8 +143,6 @@ class CorrecoesLuta(commands.Cog):
                 defensor = cog._obter_defensor(combate)
                 barreira = float(defensor.get("defesa_magica_valor", 0) or 0) if defensor.get("defesa_magica_ativa") else 0
                 if barreira > 0 and combate.get("ataque_pendente"):
-                    # Marca a barreira para o resolver e também garante que ela
-                    # nunca seja ignorada por uma camada antiga do combate.
                     defensor["defesa_magica_ativa"] = True
                     defensor["defesa_magica_valor"] = barreira
             return await original_resolver(ctx)
