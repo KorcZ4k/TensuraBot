@@ -16,13 +16,13 @@ def _recuperar_vida_apos_recuperacao(user_id: int, guild_id: int, percentual: fl
     if not jogador or jogador.get("Situação") == "morto":
         return {"vida_recuperada": 0, "vida_atual": 0, "vida_maxima": 0}
 
-    vida_atual = jogador.get("Vida", 0)
-    vida_maxima = jogador.get("Vida_Maxima", 0)
-    cura = max(0, int(vida_maxima * percentual))
+    vida_atual = int(jogador.get("Vida", 0) or 0)
+    vida_maxima = int(jogador.get("Vida_Maxima", jogador.get("Vida", 0)) or 0)
+    cura = max(1, int(vida_maxima * percentual)) if vida_atual < vida_maxima else 0
     nova_vida = min(vida_maxima, vida_atual + cura)
 
     status_db.jogadores.update_one(
-        {"ID": str(user_id), "guild_id": str(guild_id)},
+        {"_id": jogador["_id"]},
         {"$set": {"Vida": nova_vida}}
     )
 
@@ -90,7 +90,7 @@ async def aplicar_cura(user_id: int, guild_id: int, cura: int):
 
 
 async def recuperar_mana(user_id: int, guild_id: int, tipo: str):
-    """Recupera mana e vida usando o mesmo cooldown de descanso/meditação."""
+    """Recupera mana e também 50% da vida máxima a cada uso."""
     resultado = await run_db(status_db.recuperar_mana, user_id, guild_id, tipo)
 
     if not resultado.get("sucesso"):
@@ -100,7 +100,7 @@ async def recuperar_mana(user_id: int, guild_id: int, tipo: str):
         _recuperar_vida_apos_recuperacao,
         user_id,
         guild_id,
-        resultado.get("percentual", 0) / 100,
+        0.50,
     )
     resultado.update(vida)
     resultado["mensagem"] += (
