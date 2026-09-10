@@ -27,6 +27,11 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn('"Defesa", "defesa"', source)
         self.assertIn('"Magia", "magia"', source)
 
+    def test_global_command_error_handler_does_not_reraise(self):
+        source = self._source("main.py")
+        self.assertNotIn("raise error", source)
+        self.assertIn("[COMANDO][ERRO]", source)
+
     def test_empty_legacy_rpg_module_is_removed(self):
         self.assertFalse((ROOT / "database/python/rpg.py").exists())
 
@@ -37,6 +42,7 @@ class CombatHardeningTests(unittest.TestCase):
             "comandos/RPG/correcoes_luta.py",
             "comandos/RPG/correcoes_concorrencia.py",
             "comandos/RPG/correcoes_party.py",
+            "main.py",
         ):
             ast.parse(self._source(relative), filename=relative)
 
