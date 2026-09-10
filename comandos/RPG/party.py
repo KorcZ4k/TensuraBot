@@ -1,9 +1,14 @@
+import time
+
 import discord
 from discord.ext import commands
 
 from database.python.luta_async import pode_lutar, atualizar_situacao
 from database.python.luta import criar_monstro
 from . import luta as luta_mod
+
+
+CONVITE_EXPIRA_EM = 15 * 60
 
 
 class PartyCombate(commands.Cog):
@@ -14,9 +19,19 @@ class PartyCombate(commands.Cog):
         self.parties = {}
         self.convites = {}
 
+    def _limpar_convites_expirados(self):
+        agora = time.monotonic()
+        expirados = [
+            convite_id
+            for convite_id, convite in self.convites.items()
+            if agora - convite.get("criado_em", agora) >= CONVITE_EXPIRA_EM
+        ]
+        for convite_id in expirados:
+            self.convites.pop(convite_id, None)
+
     def _party_do_usuario(self, guild_id, user_id):
         for party_id, party in self.parties.items():
-            if party["guild_id"] == str(guild_id) and str(user_id) in party["membros"]:
+            if party.get("guild_id") == str(guild_id) and str(user_id) in party.get("membros", []):
                 return party_id, party
         return None, None
 
@@ -55,18 +70,28 @@ class PartyCombate(commands.Cog):
             await ctx.send("❌ Você já pertence a uma party.")
             return
         party_id = f"{ctx.guild.id}:{ctx.author.id}"
-        self.parties[party_id] = {"guild_id": str(ctx.guild.id), "lider_id": str(ctx.author.id), "lider_nome": ctx.author.display_name, "membros": [str(ctx.author.id)], "limite": 4}
+        self.parties[party_id] = {
+            "guild_id": str(ctx.guild.id),
+            "lider_id": str(ctx.author.id),
+            "lider_nome": ctx.author.display_name,
+            "membros": [str(ctx.author.id)],
+            "limite": 4,
+        }
         await ctx.send(f"👥 {ctx.author.mention} criou uma party. Convide alguém com `!party convidar @membro`.")
 
     @party.command(name="convidar", aliases=["invite"])
     @commands.guild_only()
     async def party_convidar(self, ctx, membro: discord.Member):
+        self._limpar_convites_expirados()
         party_id, party = self._party_do_usuario(ctx.guild.id, ctx.author.id)
         if not party:
             await ctx.send("❌ Crie uma party primeiro com `!party criar`.")
             return
         if party["lider_id"] != str(ctx.author.id):
             await ctx.send("❌ Apenas o líder pode convidar membros.")
+            return
+        if self._party_em_combate(party_id):
+            await ctx.send("❌ A party está em combate e não pode receber alterações agora.")
             return
         if membro.bot or membro.id == ctx.author.id:
             await ctx.send("❌ Este membro não pode ser convidado.")
@@ -79,42 +104,69 @@ class PartyCombate(commands.Cog):
             await ctx.send("❌ Este membro já pertence a uma party.")
             return
         convite_id = f"{party_id}:{membro.id}"
-        self.convites[convite_id] = party_id
+        self.convites[convite_id] = {
+            "party_id": party_id,
+            "criado_em": time.monotonic(),
+        }
         await ctx.send(f"📨 {membro.mention}, você foi convidado para a party de {ctx.author.mention}. Use `!party aceitar` ou `!party recusar`.")
 
     @party.command(name="aceitar")
     @commands.guild_only()
     async def party_aceitar(self, ctx):
+        self._limpar_convites_expirados()
         prefixo = f"{ctx.guild.id}:"
-        convite_id = next((k for k in self.convites if k.startswith(prefixo) and k.endswith(f":{ctx.author.id}")), None)
+        convite_id = next(
+            (
+                k for k, convite in self.convites.items()
+                if k.startswith(prefixo)
+                and k.endswith(f":{ctx.author.id}")
+                and convite.get("party_id")
+            ),
+            None,
+        )
         if not convite_id:
             await ctx.send("❌ Você não possui um convite pendente.")
             return
-        party_id = self.convites.pop(convite_id)
-        party = self.parties.get(party_id)
+        convite = self.convites.get(convite_id)
+        party_id = convite.get("party_id") if convite else None
+        party = self.parties.get(party_id) if party_id else None
         if not party:
+            self.convites.pop(convite_id, None)
             await ctx.send("❌ Esta party não existe mais.")
             return
+        # Não consome o convite quando a party está temporariamente bloqueada.
         if self._party_em_combate(party_id):
-            await ctx.send("❌ Esta party está em combate e não pode ser alterada agora.")
+            await ctx.send("❌ Esta party está em combate e não pode ser alterada agora. Tente novamente quando o combate terminar.")
             return
         if len(party["membros"]) >= party["limite"]:
+            self.convites.pop(convite_id, None)
             await ctx.send("❌ A party ficou cheia.")
             return
         if str(ctx.author.id) in party["membros"]:
+            self.convites.pop(convite_id, None)
             await ctx.send("❌ Você já está nesta party.")
             return
         _, outra = self._party_do_usuario(ctx.guild.id, ctx.author.id)
         if outra:
+            self.convites.pop(convite_id, None)
             await ctx.send("❌ Você já pertence a outra party.")
             return
         party["membros"].append(str(ctx.author.id))
+        self.convites.pop(convite_id, None)
         await ctx.send(f"✅ {ctx.author.mention} entrou na party.")
 
     @party.command(name="recusar")
     @commands.guild_only()
     async def party_recusar(self, ctx):
-        convite_id = next((k for k in self.convites if k.startswith(f"{ctx.guild.id}:") and k.endswith(f":{ctx.author.id}")), None)
+        self._limpar_convites_expirados()
+        convite_id = next(
+            (
+                k for k in self.convites
+                if k.startswith(f"{ctx.guild.id}:")
+                and k.endswith(f":{ctx.author.id}")
+            ),
+            None,
+        )
         if not convite_id:
             await ctx.send("❌ Você não possui um convite pendente.")
             return
@@ -210,9 +262,20 @@ class PartyCombate(commands.Cog):
         participantes.append(monstro)
         participantes.sort(key=lambda p: p.get("Velocidade", p.get("velocidade", 0)), reverse=True)
         luta_cog.combates[ctx.channel.id] = {
-            "participantes": participantes, "turno": 0, "numero_turno": 1, "fase": "ataque", "ativo": True,
-            "pvp": False, "party": True, "party_id": party_id, "guild_id": guild_id, "ataque_pendente": None,
-            "historico": [], "aguardando_finalizacao": False, "vencedor_id": None, "perdedor_id": None,
+            "participantes": participantes,
+            "turno": 0,
+            "numero_turno": 1,
+            "fase": "ataque",
+            "ativo": True,
+            "pvp": False,
+            "party": True,
+            "party_id": party_id,
+            "guild_id": guild_id,
+            "ataque_pendente": None,
+            "historico": [],
+            "aguardando_finalizacao": False,
+            "vencedor_id": None,
+            "perdedor_id": None,
         }
         for jogador in participantes:
             if jogador.get("tipo") == "jogador":
