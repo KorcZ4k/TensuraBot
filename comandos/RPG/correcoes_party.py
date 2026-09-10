@@ -23,7 +23,12 @@ def _monstros_vivos(combate):
 
 def _dar_recompensas(self, user_id, guild_id, xp, hunos):
     combate = next(
-        (c for c in self.combates.values() if c.get("guild_id") == str(guild_id) and c.get("party")),
+        (
+            c for c in self.combates.values()
+            if c.get("guild_id") == str(guild_id)
+            and c.get("party")
+            and any(str(p.get("id")) == str(user_id) for p in c.get("participantes", []))
+        ),
         None,
     )
     if not combate:
@@ -99,8 +104,7 @@ async def _proximo_turno(self, ctx):
 
     proximo = next(
         (
-            i
-            for i in range(1, len(participantes) + 1)
+            i for i in range(1, len(participantes) + 1)
             if (atual + i) % len(participantes) in vivos
         ),
         1,
@@ -109,7 +113,7 @@ async def _proximo_turno(self, ctx):
     return await _PROXIMO_TURNO_ORIGINAL(self, ctx)
 
 
-def setup(bot):
+async def setup(bot):
     base.Luta._dar_recompensas = _dar_recompensas
     base.Luta._finalizar = _finalizar
     base.Luta._proximo_turno = _proximo_turno
