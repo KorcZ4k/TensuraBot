@@ -91,7 +91,6 @@ def _dano_habilidade_fisica(atacante, defensor, ataque):
     else:
         dano -= _valor(defensor, "Força") + _valor(defensor, "Defesa")
         if defensor.get("defesa_ativa"):
-            # Defesa ativa representa a mesma barreira física; não subtraímos duas vezes.
             defensor["defesa_ativa"] = False
     return max(0, int(dano)), "atingiu"
 
@@ -166,8 +165,6 @@ async def _resolver_habilidade(self, ctx, combate, ataque):
 async def _resolver_ataque_com_desviante(self, ctx):
     combate = self._obter_combate(ctx.channel.id)
     ataque = combate.get("ataque_pendente") if combate else None
-    if combate and ataque and ataque.get("_resolvendo"):
-        return
     if combate and ataque and ataque.get("tipo") != "habilidade":
         defensor = self._obter_defensor(combate)
         atacante = self._obter_atacante(combate)
