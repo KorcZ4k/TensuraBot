@@ -1,4 +1,5 @@
 import ast
+import json
 import unittest
 from pathlib import Path
 
@@ -43,6 +44,27 @@ class CombatHardeningTests(unittest.TestCase):
         text = source("main.py")
         self.assertNotIn("raise error", text)
         self.assertIn("[COMANDO][ERRO]", text)
+
+    def test_restart_recovers_orphaned_combat_status(self):
+        text = source("main.py")
+        self.assertIn("async def _recuperar_combates_orfaos", text)
+        self.assertIn('{"Situação": "ativo_combate"}', text)
+        self.assertIn('{"$set": {"Situação": "ativo"}}', text)
+        self.assertIn("await _recuperar_combates_orfaos()", text)
+
+    def test_slime_has_no_stun_or_control_effects(self):
+        data = json.loads(source("database/json/golpes.json"))
+        golpes = data["golpes"]
+        for nome in ("pancada", "investida"):
+            efeito = golpes[nome].get("efeito")
+            self.assertIsNone(efeito, f"{nome} não pode aplicar efeito de controle")
+
+    def test_monster_definition_only_references_existing_attacks(self):
+        monstros = json.loads(source("database/json/monstros.json"))["monstros"]
+        golpes = json.loads(source("database/json/golpes.json"))["golpes"]
+        for nome, monstro in monstros.items():
+            for golpe in monstro.get("golpes", []):
+                self.assertIn(golpe, golpes, f"Monstro {nome} referencia golpe inexistente: {golpe}")
 
     def test_hardening_modules_remain_valid_python(self):
         for relative in (
