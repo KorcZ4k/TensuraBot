@@ -66,6 +66,8 @@ async def on_command_error(ctx, error):
                         return
                 except Exception:
                     pass
+    if isinstance(error, commands.CommandNotFound):
+        return
     if (isinstance(error, commands.MissingRequiredArgument) and param_name == "membro" and getattr(command, "name", None) == "pvp" and getattr(parent, "name", None) == "luta"):
         mencoes = [m for m in ctx.message.mentions if not m.bot]
         membro = next((m for m in mencoes if m.id != ctx.author.id), None)
@@ -73,8 +75,6 @@ async def on_command_error(ctx, error):
             await command.callback(ctx.cog, ctx, membro)
             return
         await ctx.send("❌ Mencione um membro válido. Exemplo: `!luta pvp @jogador`")
-        return
-    if isinstance(error, commands.CommandNotFound):
         return
     raise error
 
@@ -100,8 +100,6 @@ async def on_ready():
     agora = datetime.datetime.now(fuso_horario)
     canal = bot.get_channel(1543040912912031775)
     print(f"Bot conectado como {bot.user}")
-    # on_ready pode ser disparado novamente após uma reconexão. Não envie
-    # várias mensagens "Online" para o mesmo processo.
     if canal is not None and not _online_notificado:
         embed = discord.Embed(title="🟢 | Online", description="Moon Tensura está online e pronto para o RPG", colour=0x1CAA00, timestamp=agora)
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
@@ -131,9 +129,12 @@ async def carregar_extensoes():
     extensoes = [
         "comandos.RPG.luta", "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
         "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs", "comandos.RPG.usarhab",
-        "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento", "comandos.RPG.correcoes_luta",
+        "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento",
+        # habilidades_combate instala o resolver final; correcoes_luta deve ser carregada depois
+        # para poder envolver esse resolver e não ser sobrescrita por ele.
+        "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_luta",
         "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao", "comandos.RPG.loja", "comandos.RPG.inventario",
-        "comandos.RPG.habilidades_combate", "comandos.RPG.evento_monstros", "comandos.RPG.assentamentos",
+        "comandos.RPG.evento_monstros", "comandos.RPG.assentamentos",
         "comandos.ECONOMIA.Mora", "comandos.ECONOMIA.Hunos", "comandos.ADMINISTRACAO.luta_admin",
         "comandos.ADMINISTRACAO.autorole_commands", "comandos.ADMINISTRACAO.autorole", "comandos.ADMINISTRACAO.configurações",
         "comandos.ADMINISTRACAO.canais_comandos", "comandos.ADMINISTRACAO.moderacao", "comandos.ADMINISTRACAO.automod",
