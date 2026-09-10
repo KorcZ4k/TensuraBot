@@ -270,7 +270,7 @@ class Inventario(commands.Cog):
         equipados = [str(x) for x in doc.get("equipados", [])][:2]
         armas = [self._catalogo(x) for x in equipados if self._catalogo(x) and "dano" in self._catalogo(x)]
         if not armas:
-            await ctx.send("❌ Você precisa equipar uma arma primeiro. Use `!equipar <id>`.")
+            await ctx.send("❌ Você precisa equipar uma arma primeiro. Use `!equipar <id>`." )
             return
         arma = armas[0]
         nome = str(arma.get("nome", "Arma"))
@@ -288,8 +288,8 @@ class Inventario(commands.Cog):
         combate["fase"] = "defesa"
         await luta._anunciar_ataque(ctx)
 
-    @commands.command(name="corte")
-    async def corte(self, ctx):
+    @commands.command(name="corte_arma", aliases=["arma_corte"])
+    async def corte_arma(self, ctx):
         await self._ataque_com_arma(ctx, "corte")
 
     @commands.command(name="estocada")
