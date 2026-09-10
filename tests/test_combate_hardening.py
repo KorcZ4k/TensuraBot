@@ -88,10 +88,17 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("iniciar_cooldown_monstro", text)
         self.assertIn("⏳", text)
 
+    def test_rest_and_meditation_always_restore_life(self):
+        text = source("database/python/status_async.py")
+        self.assertIn('0.50,', text)
+        self.assertIn('"Vida": nova_vida', text)
+        self.assertIn('"vida_recuperada"', text)
+
     def test_hardening_modules_remain_valid_python(self):
         for relative in (
             "database/python/luta.py",
             "database/python/luta_async.py",
+            "database/python/status_async.py",
             "comandos/RPG/luta.py",
             "comandos/RPG/luta_sync.py",
             "comandos/RPG/party.py",
