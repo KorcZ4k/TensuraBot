@@ -57,6 +57,8 @@ class CooldownMonstros(commands.Cog):
         parent = getattr(ctx.command, "parent", None)
         if getattr(parent, "name", "").casefold() != "luta":
             return True
+        if ctx.guild is None:
+            return True
         monstro_tipo = ctx.kwargs.get("monstro_tipo")
         luta = ctx.bot.get_cog("Luta")
         monstro_id = luta._encontrar_monstro(monstro_tipo) if luta else None
@@ -88,7 +90,7 @@ class CooldownMonstros(commands.Cog):
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         reserva = getattr(ctx, "_monstro_cooldown_reserva", None)
-        if not reserva:
+        if not reserva or ctx.guild is None:
             return
         monstro_id, fim = reserva
         await luta_db.cancelar_cooldown_monstro(
