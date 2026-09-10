@@ -144,7 +144,7 @@ async def _resolver_habilidade(self, ctx, combate, ataque):
         defensor["vida"] = max(0, int(_valor(defensor, "vida") - dano))
         buffs = _aplicar_buffs(atacante, ataque.get("efeitos", []))
         debuffs = _aplicar_efeitos(defensor, [e for e in ataque.get("efeitos", []) if not str(e.get("nome", e.get("tipo", ""))).lower().startswith("buff_")])
-        mensagem = f"⚔️ **{atacante['nome']}** causou **{dano} de dano** com **{nome}** em **{defensor['nome']}`."
+        mensagem = f"⚔️ **{atacante['nome']}** causou **{dano} de dano** com **{nome}** em **{defensor['nome']}**."
         if buffs:
             mensagem += "\n💪 " + ", ".join(buffs) + "."
         if debuffs:
@@ -174,8 +174,6 @@ async def _defesa_monstro_corrigida(self, ctx):
     combate = self._obter_combate(ctx.channel.id)
     if not combate or not combate.get("ativo") or combate.get("fase") != "defesa":
         return
-    if combate.get("_resolvendo_ataque"):
-        return
     defensor = self._obter_defensor(combate)
     if defensor.get("tipo") != "monstro":
         return
@@ -183,7 +181,7 @@ async def _defesa_monstro_corrigida(self, ctx):
     escolha = random.choice(("defesa", "esquiva", "normal"))
     defensor["defesa_ativa"] = escolha == "defesa"
     defensor["esquiva_ativa"] = escolha == "esquiva"
-    rotulos = {"defesa": "🛡️ defesa", "esquiva": "💨 esquiva", "normal": "⚔️ ataque normal"}
+    rotulos = {"defesa": "🛡️ defesa", "esquiva": "💨 esquiva", "normal": "⚔️ reação normal"}
     await ctx.send(f"🤖 **{defensor['nome']}** escolheu **{rotulos[escolha]}** como reação.")
     await asyncio.sleep(0.5)
 
@@ -199,16 +197,10 @@ async def _resolver_ataque(self, ctx):
     combate = self._obter_combate(ctx.channel.id)
     if not combate or not combate.get("ativo"):
         return
-    if combate.get("_resolvendo_ataque"):
-        return
-    combate["_resolvendo_ataque"] = True
-    try:
-        ataque = combate.get("ataque_pendente")
-        if ataque and ataque.get("tipo") == "habilidade":
-            return await _resolver_habilidade(self, ctx, combate, ataque)
-        return await _resolver_ataque_com_desviante(self, ctx)
-    finally:
-        combate.pop("_resolvendo_ataque", None)
+    ataque = combate.get("ataque_pendente")
+    if ataque and ataque.get("tipo") == "habilidade":
+        return await _resolver_habilidade(self, ctx, combate, ataque)
+    return await _resolver_ataque_com_desviante(self, ctx)
 
 
 def _texto_status_com_efeitos(self, participantes):
