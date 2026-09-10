@@ -119,81 +119,6 @@ def _preencher_atributos_jogador(jogador, dados):
     return jogador
 
 
-async def _pve_corrigido(self, ctx, *partes_monstro):
-    if not ctx.guild:
-        return
-
-    if self._combate_ativo(ctx.channel.id):
-        await ctx.send("❌ Já existe um combate ativo neste canal.")
-        return
-
-    monstro_tipo = " ".join(str(parte) for parte in partes_monstro).strip()
-    if not monstro_tipo:
-        embed = discord.Embed(
-            title="⚔️ Luta PvE",
-            description="Informe o monstro que deseja enfrentar.\n\nExemplo: `!luta pve slime`",
-            color=discord.Color.red(),
-        )
-        await ctx.send(embed=embed)
-        return
-
-    monstro_id = _encontrar_monstro(monstro_tipo)
-    if not monstro_id:
-        await ctx.send(f"❌ Monstro `{monstro_tipo}` não encontrado. Use `!luta monstros` para ver os disponíveis.")
-        return
-
-    guild_id = str(ctx.guild.id)
-    user_id = str(ctx.author.id)
-    verificacao = luta_db.pode_lutar(user_id, guild_id)
-    if not verificacao.get("pode", False):
-        await ctx.send(verificacao.get("mensagem", "❌ Você não pode lutar."))
-        return
-
-    jogador = luta_db.criar_participante_jogador(user_id, guild_id)
-    if not jogador:
-        await ctx.send("❌ Você não possui um personagem registrado.")
-        return
-
-    dados_jogador = luta_db.obter_jogador(user_id, guild_id)
-    if not dados_jogador:
-        await ctx.send("❌ Não foi possível carregar os atributos do personagem.")
-        return
-
-    jogador = _preencher_atributos_jogador(jogador, dados_jogador)
-    jogador["nome"] = jogador.get("nome") or ctx.author.display_name
-
-    monstro = criar_monstro_balanceado(monstro_id, 1)
-    if not monstro:
-        await ctx.send("❌ Não foi possível criar esse monstro.")
-        return
-
-    participantes = [jogador, monstro]
-    participantes.sort(key=lambda p: p.get("Velocidade", p.get("velocidade", 0)), reverse=True)
-    self.combates[ctx.channel.id] = {
-        "participantes": participantes,
-        "turno": 0,
-        "numero_turno": 1,
-        "fase": "ataque",
-        "ativo": True,
-        "pvp": False,
-        "guild_id": guild_id,
-        "ataque_pendente": None,
-        "historico": [],
-        "aguardando_finalizacao": False,
-        "vencedor_id": None,
-        "perdedor_id": None,
-    }
-    self._atualizar_situacao(jogador["id"], guild_id, "ativo_combate")
-    await self._mostrar_inicio(ctx)
-
-
-def _instalar_pve_corrigido(bot):
-    grupo = bot.get_command("luta")
-    cog = bot.get_cog("Luta")
-    if grupo is None or cog is None:
-        print("[MONSTROS][ERRO] Não foi possível instalar o comando PvE: cog Luta não carregado.")
-        return False
-
     comando = grupo.get_command("pve")
     if comando is None:
         print("[MONSTROS][ERRO] Comando PvE não encontrado no grupo luta.")
@@ -207,5 +132,4 @@ def _instalar_pve_corrigido(bot):
 
 
 async def setup(bot):
-    _instalar_pve_corrigido(bot)
     print("[MONSTROS] Balanceamento de atributos, TP e PvE carregado.")

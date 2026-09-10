@@ -95,28 +95,8 @@ class Progressao(commands.Cog):
         self.bot = bot
         self._luta_patched = False
 
-    def _patch_luta(self):
-        if self._luta_patched:
-            return
-        luta = self.bot.get_cog("Luta")
-        if luta is None:
-            return
-        classe = type(luta)
-        original = getattr(classe, "_dar_recompensas", None)
-        if original is None or getattr(original, "_tp_patch", False):
-            return
-
-        def wrapper(cog, user_id, guild_id, xp, hunos):
-            resultado = original(cog, user_id, guild_id, xp, hunos)
-            tp = max(1, min(2000, int(xp or 0)))
-            asyncio.create_task(run_db(adicionar_tp, user_id, guild_id, tp, "monstro"))
-            return resultado
-
-        wrapper._tp_patch = True
-        classe._dar_recompensas = wrapper
-        self._luta_patched = True
-
     @commands.command(name="aumentar")
+    @commands.guild_only()
     async def aumentar(self, ctx, atributo: str, quantidade: int = 1):
         try:
             resultado = await run_db(aumentar_atributo_com_tp, str(ctx.author.id), str(ctx.guild.id), atributo, quantidade)
@@ -132,6 +112,7 @@ class Progressao(commands.Cog):
         await ctx.send(texto)
 
     @commands.command(name="tp", aliases=["pontos", "pontostreinamento"])
+    @commands.guild_only()
     async def tp(self, ctx):
         jogador = await run_db(db["Jogadores"].find_one, {"ID": str(ctx.author.id), "guild_id": str(ctx.guild.id)}, {"TP": 1, "_id": 0})
         if not jogador:
@@ -139,9 +120,6 @@ class Progressao(commands.Cog):
             return
         await ctx.send(f"✨ Você possui **{int(jogador.get('TP', 0) or 0)} TP** (Pontos de Treinamento).")
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        self._patch_luta()
 
 
 async def setup(bot):

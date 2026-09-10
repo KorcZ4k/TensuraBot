@@ -365,7 +365,7 @@ class EventoMonstros(commands.Cog):
                 "evento_id": evento_id,
             }
             luta.combates[channel.id] = combate
-            luta._atualizar_situacao(jogador["id"], str(guild.id), "ativo_combate")
+            await luta._marcar_combate([jogador], str(guild.id), "ativo_combate")
 
             evento["encerrado"] = True
             view = evento.get("view")

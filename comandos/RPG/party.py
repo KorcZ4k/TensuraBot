@@ -248,7 +248,7 @@ class PartyCombate(commands.Cog):
                 await ctx.send(f"❌ <@{membro_id}> não possui personagem registrado.")
                 return
             jogador["nome"] = jogador.get("nome") or membro.display_name
-            jogador["equipe"] = "party"
+            jogador["equipe"] = "jogadores"
             jogador["vida"] = max(0, int(jogador.get("vida", 0) or 0))
             if jogador["vida"] <= 0:
                 await ctx.send(f"❌ <@{membro_id}> está sem vida para participar do combate.")

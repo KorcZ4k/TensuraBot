@@ -19,14 +19,6 @@ CANAIS_ASSENTAMENTOS = (
 )
 COLLECTION = "Evento"
 
-_LUTA_PATCHED = False
-_HABS_PATCHED = False
-_ORIG_DANO_FISICO = None
-_ORIG_DANO_MAGIA = None
-_ORIG_PROCESSAR_EFEITOS = None
-_ORIG_RESOLVER = None
-_ORIG_DANO_HABILIDADE = None
-
 
 async def _get_assentamento(channel_id):
     return await run_db(db[COLLECTION].find_one, {"tipo": "assentamento", "guild_id": str(GUILD_ID), "canal_id": str(channel_id)})
@@ -64,109 +56,6 @@ async def _registrar_vitoria(channel_id, vencedor_id):
                  }, "$inc": {"derrotados": 1, "pessoas_derrotadas": 1}}, upsert=True)
 
 
-def _eh_duelo(combate):
-    return bool(combate and combate.get("assentamento_duelo"))
-
-
-def _marcar_se_letal(atacante, defensor, dano):
-    if not defensor.get("_duelo_assentamento"):
-        return dano
-    dano = int(dano or 0)
-    vida = max(1, int(defensor.get("vida", 1) or 1))
-    if dano >= vida:
-        atacante["_duelo_vitoria_pendente"] = True
-    return min(dano, max(0, vida - 1))
-
-
-def _instalar_protecao_nao_letal():
-    global _LUTA_PATCHED, _HABS_PATCHED
-    global _ORIG_DANO_FISICO, _ORIG_DANO_MAGIA, _ORIG_PROCESSAR_EFEITOS, _ORIG_RESOLVER, _ORIG_DANO_HABILIDADE
-    if _LUTA_PATCHED:
-        return
-    try:
-        from . import luta as luta_mod
-        _ORIG_DANO_FISICO = luta_mod._calcular_dano_fisico
-        def dano_fisico_duelo(atacante, defensor):
-            dano, motivo = _ORIG_DANO_FISICO(atacante, defensor)
-            dano = _marcar_se_letal(atacante, defensor, dano)
-            return dano, motivo
-        luta_mod._calcular_dano_fisico = dano_fisico_duelo
-
-        if hasattr(luta_mod, "_calcular_dano_magia"):
-            _ORIG_DANO_MAGIA = luta_mod._calcular_dano_magia
-            def dano_magia_duelo(self, atacante, defensor, ataque):
-                dano, motivo = _ORIG_DANO_MAGIA(self, atacante, defensor, ataque)
-                dano = _marcar_se_letal(atacante, defensor, dano)
-                return dano, motivo
-            luta_mod._calcular_dano_magia = dano_magia_duelo
-
-        if hasattr(luta_mod.Luta, "_processar_efeitos"):
-            _ORIG_PROCESSAR_EFEITOS = luta_mod.Luta._processar_efeitos
-            async def processar_efeitos_duelo(self, *args, **kwargs):
-                resultado = await _ORIG_PROCESSAR_EFEITOS(self, *args, **kwargs)
-                for combate in getattr(self, "combates", {}).values():
-                    if _eh_duelo(combate):
-                        for participante in combate.get("participantes", []):
-                            if participante.get("tipo") == "jogador":
-                                participante["vida"] = max(1, int(participante.get("vida", 1)))
-                return resultado
-            luta_mod.Luta._processar_efeitos = processar_efeitos_duelo
-
-        if hasattr(luta_mod.Luta, "_resolver_ataque"):
-            _ORIG_RESOLVER = luta_mod.Luta._resolver_ataque
-            async def resolver_duelo(self, ctx):
-                resultado = await _ORIG_RESOLVER(self, ctx)
-                combate = self._obter_combate(ctx.channel.id)
-                if not _eh_duelo(combate):
-                    return resultado
-                vencedor = next((p for p in combate.get("participantes", []) if p.get("_duelo_vitoria_pendente")), None)
-                if not vencedor or not combate.get("ativo"):
-                    return resultado
-                perdedor = next((p for p in combate["participantes"] if p.get("id") != vencedor.get("id")), None)
-                if perdedor:
-                    perdedor["vida"] = 1
-                combate["ativo"] = False
-                combate["aguardando_finalizacao"] = False
-                combate["vencedor_id"] = str(vencedor.get("id"))
-                combate["perdedor_id"] = str(perdedor.get("id")) if perdedor else None
-                for participante in combate.get("participantes", []):
-                    participante.pop("_duelo_vitoria_pendente", None)
-                    participante.pop("_duelo_assentamento", None)
-                    if participante.get("tipo") == "jogador":
-                        try:
-                            self._atualizar_situacao(participante["id"], combate["guild_id"], "ativo")
-                        except Exception:
-                            pass
-                await _registrar_vitoria(combate["assentamento_canal_id"], vencedor["id"])
-                embed = discord.Embed(
-                    title="🏰 | Assentamento conquistado!",
-                    description=f"👑 **{vencedor.get('nome', 'Jogador')}** venceu o duelo contra **{perdedor.get('nome', 'o adversário') if perdedor else 'o adversário'}** e agora é o dono do assentamento.\n\n❤️ O duelo foi não letal; o derrotado ficou com **1 HP**.",
-                    color=discord.Color.gold(),
-                )
-                await ctx.send(embed=embed)
-                return resultado
-            luta_mod.Luta._resolver_ataque = resolver_duelo
-
-        _LUTA_PATCHED = True
-
-        try:
-            from . import habilidades_combate as habs_mod
-            if hasattr(habs_mod, "_dano_habilidade_fisica") and not _HABS_PATCHED:
-                _ORIG_DANO_HABILIDADE = habs_mod._dano_habilidade_fisica
-                def dano_habilidade_duelo(atacante, defensor, habilidade):
-                    resultado = _ORIG_DANO_HABILIDADE(atacante, defensor, habilidade)
-                    if defensor.get("_duelo_assentamento") and isinstance(resultado, tuple):
-                        dano = _marcar_se_letal(atacante, defensor, resultado[0])
-                        return (dano, *resultado[1:])
-                    return resultado
-                habs_mod._dano_habilidade_fisica = dano_habilidade_duelo
-                _HABS_PATCHED = True
-        except Exception as erro:
-            print(f"[ASSENTAMENTOS][ERRO][HABILIDADES] {type(erro).__name__}: {erro}")
-    except Exception as erro:
-        print(f"[ASSENTAMENTOS][ERRO][PATCH] {type(erro).__name__}: {erro}")
-
-
 class Duelo(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -175,7 +64,6 @@ class Duelo(commands.Cog):
     async def cog_load(self):
         if self._instalado:
             return
-        _instalar_protecao_nao_letal()
         self._instalado = True
         for canal_id in CANAIS_ASSENTAMENTOS:
             try:
@@ -243,7 +131,7 @@ class Duelo(commands.Cog):
             "assentamento_canal_id": ctx.channel.id,
         }
         for jogador in participantes:
-            luta._atualizar_situacao(jogador["id"], str(ctx.guild.id), "ativo_combate")
+            await luta._marcar_combate(participantes, str(ctx.guild.id), "ativo_combate")
 
         await ctx.send(embed=discord.Embed(
             title="🏰 | Duelo pelo Assentamento",

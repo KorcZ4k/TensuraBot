@@ -1,7 +1,7 @@
 """Sistema de combate canonico do TensuraBot.
 
 A ordem de turnos e controlada aqui, em um unico estado de combate.
-Nao usa monkeypatches encadeados para resolver ataque/defesa.
+Nao usa substituicoes encadeadas para resolver ataque/defesa.
 """
 
 import asyncio
@@ -99,7 +99,10 @@ class Luta(commands.Cog):
     def _novo_combate(self, participantes, guild_id, pvp=False, party=False, party_id=None):
         participantes = self._ordenar(list(participantes))
         for p in participantes:
-            p.setdefault("equipe", "jogadores" if p.get("tipo") == "jogador" else "inimigos")
+            if pvp and p.get("tipo") == "jogador":
+                p["equipe"] = f"jogador:{p.get('id')}"
+            else:
+                p.setdefault("equipe", "jogadores" if p.get("tipo") == "jogador" else "inimigos")
             p.setdefault("efeitos", [])
             p.setdefault("defesa_ativa", False)
             p.setdefault("esquiva_ativa", False)
@@ -167,6 +170,13 @@ class Luta(commands.Cog):
         return None
 
     def _condicao_vitoria(self, combate):
+        if combate.get("pvp"):
+            vivos = [p for p in combate.get("participantes", []) if _vivo(p)]
+            if len(vivos) == 1:
+                return "pvp"
+            if not vivos:
+                return "empate"
+            return None
         jogadores = [p for p in combate["participantes"] if p.get("equipe") == "jogadores" and _vivo(p)]
         inimigos = [p for p in combate["participantes"] if p.get("equipe") == "inimigos" and _vivo(p)]
         if jogadores and not inimigos:
@@ -228,9 +238,40 @@ class Luta(commands.Cog):
             ganho_xp = parte_xp + (1 if i < resto_xp else 0)
             ganho_hunos = parte_hunos + (1 if i < resto_hunos else 0)
             filtro = {"ID": str(p.get("id")), "guild_id": str(combate.get("guild_id"))}
-            await run_db(db["Jogadores"].update_one, filtro, {"$inc": {"XP": ganho_xp}})
+            ganho_tp = max(1, min(2000, ganho_xp)) if ganho_xp > 0 else 0
+            await run_db(db["Jogadores"].update_one, filtro, {"$inc": {"XP": ganho_xp, "TP": ganho_tp}})
             await run_db(db["Hunos"].update_one, filtro, {"$inc": {"carteira": ganho_hunos}}, upsert=True)
         return xp, hunos
+
+    async def _finalizar_duelo_assentamento(self, ctx, vencedor, perdedor):
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate:
+            return
+        combate["ativo"] = False
+        combate["fase"] = "finalizado"
+        combate["aguardando_finalizacao"] = False
+        combate["vencedor_id"] = str(vencedor.get("id"))
+        combate["perdedor_id"] = str(perdedor.get("id"))
+        for participante in combate.get("participantes", []):
+            participante.pop("_duelo_vitoria_pendente", None)
+            participante.pop("_duelo_assentamento", None)
+        await self._salvar(combate)
+        try:
+            if db is not None:
+                await run_db(
+                    db["Evento"].update_one,
+                    {"tipo": "assentamento", "guild_id": str(combate.get("guild_id")), "canal_id": str(combate.get("assentamento_canal_id"))},
+                    {"$set": {"DONO": str(vencedor.get("id")), "data_posse": discord.utils.utcnow().strftime("%d/%m/%Y"), "hora_posse": discord.utils.utcnow().strftime("%H:%M:%S")}, "$inc": {"derrotados": 1, "pessoas_derrotadas": 1}},
+                    upsert=True,
+                )
+        except Exception as erro:
+            print(f"[LUTA][ASSENTAMENTO][ERRO] {type(erro).__name__}: {erro}")
+        await ctx.send(embed=discord.Embed(
+            title="🏰 | Assentamento conquistado!",
+            description=f"👑 **{vencedor.get('nome', 'Jogador')}** venceu o duelo contra **{perdedor.get('nome', 'o adversário')}** e agora é o dono do assentamento.\n\n❤️ O duelo foi não letal; o derrotado ficou com **1 HP**.",
+            color=discord.Color.gold(),
+        ))
+        self.combates.pop(ctx.channel.id, None)
 
     async def _finalizar(self, ctx, motivo="vida", vencedor=None, perdedor=None):
         combate = self._obter_combate(ctx.channel.id)
@@ -247,7 +288,9 @@ class Luta(commands.Cog):
         combate["fase"] = "finalizado"
         await self._salvar(combate)
         xp = hunos = 0
-        if resultado == "jogadores":
+        if combate.get("pvp"):
+            descricao = f"💀 **{vencedor.get('nome')}** finalizou **{perdedor.get('nome')}** ({motivo})." if vencedor and perdedor else "⚖️ O combate PvP terminou em empate."
+        elif resultado == "jogadores":
             xp, hunos = await self._recompensar(combate)
             descricao = "🏆 Os jogadores venceram o combate!"
         elif resultado == "inimigos":
@@ -350,6 +393,7 @@ class Luta(commands.Cog):
                 combate["fase"] = "ataque"
                 await self._proximo_turno(ctx)
                 return
+            duelo_pendente = False
             if ataque.get("tipo") == "magia" and ataque.get("cura_base", 0) > 0:
                 cura = int(_attr(atacante, "Magia") + _attr(atacante, "Inteligencia") + _num(ataque.get("cura_base")))
                 atacante["vida"] = min(int(_num(atacante.get("vida_maxima"), _num(atacante.get("vida")))), int(_num(atacante.get("vida"))) + cura)
@@ -359,7 +403,11 @@ class Luta(commands.Cog):
                 if resultado == "esquivou":
                     mensagem = f"💨 **{defensor.get('nome')}** esquivou da magia!"
                 else:
-                    defensor["vida"] = max(0, int(_num(defensor.get("vida")) - dano))
+                    vida_antes = int(_num(defensor.get("vida")))
+                    if combate.get("assentamento_duelo") and dano >= vida_antes:
+                        dano = max(0, vida_antes - 1)
+                        duelo_pendente = True
+                    defensor["vida"] = max(0, vida_antes - dano)
                     mensagem = f"✨ **{atacante.get('nome')}** causou **{dano} de dano mágico** em **{defensor.get('nome')}**."
                     efeito = self._aplicar_efeito(defensor, ataque.get("efeito"))
                     if efeito:
@@ -369,11 +417,18 @@ class Luta(commands.Cog):
                 if resultado == "esquivou":
                     mensagem = f"💨 **{defensor.get('nome')}** esquivou do ataque!"
                 else:
-                    defensor["vida"] = max(0, int(_num(defensor.get("vida")) - dano))
+                    vida_antes = int(_num(defensor.get("vida")))
+                    if combate.get("assentamento_duelo") and dano >= vida_antes:
+                        dano = max(0, vida_antes - 1)
+                        duelo_pendente = True
+                    defensor["vida"] = max(0, vida_antes - dano)
                     mensagem = f"⚔️ **{atacante.get('nome')}** causou **{dano} de dano** em **{defensor.get('nome')}**."
                     efeito = self._aplicar_efeito(defensor, ataque.get("efeito"))
                     if efeito:
                         mensagem += f"\n⚠️ Efeito: **{efeito.title()}**."
+            if combate.get("assentamento_duelo") and defensor.get("vida", 0) <= 0:
+                defensor["vida"] = 1
+                duelo_pendente = True
             combate["historico"].append(mensagem)
             defensor["defesa_ativa"] = False
             defensor["esquiva_ativa"] = False
@@ -382,8 +437,18 @@ class Luta(commands.Cog):
             embed = discord.Embed(title="💥 Resultado", description=mensagem, color=discord.Color.red())
             embed.add_field(name="📋 Status", value=self._texto_status(combate["participantes"]), inline=False)
             await ctx.send(embed=embed)
+            if combate.get("assentamento_duelo") and duelo_pendente:
+                await self._finalizar_duelo_assentamento(ctx, atacante, defensor)
+                return
+            if combate.get("pvp") and not _vivo(defensor):
+                combate["aguardando_finalizacao"] = True
+                combate["vencedor_id"] = str(atacante.get("id"))
+                combate["perdedor_id"] = str(defensor.get("id"))
+                combate["fase"] = "finalizacao"
+                await ctx.send(f"⚔️ **{atacante.get('nome')}** venceu o turno decisivo. Use `!matar` ou `!desmaiar` para finalizar o PvP.")
+                return
             resultado = self._condicao_vitoria(combate)
-            if resultado:
+            if resultado and not combate.get("pvp"):
                 await self._finalizar(ctx, motivo="vida", vencedor=atacante, perdedor=defensor)
                 return
             await self._salvar(combate)
@@ -581,7 +646,7 @@ class Luta(commands.Cog):
             await ctx.send(embed=embed)
 
     @luta.command(name="pve")
-    async def luta_pve(self, ctx, monstro_tipo: str):
+    async def luta_pve(self, ctx, *, monstro_tipo: str):
         if not ctx.guild or self._combate_ativo(ctx.channel.id):
             await ctx.send("❌ Já existe um combate ativo neste canal." if self._combate_ativo(ctx.channel.id) else "❌ Este comando só funciona em servidor.")
             return
@@ -693,14 +758,6 @@ class Luta(commands.Cog):
         combate["aguardando_finalizacao"] = False
         await self._finalizar(ctx, motivo=motivo, vencedor=vencedor, perdedor=perdedor)
 
-    @commands.command(name="rluta", aliases=["resetarluta"])
-    async def rluta(self, ctx):
-        combate = self.combates.pop(ctx.channel.id, None)
-        if not combate:
-            await ctx.send("❌ Não existe combate ativo neste canal.")
-            return
-        await self._salvar(combate)
-        await ctx.send("🔄 Combate resetado.")
 
 
 # Compatibilidade usada pelo cog de party.
