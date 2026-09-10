@@ -52,25 +52,17 @@ async def _resolver_ataque_interno(cog, ctx, combate, original):
         return
 
     ataque = combate.get("ataque_pendente")
-    if not isinstance(ataque, dict) or ataque.get("_resolvendo"):
+    if not isinstance(ataque, dict):
         return
 
-    ataque["_resolvendo"] = True
-    try:
-        await original(ctx)
-    finally:
-        ataque_atual = combate.get("ataque_pendente")
-        if isinstance(ataque_atual, dict) and ataque_atual is ataque:
-            ataque_atual["_resolvendo"] = False
+    # O resolvedor especializado é quem controla o marcador _resolvendo.
+    # A proteção deste módulo usa a task + lock para impedir chamadas
+    # concorrentes sem bloquear uma resolução encadeada no mesmo task.
+    await original(ctx)
 
 
 async def setup(bot):
-    """Envolve o método efetivamente instalado na instância do Cog.
-
-    Isso é necessário porque outras correções também substituem métodos na
-    instância de ``Luta``; alterar apenas a classe deixaria essa proteção fora
-    do caminho real de execução.
-    """
+    """Envolve o método efetivamente instalado na instância do Cog."""
     luta = bot.get_cog("Luta")
     if luta is None:
         raise RuntimeError("O Cog Luta não está carregado para aplicar a proteção de concorrência.")
