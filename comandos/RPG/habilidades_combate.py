@@ -8,6 +8,7 @@ from . import luta as luta_mod
 from . import luta_sync as base
 
 _OBTER_DEFENSOR_ORIGINAL = base.Luta._obter_defensor
+_RESOLVER_ANTES_DE_HABILIDADES = base.Luta._resolver_ataque
 
 
 def _valor(p, chave, padrao=0):
@@ -164,11 +165,15 @@ async def _resolver_ataque_com_desviante(self, ctx):
         if defensor.get("esquiva_ativa") and defensor.get("tipo") == "jogador" and defensor.get("desviante_ativo"):
             if _desviante_esquiva(defensor, atacante):
                 defensor["esquiva_ativa"] = False
-                combate["historico"].append(f"💨 **{defensor['nome']}** desviou do ataque graças ao **Desviante**!")
-                await ctx.send(embed=discord.Embed(title="💨 Desviante", description=combate["historico"][-1], color=discord.Color.green()))
+                mensagem = f"💨 **{defensor['nome']}** desviou do ataque graças ao **Desviante**!"
+                combate["historico"].append(mensagem)
+                await ctx.send(embed=discord.Embed(title="💨 Desviante", description=mensagem, color=discord.Color.green()))
                 await asyncio.sleep(1)
                 return await self._proximo_turno(ctx)
-    return await luta_mod._resolver_ataque(self, ctx)
+    # IMPORTANTE: não chamar luta_mod._resolver_ataque. O módulo luta.py
+    # não exporta essa função; ele a injeta como método da classe. Guardamos
+    # a referência real antes de este módulo substituí-la.
+    return await _RESOLVER_ANTES_DE_HABILIDADES(self, ctx)
 
 
 async def _defesa_monstro_corrigida(self, ctx):
