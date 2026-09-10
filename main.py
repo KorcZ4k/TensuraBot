@@ -24,6 +24,7 @@ MENSAGEM_MANUTENCAO = "O bot está em manutenção nesse momento, aguarde até s
 
 _context_send_original = commands.Context.send
 
+
 def _partes_texto(texto, limite):
     texto = str(texto)
     if len(texto) <= limite:
@@ -39,6 +40,7 @@ def _partes_texto(texto, limite):
         partes.append(restante[:corte])
         restante = restante[corte:].lstrip()
     return partes
+
 
 def _normalizar_embed(embed):
     if embed is None:
@@ -65,6 +67,7 @@ def _normalizar_embed(embed):
         embeds.append(extra)
     return embeds
 
+
 async def _context_send_com_embed(self, content=None, *, embed=None, **kwargs):
     if content is not None and embed is None:
         ultimo = None
@@ -81,7 +84,9 @@ async def _context_send_com_embed(self, content=None, *, embed=None, **kwargs):
         return ultimo
     return await _context_send_original(self, content=content, embed=embed, **kwargs)
 
+
 commands.Context.send = _context_send_com_embed
+
 
 @bot.check
 async def verificar_canal_de_comandos(ctx):
@@ -103,9 +108,11 @@ async def verificar_canal_de_comandos(ctx):
         return False
     return True
 
+
 @bot.event
 async def on_member_join(member):
     await cadastro_async([member])
+
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -145,15 +152,20 @@ async def on_command_error(ctx, error):
                     combate["ataque_pendente"] = None
                     combate["fase"] = "ataque"
                     await ctx.send("⚠️ A ação falhou e foi cancelada com segurança. O combate continua no turno atual.")
+                    return
         except Exception as recuperacao_erro:
             print(f"[COMANDO][RECUPERACAO][ERRO] {type(recuperacao_erro).__name__}: {recuperacao_erro}")
-    raise error
+    # O erro já foi registrado. Não relançamos a exceção a partir do handler
+    # global, evitando uma segunda exceção no loop de eventos do Discord.
+    return
+
 
 async def _cadastrar_guild(guild):
     membros = [member for member in guild.members if not member.bot]
     quantidade = await cadastro_async(membros)
     print(f"{guild.name}: {quantidade} usuários processados.")
     return quantidade
+
 
 async def _cadastro_inicial_background():
     global _cadastro_inicial_concluido
@@ -163,6 +175,7 @@ async def _cadastro_inicial_background():
         print(f"[CADASTRO][ERRO] {type(erro).__name__}: {erro}")
         return
     _cadastro_inicial_concluido = True
+
 
 @bot.event
 async def on_ready():
@@ -178,6 +191,7 @@ async def on_ready():
         _online_notificado = True
     if not _cadastro_inicial_concluido:
         asyncio.create_task(_cadastro_inicial_background())
+
 
 async def _carregar_extensao_com_recuperacao_de_conflito(extensao):
     try:
@@ -195,6 +209,7 @@ async def _carregar_extensao_com_recuperacao_de_conflito(extensao):
             raise
         print(f"[EXTENSÃO][CONFLITO] {extensao}: comando '{nome}' já existia; registro anterior removido, tentando novamente.")
         await bot.load_extension(extensao)
+
 
 async def carregar_extensoes():
     extensoes = [
@@ -219,9 +234,11 @@ async def carregar_extensoes():
             print(f"[EXTENSÃO][ERRO] {extensao}: {type(erro).__name__}: {erro}")
             raise
 
+
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
     raise RuntimeError("DISCORD_TOKEN não foi configurado.")
+
 
 async def main():
     try:
@@ -231,5 +248,6 @@ async def main():
             await bot.start(TOKEN)
     finally:
         await close_db()
+
 
 asyncio.run(main())
