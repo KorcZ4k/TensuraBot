@@ -3,10 +3,6 @@ import json
 import random
 
 
-# ==========================================
-# CARREGAR CONFIGURAÇÕES
-# ==========================================
-
 def _carregar_golpes():
     try:
         with open("database/json/golpes.json", "r", encoding="utf-8") as arquivo:
@@ -39,16 +35,18 @@ def criar_participante_jogador(user_id: str, guild_id: str):
         return None
     forca = jogador.get("Força", 10)
     defesa = jogador.get("Defesa", 10)
+    velocidade = jogador.get("Velocidade", 50)
+    mana = jogador.get("Mana", 50)
     return {
         "id": str(user_id),
         "nome": jogador.get("Nome", f"Jogador_{user_id}"),
         "tipo": "jogador",
         "vida": jogador.get("Vida", 100),
         "vida_maxima": jogador.get("Vida_Maxima", jogador.get("Vida", 100)),
-        "mana": jogador.get("Mana", 50),
-        "mana_maxima": jogador.get("Mana_Maxima", jogador.get("Mana", 50)),
-        "velocidade": jogador.get("Velocidade", 50),
-        "Velocidade": jogador.get("Velocidade", 50),
+        "mana": mana,
+        "mana_maxima": jogador.get("Mana_Maxima", mana),
+        "velocidade": velocidade,
+        "Velocidade": velocidade,
         "Força": forca,
         "Defesa": defesa,
         "Destreza": jogador.get("Destreza", 10),
@@ -76,18 +74,22 @@ def criar_monstro(tipo: str, nivel: int = 1):
     velocidade = int(atributos_base.get("Velocidade", 20) * fator_escala)
     destreza = int(atributos_base.get("Destreza", 10) * fator_escala)
     defesa_total = forca + defesa_base
-    vida_base = dados.get("vida_base", 50)
-    vida = int(vida_base * fator_escala)
+    vida = int(dados.get("vida_base", 50) * fator_escala)
     dano_base = int(dados.get("dano_base", 10) * fator_escala)
     xp_recompensa = int(dados.get("xp_recompensa", 20) * fator_escala)
     hunos_recompensa = int(dados.get("hunos_recompensa", 10) * fator_escala)
     return {
         "id": str(tipo), "nome": dados.get("nome", tipo), "emoji": dados.get("emoji", "👹"),
         "tipo": "monstro", "nivel": nivel, "nivel_minimo": nivel_minimo, "nivel_maximo": nivel_maximo,
-        "vida": vida, "vida_maxima": vida, "mana": 0, "Força": forca, "Defesa": defesa_base,
-        "Destreza": destreza, "defesa": defesa_total, "velocidade": velocidade, "Velocidade": velocidade,
+        "vida": vida, "vida_maxima": vida, "mana": 0, "mana_maxima": 0,
+        "Força": forca, "Defesa": defesa_base, "Destreza": destreza,
+        "defesa": defesa_total, "velocidade": velocidade, "Velocidade": velocidade,
+        "Magia": int(atributos_base.get("Magia", 0) or 0),
+        "Inteligencia": int(atributos_base.get("Inteligencia", 0) or 0),
         "dano_base": dano_base, "xp_recompensa": xp_recompensa, "hunos_recompensa": hunos_recompensa,
-        "defesa_ativa": False, "esquiva_ativa": False, "defesa_magica_ativa": False, "defesa_magica_valor": 0,
+        "golpes": list(dados.get("golpes", [])),
+        "defesa_ativa": False, "esquiva_ativa": False,
+        "defesa_magica_ativa": False, "defesa_magica_valor": 0,
     }
 
 
@@ -108,21 +110,17 @@ def limpar_defesa(participante):
 
 def calcular_dano(atacante, defensor=None):
     if defensor and defensor.get("esquiva_ativa", False):
-        chance_esquiva = 0.40
         defensor["esquiva_ativa"] = False
-        if random.random() < chance_esquiva:
+        if random.random() < 0.40:
             return 0, "esquivou"
     reducao = 0.50 if defensor and defensor.get("defesa_ativa", False) else 0
     if atacante.get("tipo") == "jogador":
-        forca = atacante.get("Força", 10)
-        destreza = atacante.get("Destreza", 10)
-        dano = int((forca + destreza) / 2) + random.randint(1, 10)
+        dano = int((atacante.get("Força", 10) + atacante.get("Destreza", 10)) / 2) + random.randint(1, 10)
     else:
         dano = atacante.get("dano_base", 10) + random.randint(1, 15)
     if defensor:
-        defesa = defensor.get("defesa", 0)
-        dano = max(1, dano - int(defesa * 0.1))
-    if reducao > 0:
+        dano = max(1, dano - int(float(defensor.get("defesa", 0) or 0) * 0.1))
+    if reducao:
         dano = int(dano * (1 - reducao))
     return max(1, dano), "normal"
 
@@ -145,9 +143,6 @@ def pode_lutar(user_id: str, guild_id: str):
         return {"pode": False, "mensagem": "❌ Você está morto."}
     if jogador.get("Vida", 0) <= 0:
         return {"pode": False, "mensagem": "❌ Você está sem vida."}
-    # Combates são mantidos apenas em memória. Um estado ativo persistido
-    # sem combate correspondente é necessariamente órfão (ex.: reinício).
-    # O bot limpará esses estados no startup; aqui não os tratamos como morte.
     if situacao == "ativo_combate":
         return {"pode": False, "mensagem": "❌ Você já está em combate."}
     return {"pode": True, "mensagem": "Pode lutar."}
@@ -159,10 +154,8 @@ def obter_vencedores(combate):
     if not derrotados:
         return None
     if combate.get("pvp", False):
-        for participante in participantes:
-            if participante.get("vida", 0) > 0:
-                return {"tipo": "vitoria", "vencedor": participante}
-        return {"tipo": "empate", "vencedor": None}
+        vivos = [p for p in participantes if p.get("vida", 0) > 0]
+        return {"tipo": "vitoria", "vencedor": vivos[0]} if vivos else {"tipo": "empate", "vencedor": None}
     jogadores_vivos = any(p.get("tipo") == "jogador" and p.get("vida", 0) > 0 for p in participantes)
     monstros_vivos = any(p.get("tipo") == "monstro" and p.get("vida", 0) > 0 for p in participantes)
     if jogadores_vivos and not monstros_vivos:
@@ -182,9 +175,22 @@ def finalizar_combate(combate):
         if participante.get("tipo") != "jogador":
             continue
         vida = max(0, int(participante.get("vida", 0) or 0))
-        situacao = "morto" if vida <= 0 else "ativo"
+        mana = int(participante.get("mana", 0) or 0)
+        situacao = "ativo" if vida > 0 else "morto"
         db["Jogadores"].update_one(
             {"ID": str(participante.get("id")), "guild_id": str(guild_id)},
-            {"$set": {"Vida": vida, "Mana": int(participante.get("mana", 0) or 0), "Situação": situacao}},
+            {"$set": {"Vida": vida, "Mana": mana, "Situação": situacao}},
         )
+    if resultado and resultado.get("tipo") == "vitoria" and resultado.get("lado") == "jogadores":
+        vivos = [p for p in participantes if p.get("tipo") == "jogador" and p.get("vida", 0) > 0]
+        derrotados_monstros = [p for p in participantes if p.get("tipo") == "monstro" and p.get("vida", 0) <= 0]
+        xp_total = sum(int(p.get("xp_recompensa", 0) or 0) for p in derrotados_monstros)
+        hunos_total = sum(int(p.get("hunos_recompensa", 0) or 0) for p in derrotados_monstros)
+        for indice, jogador in enumerate(vivos):
+            xp = xp_total // len(vivos) + (1 if indice < xp_total % len(vivos) else 0)
+            hunos = hunos_total // len(vivos) + (1 if indice < hunos_total % len(vivos) else 0)
+            filtro = {"ID": str(jogador.get("id")), "guild_id": str(guild_id)}
+            db["Jogadores"].update_one(filtro, {"$inc": {"XP": xp}})
+            db["Hunos"].update_one(filtro, {"$inc": {"carteira": hunos}}, upsert=True)
+        return {"xp": xp_total, "hunos": hunos_total}
     return resultado
