@@ -1,10 +1,9 @@
-import asyncio
-
 import discord
 from discord.ext import commands
 
 from database.python.luta_async import pode_lutar, atualizar_situacao
 from database.python.luta import criar_monstro
+from . import luta as luta_mod
 
 
 class PartyCombate(commands.Cog):
@@ -192,7 +191,7 @@ class PartyCombate(commands.Cog):
             if not verificacao.get("pode", False):
                 await ctx.send(f"❌ <@{membro_id}> não pode participar: {verificacao.get('mensagem', 'indisponível')}")
                 return
-            jogador = await luta_cog._criar_participante(str(membro_id), guild_id)
+            jogador = await luta_mod._criar_participante(str(membro_id), guild_id)
             if not jogador:
                 await ctx.send(f"❌ <@{membro_id}> não possui personagem registrado.")
                 return
