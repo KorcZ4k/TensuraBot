@@ -7,7 +7,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from database.python.users import cadastro_async
-from database.python.mongodb import db, close_db
+from database.python.mongodb import db, close_db, run_db
 from database.python.mongo_indexes import ensure_indexes
 from database.python.canais_comandos import canal_bloqueado
 
@@ -155,8 +155,6 @@ async def on_command_error(ctx, error):
                     return
         except Exception as recuperacao_erro:
             print(f"[COMANDO][RECUPERACAO][ERRO] {type(recuperacao_erro).__name__}: {recuperacao_erro}")
-    # O erro já foi registrado. Não relançamos a exceção a partir do handler
-    # global, evitando uma segunda exceção no loop de eventos do Discord.
     return
 
 
@@ -175,6 +173,20 @@ async def _cadastro_inicial_background():
         print(f"[CADASTRO][ERRO] {type(erro).__name__}: {erro}")
         return
     _cadastro_inicial_concluido = True
+
+
+async def _recuperar_combates_orfaos():
+    """Libera jogadores que ficaram marcados como em combate após um restart."""
+    if db is None:
+        return
+    resultado = await run_db(
+        db["Jogadores"].update_many,
+        {"Situação": "ativo_combate"},
+        {"$set": {"Situação": "ativo"}},
+    )
+    modificados = int(getattr(resultado, "modified_count", 0) or 0)
+    if modificados:
+        print(f"[LUTA][RECUPERAÇÃO] {modificados} estado(s) de combate órfão(s) liberado(s).")
 
 
 @bot.event
@@ -245,6 +257,7 @@ async def main():
         async with bot:
             await carregar_extensoes()
             await ensure_indexes()
+            await _recuperar_combates_orfaos()
             await bot.start(TOKEN)
     finally:
         await close_db()
