@@ -95,6 +95,34 @@ def _dano_habilidade_fisica(atacante, defensor, ataque):
     return max(0, int(dano)), "atingiu"
 
 
+def _dano_ataque_fisico(atacante, defensor, ataque):
+    """Resolve soco/chute/ataque de monstro sem voltar para a cadeia de monkeypatches."""
+    if defensor.get("esquiva_ativa"):
+        defensor["esquiva_ativa"] = False
+        if defensor.get("desviante_ativo") and _desviante_esquiva(defensor, atacante):
+            defensor["desviante_ativo"] = False
+            return 0, "esquivou_desviante"
+        if random.random() < 0.40:
+            return 0, "esquivou"
+
+    dano = _valor(atacante, "Força") + _valor(atacante, "Velocidade") + _valor(ataque, "dano_base")
+    if ataque.get("com_arma"):
+        dano += _valor(atacante, "dano_arma")
+
+    if defensor.get("defesa_magica_ativa"):
+        dano -= _valor(defensor, "defesa_magica_valor")
+        defensor["defesa_magica_ativa"] = False
+        defensor["defesa_magica_valor"] = 0
+    elif defensor.get("defesa_ativa"):
+        defesa = _valor(defensor, "defesa")
+        if defesa <= 0:
+            defesa = _valor(defensor, "Força") + _valor(defensor, "Defesa")
+        dano -= defesa
+        defensor["defesa_ativa"] = False
+
+    return max(0, int(dano)), "atingiu"
+
+
 async def _finalizar_resultado(self, ctx, combate, atacante, defensor, mensagem):
     combate["historico"].append(mensagem)
     defensor["defesa_ativa"] = False
@@ -165,19 +193,60 @@ async def _resolver_habilidade(self, ctx, combate, ataque):
 async def _resolver_ataque_com_desviante(self, ctx):
     combate = self._obter_combate(ctx.channel.id)
     ataque = combate.get("ataque_pendente") if combate else None
-    if combate and ataque and ataque.get("tipo") != "habilidade":
-        defensor = self._obter_defensor(combate)
-        atacante = self._obter_atacante(combate)
-        if defensor.get("esquiva_ativa") and defensor.get("tipo") == "jogador" and defensor.get("desviante_ativo") and _desviante_esquiva(defensor, atacante):
-            defensor["esquiva_ativa"] = False
-            defensor["desviante_ativo"] = False
+    if not combate or not ataque:
+        return
+    defensor = self._obter_defensor(combate)
+    atacante = self._obter_atacante(combate)
+
+    if ataque.get("tipo") != "habilidade" and defensor.get("esquiva_ativa") and defensor.get("tipo") == "jogador" and defensor.get("desviante_ativo") and _desviante_esquiva(defensor, atacante):
+        defensor["esquiva_ativa"] = False
+        defensor["desviante_ativo"] = False
+        mensagem = f"💨 **{defensor.get('nome', 'Defensor')}** desviou do ataque graças ao **Desviante**!"
+        combate["historico"].append(mensagem)
+        combate["ataque_pendente"] = None
+        await ctx.send(embed=discord.Embed(title="💨 Desviante", description=mensagem, color=discord.Color.green()))
+        await asyncio.sleep(1)
+        return await self._proximo_turno(ctx)
+
+    # Ataques físicos são resolvidos aqui de forma direta. Antes eles voltavam
+    # para a cadeia de métodos monkeypatched (habilidades -> luta -> sync),
+    # o que podia deixar o combate parado logo após a reação "defesa".
+    if ataque.get("tipo") != "magia":
+        dano, resultado = _dano_ataque_fisico(atacante, defensor, ataque)
+        if resultado == "esquivou_desviante":
             mensagem = f"💨 **{defensor.get('nome', 'Defensor')}** desviou do ataque graças ao **Desviante**!"
-            combate["historico"].append(mensagem)
-            combate["ataque_pendente"] = None
-            await ctx.send(embed=discord.Embed(title="💨 Desviante", description=mensagem, color=discord.Color.green()))
-            await asyncio.sleep(1)
-            return await self._proximo_turno(ctx)
-    return await _RESOLVER_ANTES_DE_HABILIDADES(self, ctx)
+        elif resultado == "esquivou":
+            mensagem = f"💨 **{defensor.get('nome', 'Defensor')}** esquivou do ataque de **{atacante.get('nome', 'Atacante')}**!"
+        else:
+            defensor["vida"] = max(0, int(_valor(defensor, "vida") - dano))
+            mensagem = f"⚔️ **{atacante.get('nome', 'Atacante')}** causou **{dano} de dano** em **{defensor.get('nome', 'Defensor')}**!"
+            efeito = ataque.get("efeito")
+            if isinstance(efeito, dict) and efeito.get("nome"):
+                aplicados = _aplicar_efeitos(defensor, [efeito])
+                if aplicados:
+                    mensagem += "\n⚠️ Efeito aplicado: " + ", ".join(x.title() for x in aplicados) + "."
+        return await _finalizar_resultado(self, ctx, combate, atacante, defensor, mensagem)
+
+    # Magias especiais (cura/barreira) continuam passando pela camada que
+    # prepara esses estados. Magias ofensivas comuns também são resolvidas
+    # diretamente para evitar reentrada desnecessária.
+    if ataque.get("cura_base", 0) > 0:
+        cura = int(_valor(atacante, "Magia") + _valor(atacante, "Inteligencia") + _valor(ataque, "cura_base"))
+        atacante["vida"] = min(_valor(atacante, "vida_maxima", atacante.get("vida", 0)), _valor(atacante, "vida") + cura)
+        return await _finalizar_resultado(self, ctx, combate, atacante, atacante, f"✨ **{atacante.get('nome', 'Atacante')}** recuperou **{cura} de vida**!")
+
+    dano, resultado = self._calcular_dano_magia(atacante, defensor, ataque)
+    if resultado == "esquivou":
+        mensagem = f"💨 **{defensor.get('nome', 'Defensor')}** esquivou completamente da magia!"
+    else:
+        defensor["vida"] = max(0, int(_valor(defensor, "vida") - dano))
+        mensagem = f"✨ **{atacante.get('nome', 'Atacante')}** causou **{dano} de dano mágico** em **{defensor.get('nome', 'Defensor')}**!"
+        efeito = ataque.get("efeito")
+        if isinstance(efeito, dict) and efeito.get("nome"):
+            aplicados = _aplicar_efeitos(defensor, [efeito])
+            if aplicados:
+                mensagem += "\n⚠️ Efeito aplicado: " + ", ".join(x.title() for x in aplicados) + "."
+    return await _finalizar_resultado(self, ctx, combate, atacante, defensor, mensagem)
 
 
 async def _defesa_monstro_corrigida(self, ctx):
@@ -227,9 +296,12 @@ async def _resolver_ataque(self, ctx):
     if not ataque or ataque.get("_resolvendo"):
         return
     ataque["_resolvendo"] = True
-    if ataque.get("tipo") == "habilidade":
-        return await _resolver_habilidade(self, ctx, combate, ataque)
-    return await _resolver_ataque_com_desviante(self, ctx)
+    try:
+        if ataque.get("tipo") == "habilidade":
+            return await _resolver_habilidade(self, ctx, combate, ataque)
+        return await _resolver_ataque_com_desviante(self, ctx)
+    finally:
+        ataque.pop("_resolvendo", None)
 
 
 def _texto_status_com_efeitos(self, participantes):
