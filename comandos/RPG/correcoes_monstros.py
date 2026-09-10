@@ -1,4 +1,4 @@
-"""Correções para comandos de consulta de monstros."""
+"""Correções para consulta de monstros sem ultrapassar os limites do Discord."""
 
 import discord
 
@@ -11,7 +11,9 @@ async def _listar_monstros(self, ctx):
         return
 
     itens = list(MONSTROS.items())
+    total_paginas = (len(itens) + 24) // 25
     for inicio in range(0, len(itens), 25):
+        pagina = inicio // 25 + 1
         embed = discord.Embed(
             title="🐉 Monstros Disponíveis",
             color=discord.Color.dark_red(),
@@ -28,14 +30,13 @@ async def _listar_monstros(self, ctx):
                 ),
                 inline=True,
             )
-        if len(itens) > 25:
-            pagina = inicio // 25 + 1
-            total_paginas = (len(itens) + 24) // 25
-            embed.set_footer(text=f"Página {pagina}/{total_paginas} • Use !luta pve <id> para iniciar")
+        embed.set_footer(text=f"Página {pagina}/{total_paginas} • Use !luta pve <id> para iniciar")
         await ctx.send(embed=embed)
 
 
 async def setup(bot):
-    comando = bot.get_command("luta monstros")
-    if comando is not None:
-        comando.callback = _listar_monstros
+    grupo = bot.get_command("luta")
+    comando = grupo.get_command("monstros") if grupo is not None else None
+    if comando is None:
+        raise RuntimeError("O comando !luta monstros não foi encontrado para aplicar a correção.")
+    comando.callback = _listar_monstros
