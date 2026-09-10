@@ -1,6 +1,11 @@
 from database.python.mongodb import db
 import json
 import random
+from datetime import datetime, timedelta, timezone
+
+from pymongo import ReturnDocument
+
+MONSTRO_COOLDOWN_HORAS = 6
 
 
 def _carregar_golpes():
@@ -91,6 +96,49 @@ def criar_monstro(tipo: str, nivel: int = 1):
         "defesa_ativa": False, "esquiva_ativa": False,
         "defesa_magica_ativa": False, "defesa_magica_valor": 0,
     }
+
+
+def verificar_cooldown_monstro(user_id: str, guild_id: str, monstro_id: str):
+    jogador = obter_jogador(user_id, guild_id)
+    if not jogador:
+        return {"disponivel": False, "segundos_restantes": 0, "fim": None}
+    fim = (jogador.get("Cooldowns_Monstros") or {}).get(str(monstro_id))
+    if not isinstance(fim, datetime):
+        return {"disponivel": True, "segundos_restantes": 0, "fim": None}
+    agora = datetime.now(timezone.utc)
+    if fim.tzinfo is None:
+        fim = fim.replace(tzinfo=timezone.utc)
+    segundos = max(0, int((fim - agora).total_seconds()))
+    return {"disponivel": segundos <= 0, "segundos_restantes": segundos, "fim": fim}
+
+
+def iniciar_cooldown_monstro(user_id: str, guild_id: str, monstro_id: str):
+    """Reserva atomicamente 6h para este jogador contra este monstro."""
+    if db is None:
+        return {"sucesso": False, "segundos_restantes": 0, "fim": None}
+    agora = datetime.now(timezone.utc)
+    fim = agora + timedelta(hours=MONSTRO_COOLDOWN_HORAS)
+    campo = f"Cooldowns_Monstros.{str(monstro_id)}"
+    jogador = db["Jogadores"].find_one_and_update(
+        {
+            "ID": str(user_id),
+            "guild_id": str(guild_id),
+            "$or": [
+                {campo: {"$exists": False}},
+                {campo: {"$lte": agora}},
+            ],
+        },
+        {"$set": {campo: fim}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if jogador is None:
+        verificacao = verificar_cooldown_monstro(user_id, guild_id, monstro_id)
+        return {
+            "sucesso": False,
+            "segundos_restantes": verificacao["segundos_restantes"],
+            "fim": verificacao["fim"],
+        }
+    return {"sucesso": True, "segundos_restantes": MONSTRO_COOLDOWN_HORAS * 3600, "fim": fim}
 
 
 def ativar_defesa(participante):
