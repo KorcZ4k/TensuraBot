@@ -193,6 +193,18 @@ async def _defesa_monstro_corrigida(self, ctx):
     await self._resolver_ataque(ctx)
 
 
+def _obter_defensor_corrigido(self, combate):
+    """Em party, o alvo deve ser de outra equipe; nunca um aliado."""
+    if not combate.get("party"):
+        return base.Luta._obter_defensor(self, combate)
+    atacante = self._obter_atacante(combate)
+    equipe_atacante = atacante.get("equipe")
+    inimigos = [p for p in combate.get("participantes", []) if p is not atacante and p.get("equipe") != equipe_atacante]
+    if inimigos:
+        return inimigos[0]
+    return base.Luta._obter_defensor(self, combate)
+
+
 async def _resolver_ataque(self, ctx):
     combate = self._obter_combate(ctx.channel.id)
     if not combate or not combate.get("ativo"):
@@ -230,10 +242,12 @@ def _texto_status_com_efeitos(self, participantes):
 async def setup(bot):
     base.Luta._resolver_ataque = _resolver_ataque
     base.Luta._defesa_monstro = _defesa_monstro_corrigida
+    base.Luta._obter_defensor = _obter_defensor_corrigido
     base.Luta._texto_status = _texto_status_com_efeitos
     luta = bot.get_cog("Luta")
     if luta:
         luta._resolver_ataque = _resolver_ataque.__get__(luta, base.Luta)
         luta._defesa_monstro = _defesa_monstro_corrigida.__get__(luta, base.Luta)
+        luta._obter_defensor = _obter_defensor_corrigido.__get__(luta, base.Luta)
         luta._texto_status = _texto_status_com_efeitos.__get__(luta, base.Luta)
-    print("✅ Resolver de habilidades, defesa do monstro e proteção contra dupla resolução integrados ao fluxo de combate.")
+    print("✅ Resolver de habilidades, defesa PvE e alvos de party integrados ao fluxo de combate.")
