@@ -75,8 +75,9 @@ async def _context_send_com_embed(self, content=None, *, embed=None, **kwargs):
         return ultimo
     if embed is not None:
         ultimo = None
-        for item in _normalizar_embed(embed):
-            ultimo = await _context_send_original(self, content=content if item is embed else None, embed=item, **kwargs)
+        embeds = _normalizar_embed(embed)
+        for item in embeds:
+            ultimo = await _context_send_original(self, content=content if not embeds.index(item) else None, embed=item, **kwargs)
         return ultimo
     return await _context_send_original(self, content=content, embed=embed, **kwargs)
 
@@ -86,9 +87,6 @@ commands.Context.send = _context_send_com_embed
 async def verificar_canal_de_comandos(ctx):
     comando = getattr(ctx.command, "name", "").casefold()
 
-    # Durante a manutenção, nenhum comando é executado. A única exceção é
-    # !manutencao, que permanece disponível para que um administrador possa
-    # encerrar a manutenção. Eventos não passam por este check.
     if getattr(bot, "em_manutencao", False) and comando != "manutencao":
         await ctx.send(MENSAGEM_MANUTENCAO)
         return False
@@ -206,7 +204,7 @@ async def carregar_extensoes():
         "comandos.RPG.luta", "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
         "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs",
         "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento",
-        "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_luta",
+        "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_luta", "comandos.RPG.correcoes_party",
         "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao", "comandos.RPG.loja",
         "comandos.RPG.inventario", "comandos.RPG.usarhab",
         "comandos.RPG.evento_monstros", "comandos.RPG.assentamentos",
