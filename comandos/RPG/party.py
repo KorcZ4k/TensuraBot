@@ -3,11 +3,7 @@ import asyncio
 import discord
 from discord.ext import commands
 
-from database.python.luta_async import (
-    pode_lutar,
-    criar_participante_jogador,
-    atualizar_situacao,
-)
+from database.python.luta_async import pode_lutar, atualizar_situacao
 from database.python.luta import criar_monstro
 
 
@@ -24,6 +20,15 @@ class PartyCombate(commands.Cog):
             if party["guild_id"] == str(guild_id) and str(user_id) in party["membros"]:
                 return party_id, party
         return None, None
+
+    def _party_em_combate(self, party_id):
+        luta = self.bot.get_cog("Luta")
+        if not luta:
+            return False
+        return any(
+            combate.get("ativo") and combate.get("party_id") == party_id
+            for combate in luta.combates.values()
+        )
 
     @commands.group(name="party", aliases=["grupo"], invoke_without_command=True)
     @commands.guild_only()
@@ -91,6 +96,9 @@ class PartyCombate(commands.Cog):
         if not party:
             await ctx.send("❌ Esta party não existe mais.")
             return
+        if self._party_em_combate(party_id):
+            await ctx.send("❌ Esta party está em combate e não pode ser alterada agora.")
+            return
         if len(party["membros"]) >= party["limite"]:
             await ctx.send("❌ A party ficou cheia.")
             return
@@ -121,6 +129,9 @@ class PartyCombate(commands.Cog):
         if not party:
             await ctx.send("❌ Você não está em uma party.")
             return
+        if self._party_em_combate(party_id):
+            await ctx.send("❌ A party está em combate. Saia apenas quando o combate terminar.")
+            return
         party["membros"].remove(str(ctx.author.id))
         if not party["membros"]:
             self.parties.pop(party_id, None)
@@ -137,6 +148,9 @@ class PartyCombate(commands.Cog):
         if not party or party["lider_id"] != str(ctx.author.id):
             await ctx.send("❌ Apenas o líder pode expulsar membros.")
             return
+        if self._party_em_combate(party_id):
+            await ctx.send("❌ A party está em combate. Não é possível expulsar membros agora.")
+            return
         if str(membro.id) not in party["membros"] or membro.id == ctx.author.id:
             await ctx.send("❌ Este membro não pode ser expulso.")
             return
@@ -152,6 +166,9 @@ class PartyCombate(commands.Cog):
             return
         if party["lider_id"] != str(ctx.author.id):
             await ctx.send("❌ Apenas o líder da party pode iniciar a luta.")
+            return
+        if self._party_em_combate(party_id):
+            await ctx.send("❌ Esta party já está em combate.")
             return
         luta_cog = self.bot.get_cog("Luta")
         if not luta_cog:
@@ -175,7 +192,7 @@ class PartyCombate(commands.Cog):
             if not verificacao.get("pode", False):
                 await ctx.send(f"❌ <@{membro_id}> não pode participar: {verificacao.get('mensagem', 'indisponível')}")
                 return
-            jogador = await criar_participante_jogador(str(membro_id), guild_id)
+            jogador = await luta_cog._criar_participante(str(membro_id), guild_id)
             if not jogador:
                 await ctx.send(f"❌ <@{membro_id}> não possui personagem registrado.")
                 return
@@ -192,7 +209,7 @@ class PartyCombate(commands.Cog):
             return
         monstro["equipe"] = "inimigos"
         participantes.append(monstro)
-        participantes.sort(key=lambda p: p.get("velocidade", p.get("Velocidade", 0)), reverse=True)
+        participantes.sort(key=lambda p: p.get("Velocidade", p.get("velocidade", 0)), reverse=True)
         luta_cog.combates[ctx.channel.id] = {
             "participantes": participantes, "turno": 0, "numero_turno": 1, "fase": "ataque", "ativo": True,
             "pvp": False, "party": True, "party_id": party_id, "guild_id": guild_id, "ataque_pendente": None,
