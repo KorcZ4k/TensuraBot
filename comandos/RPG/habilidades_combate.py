@@ -7,6 +7,8 @@ import discord
 from . import luta as luta_mod
 from . import luta_sync as base
 
+_OBTER_DEFENSOR_ORIGINAL = base.Luta._obter_defensor
+
 
 def _valor(p, chave, padrao=0):
     return float(p.get(chave, padrao) or 0)
@@ -196,13 +198,13 @@ async def _defesa_monstro_corrigida(self, ctx):
 def _obter_defensor_corrigido(self, combate):
     """Em party, o alvo deve ser de outra equipe; nunca um aliado."""
     if not combate.get("party"):
-        return base.Luta._obter_defensor(self, combate)
+        return _OBTER_DEFENSOR_ORIGINAL(self, combate)
     atacante = self._obter_atacante(combate)
     equipe_atacante = atacante.get("equipe")
     inimigos = [p for p in combate.get("participantes", []) if p is not atacante and p.get("equipe") != equipe_atacante]
     if inimigos:
         return inimigos[0]
-    return base.Luta._obter_defensor(self, combate)
+    return _OBTER_DEFENSOR_ORIGINAL(self, combate)
 
 
 async def _resolver_ataque(self, ctx):
