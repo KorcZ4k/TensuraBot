@@ -60,4 +60,20 @@ class Recuperacao(commands.Cog):
 
 
 async def setup(bot):
+    # Alguns módulos do bot já podem ter registrado um destes nomes/aliases.
+    # Removemos os conflitos antes da injeção do Cog para que a extensão seja
+    # carregada de forma determinística e os comandos de recuperação sejam os
+    # únicos donos desses nomes.
+    nomes_recuperacao = (
+        "descanso",
+        "descansar",
+        "rest",
+        "meditacao",
+        "meditação",
+        "meditar",
+        "meditate",
+    )
+    for nome in nomes_recuperacao:
+        bot.remove_command(nome)
+
     await bot.add_cog(Recuperacao(bot))
