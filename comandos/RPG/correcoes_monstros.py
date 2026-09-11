@@ -57,7 +57,8 @@ class CooldownMonstros(commands.Cog):
         if comando != "pve" or getattr(parent, "name", "").casefold() != "luta" or ctx.guild is None:
             return True
 
-        monstro_tipo = ctx.kwargs.get("monstro_tipo")
+        kwargs = getattr(ctx, "kwargs", {}) or {}
+        monstro_tipo = kwargs.get("monstro_tipo")
         if not monstro_tipo:
             partes = str(getattr(getattr(ctx, "message", None), "content", "")).split()
             if len(partes) >= 3 and partes[0].casefold() == "!luta" and partes[1].casefold() == "pve":
@@ -67,6 +68,24 @@ class CooldownMonstros(commands.Cog):
         monstro_id = luta._encontrar_monstro(monstro_tipo) if luta and monstro_tipo else None
         if not monstro_id:
             return True
+
+        # Primeiro consulta o cooldown para rejeitar rapidamente uma luta já bloqueada.
+        # A reserva abaixo continua sendo atômica e é a proteção contra duas chamadas
+        # simultâneas passarem pela checagem ao mesmo tempo.
+        cooldown = await luta_db.run_db(
+            luta_db.verificar_cooldown_monstro,
+            str(ctx.author.id),
+            str(ctx.guild.id),
+            str(monstro_id),
+        )
+        if cooldown.get("em_cooldown"):
+            segundos = cooldown.get("segundos_restantes", 0)
+            nome = MONSTROS[monstro_id].get("nome", monstro_id)
+            await ctx.send(
+                f"⏳ Você já enfrentou **{nome}**. "
+                f"Tente novamente em **{_formatar_tempo(segundos)}**."
+            )
+            return False
 
         # A reserva é feita antes da execução da luta. O filtro atômico no banco
         # impede duas chamadas simultâneas de iniciarem o mesmo monstro.
