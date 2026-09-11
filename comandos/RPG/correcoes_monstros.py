@@ -57,7 +57,6 @@ class CooldownMonstros(commands.Cog):
         if comando != "pve" or getattr(parent, "name", "").casefold() != "luta" or ctx.guild is None:
             return True
 
-        # ctx.kwargs pode não estar preenchido em todas as versões/configurações do parser.
         monstro_tipo = ctx.kwargs.get("monstro_tipo")
         if not monstro_tipo:
             partes = str(getattr(getattr(ctx, "message", None), "content", "")).split()
@@ -69,38 +68,30 @@ class CooldownMonstros(commands.Cog):
         if not monstro_id:
             return True
 
-        verificacao = await luta_db.run_db(
-            luta_db.verificar_cooldown_monstro,
-            str(ctx.author.id),
-            str(ctx.guild.id),
-            str(monstro_id),
-        )
-        if not verificacao.get("disponivel", False):
-            await ctx.send(
-                f"⏳ Você já enfrentou **{MONSTROS[monstro_id].get('nome', monstro_id)}**. "
-                f"Tente novamente em **{_formatar_tempo(verificacao['segundos_restantes'])}**."
-            )
-            return False
-
-        # Reserva ATOMICAMENTE 6h para este usuário + este monstro.
-        # Não é um cooldown global: outros monstros continuam disponíveis.
+        # A reserva é feita antes da execução da luta. O filtro atômico no banco
+        # impede duas chamadas simultâneas de iniciarem o mesmo monstro.
         reserva = await luta_db.run_db(
             luta_db.iniciar_cooldown_monstro,
             str(ctx.author.id),
             str(ctx.guild.id),
             str(monstro_id),
         )
+
         if not reserva.get("sucesso"):
+            segundos = reserva.get("segundos_restantes", 0)
+            nome = MONSTROS[monstro_id].get("nome", monstro_id)
             await ctx.send(
-                f"⏳ Você já enfrentou **{MONSTROS[monstro_id].get('nome', monstro_id)}**. "
-                f"Tente novamente em **{_formatar_tempo(reserva.get('segundos_restantes', 0))}**."
+                f"⏳ Você já enfrentou **{nome}**. "
+                f"Tente novamente em **{_formatar_tempo(segundos)}**."
             )
             return False
 
-        # Garante 6h mesmo se algum monstro tiver configuração diferente no JSON.
+        # Força exatamente 6h, independentemente da configuração individual
+        # encontrada no JSON, preservando a reserva criada por esta execução.
         fim = reserva.get("fim")
         if fim is not None and luta_db.db is not None:
             from datetime import datetime, timedelta, timezone
+
             agora = datetime.now(timezone.utc)
             fim_forcado = agora + timedelta(hours=COOLDOWN_MONSTRO_HORAS)
             campo = f"Cooldowns_Monstros.{str(monstro_id)}"
@@ -119,6 +110,7 @@ class CooldownMonstros(commands.Cog):
         reserva = getattr(ctx, "_monstro_cooldown_reserva", None)
         if not reserva or ctx.guild is None:
             return
+
         monstro_id, fim = reserva
         await luta_db.run_db(
             luta_db.cancelar_cooldown_monstro,
