@@ -7,6 +7,9 @@ from database.python.luta import MONSTROS
 from database.python import luta as luta_db
 
 
+COOLDOWN_MONSTRO_HORAS = 6
+
+
 def _formatar_tempo(segundos):
     segundos = max(0, int(segundos or 0))
     horas, resto = divmod(segundos, 3600)
@@ -27,10 +30,7 @@ async def _listar_monstros(self, ctx):
     total_paginas = (len(itens) + 24) // 25
     for inicio in range(0, len(itens), 25):
         pagina = inicio // 25 + 1
-        embed = discord.Embed(
-            title="🐉 Monstros Disponíveis",
-            color=discord.Color.dark_red(),
-        )
+        embed = discord.Embed(title="🐉 Monstros Disponíveis", color=discord.Color.dark_red())
         for monstro_id, dados in itens[inicio:inicio + 25]:
             embed.add_field(
                 name=f"{dados.get('emoji', '👹')} {dados.get('nome', monstro_id)}",
@@ -49,42 +49,69 @@ async def _listar_monstros(self, ctx):
 
 
 class CooldownMonstros(commands.Cog):
-    """Impede repeticao do mesmo monstro antes de 6 horas."""
+    """Bloqueia o mesmo monstro por 6 horas para cada jogador."""
 
     async def _verificar_e_reservar(self, ctx):
-        if getattr(ctx.command, "name", "").casefold() != "pve":
-            return True
+        comando = getattr(ctx.command, "name", "").casefold()
         parent = getattr(ctx.command, "parent", None)
-        if getattr(parent, "name", "").casefold() != "luta":
+        if comando != "pve" or getattr(parent, "name", "").casefold() != "luta" or ctx.guild is None:
             return True
-        if ctx.guild is None:
-            return True
+
+        # ctx.kwargs pode não estar preenchido em todas as versões/configurações do parser.
         monstro_tipo = ctx.kwargs.get("monstro_tipo")
+        if not monstro_tipo:
+            partes = str(getattr(getattr(ctx, "message", None), "content", "")).split()
+            if len(partes) >= 3 and partes[0].casefold() == "!luta" and partes[1].casefold() == "pve":
+                monstro_tipo = " ".join(partes[2:])
+
         luta = ctx.bot.get_cog("Luta")
-        monstro_id = luta._encontrar_monstro(monstro_tipo) if luta else None
+        monstro_id = luta._encontrar_monstro(monstro_tipo) if luta and monstro_tipo else None
         if not monstro_id:
             return True
 
-        verificacao = luta_db.verificar_cooldown_monstro(
-            str(ctx.author.id), str(ctx.guild.id), monstro_id
+        verificacao = await luta_db.run_db(
+            luta_db.verificar_cooldown_monstro,
+            str(ctx.author.id),
+            str(ctx.guild.id),
+            str(monstro_id),
         )
-        if not verificacao["disponivel"]:
+        if not verificacao.get("disponivel", False):
             await ctx.send(
                 f"⏳ Você já enfrentou **{MONSTROS[monstro_id].get('nome', monstro_id)}**. "
                 f"Tente novamente em **{_formatar_tempo(verificacao['segundos_restantes'])}**."
             )
             return False
 
-        reserva = luta_db.iniciar_cooldown_monstro(
-            str(ctx.author.id), str(ctx.guild.id), monstro_id
+        # Reserva ATOMICAMENTE 6h para este usuário + este monstro.
+        # Não é um cooldown global: outros monstros continuam disponíveis.
+        reserva = await luta_db.run_db(
+            luta_db.iniciar_cooldown_monstro,
+            str(ctx.author.id),
+            str(ctx.guild.id),
+            str(monstro_id),
         )
-        if not reserva["sucesso"]:
+        if not reserva.get("sucesso"):
             await ctx.send(
                 f"⏳ Você já enfrentou **{MONSTROS[monstro_id].get('nome', monstro_id)}**. "
-                f"Tente novamente em **{_formatar_tempo(reserva['segundos_restantes'])}**."
+                f"Tente novamente em **{_formatar_tempo(reserva.get('segundos_restantes', 0))}**."
             )
             return False
-        ctx._monstro_cooldown_reserva = (str(monstro_id), reserva["fim"])
+
+        # Garante 6h mesmo se algum monstro tiver configuração diferente no JSON.
+        fim = reserva.get("fim")
+        if fim is not None and luta_db.db is not None:
+            from datetime import datetime, timedelta, timezone
+            agora = datetime.now(timezone.utc)
+            fim_forcado = agora + timedelta(hours=COOLDOWN_MONSTRO_HORAS)
+            campo = f"Cooldowns_Monstros.{str(monstro_id)}"
+            await luta_db.run_db(
+                luta_db.db["Jogadores"].update_one,
+                {"ID": str(ctx.author.id), "guild_id": str(ctx.guild.id), campo: fim},
+                {"$set": {campo: fim_forcado}},
+            )
+            fim = fim_forcado
+
+        ctx._monstro_cooldown_reserva = (str(monstro_id), fim)
         return True
 
     @commands.Cog.listener()
@@ -93,8 +120,12 @@ class CooldownMonstros(commands.Cog):
         if not reserva or ctx.guild is None:
             return
         monstro_id, fim = reserva
-        await luta_db.cancelar_cooldown_monstro(
-            str(ctx.author.id), str(ctx.guild.id), monstro_id, fim
+        await luta_db.run_db(
+            luta_db.cancelar_cooldown_monstro,
+            str(ctx.author.id),
+            str(ctx.guild.id),
+            monstro_id,
+            fim,
         )
 
     @commands.Cog.listener()
@@ -105,12 +136,14 @@ class CooldownMonstros(commands.Cog):
 
 async def setup(bot):
     grupo = bot.get_command("luta")
-    comando = grupo.get_command("monstros") if grupo is not None else None
-    if comando is None:
-        raise RuntimeError("O comando !luta monstros não foi encontrado para aplicar a correção.")
-    comando.callback = _listar_monstros
+    if grupo is None:
+        raise RuntimeError("O comando !luta não foi encontrado para aplicar a correção.")
 
-    pve = grupo.get_command("pve") if grupo is not None else None
+    comando = grupo.get_command("monstros")
+    if comando is not None:
+        comando.callback = _listar_monstros
+
+    pve = grupo.get_command("pve")
     if pve is None:
         raise RuntimeError("O comando !luta pve não foi encontrado para aplicar o cooldown.")
 
