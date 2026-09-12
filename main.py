@@ -116,9 +116,6 @@ async def on_member_join(member):
 
 @bot.event
 async def on_command_error(ctx, error):
-    command = getattr(ctx, "command", None)
-    parent = getattr(command, "parent", None)
-    param_name = getattr(getattr(error, "param", None), "name", None)
     if isinstance(error, commands.CheckFailure):
         if ctx.guild is not None:
             if ctx.channel.id == CANAL_REGISTRO_ID:
@@ -130,14 +127,6 @@ async def on_command_error(ctx, error):
                 except Exception:
                     pass
     if isinstance(error, commands.CommandNotFound):
-        return
-    if isinstance(error, commands.MissingRequiredArgument) and param_name == "membro" and getattr(command, "name", None) == "pvp" and getattr(parent, "name", None) == "luta":
-        mencoes = [m for m in ctx.message.mentions if not m.bot]
-        membro = next((m for m in mencoes if m.id != ctx.author.id), None)
-        if membro is not None and hasattr(ctx, "cog"):
-            await command.callback(ctx.cog, ctx, membro)
-            return
-        await ctx.send("❌ Mencione um membro válido. Exemplo: `!luta pvp @jogador`")
         return
     erro_original = getattr(error, "original", error)
     print(f"[COMANDO][ERRO] {type(erro_original).__name__}: {erro_original}")
@@ -228,7 +217,7 @@ async def carregar_extensoes():
         "comandos.RPG.luta", "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
         "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs",
         "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento",
-        "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_luta", "comandos.RPG.correcoes_party", "comandos.RPG.correcoes_concorrencia", "comandos.RPG.correcoes_monstros",
+        "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_party", "comandos.RPG.correcoes_concorrencia", "comandos.RPG.correcoes_monstros",
         "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao", "comandos.RPG.loja",
         "comandos.RPG.inventario", "comandos.RPG.usarhab",
         "comandos.RPG.evento_monstros", "comandos.RPG.assentamentos",
