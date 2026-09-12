@@ -29,9 +29,19 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("ataque.get(\"defensor_id\")", text)
         self.assertEqual(text.count("async def _resolver_ataque"), 1)
 
+    def test_luta_is_the_only_public_fight_extension(self):
+        main = source("main.py")
+        luta = source("comandos/RPG/luta.py")
+        self.assertIn('"comandos.RPG.luta"', main)
+        self.assertNotIn('"comandos.RPG.correcoes_luta"', main)
+        self.assertNotIn('"comandos.RPG.correcoes_monstros"', main)
+        self.assertIn("async def _pve", luta)
+        self.assertIn("async def _monstros", luta)
+        self.assertIn("iniciar_cooldown_monstro", luta)
+        self.assertIn("verificar_cooldown_monstro", luta)
+
     def test_legacy_patch_modules_do_not_override_canonical_resolver(self):
         for relative in (
-            "comandos/RPG/correcoes_luta.py",
             "comandos/RPG/correcoes_concorrencia.py",
             "comandos/RPG/correcoes_party.py",
             "comandos/RPG/habilidades_combate.py",
@@ -81,11 +91,9 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn('timedelta(hours=horas)', text)
 
     def test_pve_command_enforces_monster_cooldown(self):
-        text = source("comandos/RPG/correcoes_monstros.py")
-        self.assertIn("class CooldownMonstros(commands.Cog)", text)
-        self.assertIn("pve.add_check", text)
-        self.assertIn("verificar_cooldown_monstro", text)
+        text = source("comandos/RPG/luta.py")
         self.assertIn("iniciar_cooldown_monstro", text)
+        self.assertIn("cancelar_cooldown_monstro", text)
         self.assertIn("⏳", text)
 
     def test_rest_and_meditation_always_restore_life(self):
@@ -102,10 +110,8 @@ class CombatHardeningTests(unittest.TestCase):
             "comandos/RPG/luta.py",
             "comandos/RPG/luta_sync.py",
             "comandos/RPG/party.py",
-            "comandos/RPG/correcoes_luta.py",
             "comandos/RPG/correcoes_concorrencia.py",
             "comandos/RPG/correcoes_party.py",
-            "comandos/RPG/correcoes_monstros.py",
             "comandos/RPG/habilidades_combate.py",
             "main.py",
         ):
