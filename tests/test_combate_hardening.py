@@ -37,7 +37,8 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertNotIn('"comandos.RPG.correcoes_monstros"', main)
         self.assertIn("async def _pve", luta)
         self.assertIn("async def _monstros", luta)
-        self.assertIn("iniciar_cooldown_monstro", luta)
+        self.assertIn("luta_db.iniciar_cooldown_monstro", luta)
+        self.assertIn("luta_db.cancelar_cooldown_monstro", luta)
         self.assertIn("⏳", luta)
 
     def test_legacy_patch_modules_do_not_override_canonical_resolver(self):
@@ -92,8 +93,8 @@ class CombatHardeningTests(unittest.TestCase):
 
     def test_pve_command_enforces_monster_cooldown(self):
         text = source("comandos/RPG/luta.py")
-        self.assertIn("iniciar_cooldown_monstro", text)
-        self.assertIn("cancelar_cooldown_monstro", text)
+        self.assertIn("luta_db.iniciar_cooldown_monstro", text)
+        self.assertIn("luta_db.cancelar_cooldown_monstro", text)
         self.assertIn("⏳", text)
 
     def test_rest_and_meditation_always_restore_life(self):
