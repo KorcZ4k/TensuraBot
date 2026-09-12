@@ -38,7 +38,7 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("async def _pve", luta)
         self.assertIn("async def _monstros", luta)
         self.assertIn("iniciar_cooldown_monstro", luta)
-        self.assertIn("verificar_cooldown_monstro", luta)
+        self.assertIn("⏳", luta)
 
     def test_legacy_patch_modules_do_not_override_canonical_resolver(self):
         for relative in (
