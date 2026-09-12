@@ -1,7 +1,8 @@
 """Compatibilidade do sistema de luta.
 
-O PvE continua sendo executado pelo callback original do Cog Luta.
-O cooldown e reservado em um check do comando, sem substituir o callback.
+O PvE continua usando o callback original do Cog Luta.
+O cooldown e aplicado como before_invoke do proprio comando, depois que
+o discord.py ja resolveu e validou os argumentos do comando.
 """
 
 from database.python.mongodb import run_db
@@ -9,52 +10,58 @@ from database.python import luta as luta_db
 
 
 async def setup(bot):
+    luta = bot.get_cog("Luta")
+    if luta is None:
+        raise RuntimeError("Cog Luta precisa estar carregado antes de correcoes_luta.")
+
+    comando_luta = bot.get_command("luta")
+    if comando_luta is None:
+        raise RuntimeError("Comando !luta nao foi registrado.")
+
+    comando_pve = comando_luta.get_command("pve")
+    if comando_pve is None:
+        raise RuntimeError("Subcomando !luta pve nao foi registrado.")
+
     async def verificar_cooldown_pve(ctx):
-        comando = getattr(ctx, "command", None)
-        parent = getattr(comando, "parent", None)
-        if getattr(comando, "name", "") != "pve" or getattr(parent, "name", "") != "luta":
-            return True
-        if ctx.guild is None:
-            return True
+        if ctx.guild is None or luta._combate_ativo(ctx.channel.id):
+            return
 
-        luta = bot.get_cog("Luta")
-        if luta is None or luta._combate_ativo(ctx.channel.id):
-            return True
-
-        monstro_tipo = getattr(getattr(comando, "params", {}).get("monstro_tipo"), "name", None)
+        monstro_tipo = ctx.kwargs.get("monstro_tipo")
         if not monstro_tipo:
-            return True
+            return
 
-        try:
-            valor = ctx.kwargs.get("monstro_tipo")
-        except AttributeError:
-            valor = None
-        if not valor:
-            return True
-
-        monstro_id = luta._encontrar_monstro(valor)
+        monstro_id = luta._encontrar_monstro(monstro_tipo)
         if not monstro_id:
-            return True
+            return
 
         guild_id = str(ctx.guild.id)
-        verificacao = await run_db(luta_db.pode_lutar, str(ctx.author.id), guild_id)
+        verificacao = await run_db(
+            luta_db.pode_lutar,
+            str(ctx.author.id),
+            guild_id,
+        )
         if not verificacao.get("pode"):
-            await ctx.send(verificacao.get("mensagem", "❌ Você não pode lutar."))
-            return False
+            raise commands.CommandError(verificacao.get("mensagem", "❌ Você não pode lutar."))
 
         reserva = await run_db(
             luta_db.iniciar_cooldown_monstro,
-            str(ctx.author.id), guild_id, str(monstro_id),
+            str(ctx.author.id),
+            guild_id,
+            str(monstro_id),
         )
         if reserva.get("sucesso"):
-            return True
+            return
 
         segundos = int(reserva.get("segundos_restantes", 0) or 0)
         horas, resto = divmod(segundos, 3600)
         minutos = resto // 60
         restante = f"{horas}h {minutos}min" if horas > 0 else f"{max(1, minutos)}min"
-        nome = luta_db.MONSTROS.get(str(monstro_id), {}).get("nome", valor)
-        await ctx.send(f"⏳ Você já lutou contra **{nome}**. Tente novamente em **{restante}**.")
-        return False
+        nome = luta_db.MONSTROS.get(str(monstro_id), {}).get("nome", monstro_tipo)
+        raise commands.CommandError(
+            f"⏳ Você já lutou contra **{nome}**. Tente novamente em **{restante}**."
+        )
 
-    bot.add_check(verificar_cooldown_pve)
+    # Import local para manter esta extensao pequena e evitar alterar o callback.
+    from discord.ext import commands
+
+    comando_pve.before_invoke = verificar_cooldown_pve
