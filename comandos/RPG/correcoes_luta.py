@@ -46,7 +46,7 @@ async def _pve(ctx, *, monstro_tipo: str = ""):
             await ctx.send(verificacao.get("mensagem", "❌ Você não pode lutar."))
             return
 
-        jogador = await run_db(luta_mod._criar_participante, user_id, guild_id)
+        jogador = await luta_mod._criar_participante(user_id, guild_id)
         if not jogador:
             await ctx.send("❌ Você precisa ter um personagem registrado para lutar.")
             return
