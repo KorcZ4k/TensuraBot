@@ -217,7 +217,7 @@ async def carregar_extensoes():
         "comandos.RPG.luta", "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
         "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs",
         "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento",
-        "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_party", "comandos.RPG.correcoes_concorrencia", "comandos.RPG.correcoes_monstros",
+        "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_party", "comandos.RPG.correcoes_concorrencia",
         "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao", "comandos.RPG.loja",
         "comandos.RPG.inventario", "comandos.RPG.usarhab",
         "comandos.RPG.evento_monstros", "comandos.RPG.assentamentos",
