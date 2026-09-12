@@ -1,8 +1,8 @@
 """Compatibilidade do sistema de luta.
 
 O PvE continua usando o callback original do Cog Luta.
-O cooldown e aplicado como before_invoke do proprio comando, depois que
-o discord.py ja resolveu e validou os argumentos do comando.
+O hook e registrado pela API de before_invoke do discord.py, em vez de
+sobrescrever o metodo por atribuicao.
 """
 
 from discord.ext import commands
@@ -25,9 +25,8 @@ async def setup(bot):
         raise RuntimeError("Subcomando !luta pve nao foi registrado.")
 
     async def verificar_cooldown_pve(ctx):
-        # Esta mensagem acontece depois do parser do discord.py e antes do acesso
-        # ao MongoDB. Assim, se o banco travar ou o callback falhar, o usuario
-        # ainda recebe uma confirmacao de que !luta pve foi realmente reconhecido.
+        # Confirma imediatamente que o discord.py reconheceu !luta pve.
+        # Isso ocorre antes de qualquer acesso ao MongoDB do callback original.
         await ctx.send("⚔️ Iniciando combate PvE...")
 
         if ctx.guild is None or luta._combate_ativo(ctx.channel.id):
@@ -68,4 +67,7 @@ async def setup(bot):
         await ctx.send(f"⏳ Você já lutou contra **{nome}**. Tente novamente em **{restante}**.")
         raise commands.CommandError("Cooldown PvE ativo.")
 
-    comando_pve.before_invoke = verificar_cooldown_pve
+    # IMPORTANTE: before_invoke e um decorator/metodo de registro no
+    # discord.py. Atribuir a funcao a .before_invoke apenas substitui o
+    # metodo e faz o hook nao ser executado.
+    comando_pve.before_invoke(verificar_cooldown_pve)
