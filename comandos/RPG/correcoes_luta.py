@@ -1,8 +1,8 @@
-"""Compatibilidade do sistema de luta.
+"""Correcoes de compatibilidade dos subcomandos de luta.
 
-O PvE e registrado aqui como um callback independente do Cog. Assim o
-Discord passa apenas ``ctx`` para este comando e nao existe qualquer
-rebind de callback de Cog que possa produzir ``ctx`` ausente.
+Os subcomandos substituidos neste modulo sao registrados como Command puros,
+sem callback de metodo de Cog. Isso evita que uma instancia de Cog antiga,
+recarregada ou parcialmente registrada faca o discord.py perder o ``ctx``.
 """
 
 from discord.ext import commands
@@ -94,14 +94,49 @@ async def _pve(ctx, *, monstro_tipo: str = ""):
             raise
 
 
+async def _monstros(ctx):
+    """Lista os monstros sem depender do callback do Cog Luta."""
+    if not luta_db.MONSTROS:
+        await ctx.send("❌ Nenhum monstro foi carregado.")
+        return
+
+    itens = list(luta_db.MONSTROS.items())
+    for inicio in range(0, len(itens), 25):
+        embed = __import__("discord").Embed(
+            title="🐉 Monstros Disponíveis",
+            color=__import__("discord").Color.dark_red(),
+        )
+        for monstro_id, dados in itens[inicio:inicio + 25]:
+            embed.add_field(
+                name=f"{dados.get('emoji', '👹')} {dados.get('nome', monstro_id)}",
+                value=(
+                    f"ID: `{monstro_id}`\n"
+                    f"❤️ Vida: {dados.get('vida_base', 0)}\n"
+                    f"⚔️ Dano: {dados.get('dano_base', 0)}\n"
+                    f"✨ XP: {dados.get('xp_recompensa', 0)}\n"
+                    f"💰 Hunos: {dados.get('hunos_recompensa', 0)}"
+                ),
+                inline=True,
+            )
+        await ctx.send(embed=embed)
+
+
 async def setup(bot):
     grupo = bot.get_command("luta")
     if grupo is None:
         raise RuntimeError("Comando !luta não foi registrado.")
 
-    # Remove somente o antigo subcomando PvE. Os demais subcomandos continuam
-    # exatamente no Cog canônico, inclusive !luta monstros.
+    # Remove os callbacks do Cog que apresentaram problema de binding.
     grupo.remove_command("pve")
+    grupo.remove_command("monstros")
 
-    novo_pve = commands.Command(_pve, name="pve", help="Inicia um combate PvE contra um monstro.")
-    grupo.add_command(novo_pve)
+    grupo.add_command(commands.Command(
+        _pve,
+        name="pve",
+        help="Inicia um combate PvE contra um monstro.",
+    ))
+    grupo.add_command(commands.Command(
+        _monstros,
+        name="monstros",
+        help="Lista os monstros disponíveis para PvE.",
+    ))
