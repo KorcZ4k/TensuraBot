@@ -1,8 +1,8 @@
 """Compatibilidade do sistema de luta.
 
-O PvE continua usando o callback original do Cog Luta.
-O hook e registrado pela API de before_invoke do discord.py, em vez de
-sobrescrever o metodo por atribuicao.
+O discord.py injeta a instancia do Cog como primeiro argumento dos callbacks
+registrados em um Cog. Este modulo envolve os subcomandos de luta com
+callbacks que preservam explicitamente essa assinatura.
 """
 
 from discord.ext import commands
@@ -16,29 +16,30 @@ async def setup(bot):
     if luta is None:
         raise RuntimeError("Cog Luta precisa estar carregado antes de correcoes_luta.")
 
-    comando_luta = bot.get_command("luta")
-    if comando_luta is None:
+    grupo = bot.get_command("luta")
+    if grupo is None:
         raise RuntimeError("Comando !luta nao foi registrado.")
 
-    comando_pve = comando_luta.get_command("pve")
-    if comando_pve is None:
+    pve = grupo.get_command("pve")
+    monstros = grupo.get_command("monstros")
+    if pve is None:
         raise RuntimeError("Subcomando !luta pve nao foi registrado.")
+    if monstros is None:
+        raise RuntimeError("Subcomando !luta monstros nao foi registrado.")
 
-    async def verificar_cooldown_pve(ctx):
-        # Confirma imediatamente que o discord.py reconheceu !luta pve.
-        # Isso ocorre antes de qualquer acesso ao MongoDB do callback original.
+    callback_pve_original = pve.callback
+    callback_monstros_original = monstros.callback
+
+    async def pve_callback(cog, ctx, *, monstro_tipo: str):
+        # Assinatura completa: discord.py fornece (Cog, Context, argumentos).
         await ctx.send("⚔️ Iniciando combate PvE...")
 
-        if ctx.guild is None or luta._combate_ativo(ctx.channel.id):
-            return
+        if ctx.guild is None or cog._combate_ativo(ctx.channel.id):
+            return await callback_pve_original(cog, ctx, monstro_tipo=monstro_tipo)
 
-        monstro_tipo = ctx.kwargs.get("monstro_tipo")
-        if not monstro_tipo:
-            return
-
-        monstro_id = luta._encontrar_monstro(monstro_tipo)
+        monstro_id = cog._encontrar_monstro(monstro_tipo)
         if not monstro_id:
-            return
+            return await callback_pve_original(cog, ctx, monstro_tipo=monstro_tipo)
 
         guild_id = str(ctx.guild.id)
         verificacao = await run_db(
@@ -48,7 +49,7 @@ async def setup(bot):
         )
         if not verificacao.get("pode"):
             await ctx.send(verificacao.get("mensagem", "❌ Você não pode lutar."))
-            raise commands.CommandError("PvE bloqueado pela validação do jogador.")
+            return
 
         reserva = await run_db(
             luta_db.iniciar_cooldown_monstro,
@@ -56,18 +57,20 @@ async def setup(bot):
             guild_id,
             str(monstro_id),
         )
-        if reserva.get("sucesso"):
+        if not reserva.get("sucesso"):
+            segundos = int(reserva.get("segundos_restantes", 0) or 0)
+            horas, resto = divmod(segundos, 3600)
+            minutos = resto // 60
+            restante = f"{horas}h {minutos}min" if horas > 0 else f"{max(1, minutos)}min"
+            nome = luta_db.MONSTROS.get(str(monstro_id), {}).get("nome", monstro_tipo)
+            await ctx.send(f"⏳ Você já lutou contra **{nome}**. Tente novamente em **{restante}**.")
             return
 
-        segundos = int(reserva.get("segundos_restantes", 0) or 0)
-        horas, resto = divmod(segundos, 3600)
-        minutos = resto // 60
-        restante = f"{horas}h {minutos}min" if horas > 0 else f"{max(1, minutos)}min"
-        nome = luta_db.MONSTROS.get(str(monstro_id), {}).get("nome", monstro_tipo)
-        await ctx.send(f"⏳ Você já lutou contra **{nome}**. Tente novamente em **{restante}**.")
-        raise commands.CommandError("Cooldown PvE ativo.")
+        return await callback_pve_original(cog, ctx, monstro_tipo=monstro_tipo)
 
-    # IMPORTANTE: before_invoke e um decorator/metodo de registro no
-    # discord.py. Atribuir a funcao a .before_invoke apenas substitui o
-    # metodo e faz o hook nao ser executado.
-    comando_pve.before_invoke(verificar_cooldown_pve)
+    async def monstros_callback(cog, ctx):
+        # Mesmo tratamento para !luta monstros: preserva explicitamente ctx.
+        return await callback_monstros_original(cog, ctx)
+
+    pve.callback = pve_callback
+    monstros.callback = monstros_callback
