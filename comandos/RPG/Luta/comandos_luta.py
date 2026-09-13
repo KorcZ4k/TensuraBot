@@ -6,6 +6,8 @@ Este é o único ponto de registro dos comandos de luta. O motor fica em
 
 from __future__ import annotations
 
+import re
+
 from discord.ext import commands
 
 from ..luta import (
@@ -22,6 +24,7 @@ from ..luta import (
     _chute as _legacy_chute,
 )
 from .sistemas_luta import Luta
+from .Mensagens_luta import painel
 
 
 async def luta(ctx):
@@ -66,6 +69,90 @@ async def matar(ctx):
 
 async def desmaiar(ctx):
     await _legacy_desmaiar(ctx)
+
+
+_LUTA_COMANDOS = {
+    "luta", "fight", "combate", "monstros", "pve", "pvp", "soco", "chute",
+    "defesa", "defender", "def", "shield", "block", "bloquear", "bloqueio",
+    "esquiva", "esquivar", "desviar", "dodge", "desvio", "fugir", "fuga",
+    "escape", "escapar", "run", "matar", "desmaiar",
+}
+_SEND_ORIGINAL = commands.Context.send
+
+
+def _dados_painel(ctx):
+    cog = ctx.bot.get_cog("Luta")
+    combate = cog._obter_combate(ctx.channel.id) if cog else None
+    if not combate:
+        return {}
+    atacante = cog._obter_atacante(combate)
+    ataque = combate.get("ataque_pendente") or {}
+    defensor = cog._participante(combate, ataque.get("defensor_id")) if ataque else cog._obter_defensor(combate)
+    return {
+        "combate": combate,
+        "atacante": atacante,
+        "defensor": defensor,
+        "turno": combate.get("numero_turno", 1),
+        "ataque": ataque,
+    }
+
+
+async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
+    """Força toda saída dos comandos de luta para o painel Moon Tensura."""
+    comando = getattr(self.command, "name", "").casefold()
+    parent = getattr(getattr(self.command, "parent", None), "name", "").casefold()
+    if comando not in _LUTA_COMANDOS and parent not in {"luta", "fight", "combate"}:
+        return await _SEND_ORIGINAL(self, content=content, embed=embed, **kwargs)
+
+    dados = _dados_painel(self)
+    atacante = dados.get("atacante") or {"nome": getattr(self.author, "display_name", "User"), "vida": 0, "mana": 0}
+    defensor = dados.get("defensor") or {}
+    texto = str(content or "")
+    if embed is not None:
+        texto = " ".join(filter(None, [embed.title or "", embed.description or ""]))
+        for campo in embed.fields:
+            texto += f" {campo.name}: {campo.value}"
+
+    ataque_nome = dados.get("ataque", {}).get("nome") or comando or "Ataque"
+    if comando == "soco":
+        ataque_nome = "👊 Soco"
+    elif comando == "chute":
+        ataque_nome = "🦵 Chute"
+    elif comando == "defesa":
+        ataque_nome = "🛡️ Defesa"
+    elif comando == "esquiva":
+        ataque_nome = "💨 Esquiva"
+
+    dano_match = re.search(r"\*\*(\d+)\s+de dano", texto, re.IGNORECASE)
+    dano = dano_match.group(1) if dano_match else "-"
+    efeito_match = re.search(r"Efeito:\s*\*\*([^*]+)", texto, re.IGNORECASE)
+    efeito = efeito_match.group(1) if efeito_match else "Nenhum"
+    if "esquivou" in texto.casefold():
+        efeito = "Esquivou"
+        dano = "0"
+
+    panel = painel(
+        atacante=atacante.get("nome", "User"),
+        ataque=ataque_nome,
+        vida=f"{max(0, int(float(atacante.get('vida', 0) or 0)))}/{max(1, int(float(atacante.get('vida_maxima', atacante.get('vida', 0)) or 1)))}",
+        mana=int(float(atacante.get("mana", 0) or 0)),
+        dano=dano,
+        efeito=efeito,
+        alvo=defensor.get("nome", "-"),
+        turno=dados.get("turno", "-"),
+        oponente=defensor.get("nome", "-"),
+        vida_oponente=(
+            f"{max(0, int(float(defensor.get('vida', 0) or 0)))}/{max(1, int(float(defensor.get('vida_maxima', defensor.get('vida', 0)) or 1)))}"
+            if defensor else "-"
+        ),
+        extra=texto[:500] if texto and comando not in {"soco", "chute", "defesa", "esquiva"} else "",
+    )
+    return await _SEND_ORIGINAL(self, content=None, embed=panel, **kwargs)
+
+
+# A camada visual fica aplicada apenas aos comandos de combate; comandos
+# administrativos e demais módulos continuam usando o envio normal.
+commands.Context.send = _send_interface_luta
 
 
 def _comando(callback, nome, **kwargs):
