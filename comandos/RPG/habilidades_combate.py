@@ -9,6 +9,38 @@ from discord.ext import commands
 from database.python.mongodb import db, run_db
 
 
+# O main.py já embeleza Context.send. Alguns módulos, porém, enviam mensagens
+# diretamente pelo canal. Este fallback garante que esses envios também usem
+# Embed, sem alterar mensagens que já são embeds.
+_messageable_send_original = discord.abc.Messageable.send
+
+
+async def _messageable_send_com_embed(self, *args, **kwargs):
+    content = kwargs.get("content")
+    if content is None and args and isinstance(args[0], str):
+        content = args[0]
+
+    tem_embed = kwargs.get("embed") is not None or bool(kwargs.get("embeds"))
+    if isinstance(content, str) and content.strip() and not tem_embed:
+        if args and isinstance(args[0], str):
+            args = (None, *args[1:])
+        kwargs["content"] = None
+        embed = discord.Embed(
+            description=content[:4096],
+            color=discord.Color.blurple(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+        kwargs["embed"] = embed
+
+    return await _messageable_send_original(self, *args, **kwargs)
+
+
+if not getattr(discord.abc.Messageable.send, "_tensura_embellished", False):
+    _messageable_send_com_embed._tensura_embellished = True
+    discord.abc.Messageable.send = _messageable_send_com_embed
+
+
 def _normalizar(valor: object) -> str:
     texto = unicodedata.normalize("NFKD", str(valor or "")).casefold()
     return "".join(c for c in texto if not unicodedata.combining(c)).strip()
@@ -69,10 +101,8 @@ async def _garras(ctx):
         await ctx.send(f"❌ É a vez de **{atacante.get('nome', 'outro jogador')}**.")
         return
 
-    # Garras são um ataque físico natural: não dependem de arma e recebem
-    # um bônus fixo de dano para representar o poder racial do ataque.
     dano_base = 20
-    ataque = luta._criar_ataque(
+    luta._criar_ataque(
         combate,
         "garras",
         atacante,
