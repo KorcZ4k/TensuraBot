@@ -32,7 +32,8 @@ class CombatHardeningTests(unittest.TestCase):
     def test_luta_is_the_only_public_fight_command_owner(self):
         main = source("main.py")
         luta = source("comandos/RPG/luta.py")
-        self.assertIn('"comandos.RPG.luta"', main)
+        self.assertIn('"comandos.RPG.Luta.comandos_luta"', main)
+        self.assertNotIn('"comandos.RPG.luta"', main)
         self.assertNotIn('"comandos.RPG.correcoes_luta"', main)
         self.assertNotIn('"comandos.RPG.correcoes_monstros"', main)
         self.assertNotIn('"comandos.RPG.correcoes_luta_segura"', main)
