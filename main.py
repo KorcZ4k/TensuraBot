@@ -109,6 +109,48 @@ async def verificar_canal_de_comandos(ctx):
     return True
 
 
+@bot.command(name="manutencao")
+@commands.has_guild_permissions(administrator=True)
+@commands.guild_only()
+async def manutencao(ctx):
+    """Liga/desliga a manutenção e salva o estado no MongoDB para sobreviver a restarts."""
+    bot.em_manutencao = not getattr(bot, "em_manutencao", False)
+    await run_db(
+        db["ConfiguracaoBot"].update_one,
+        {"_id": "manutencao"},
+        {"$set": {"ativa": bot.em_manutencao}},
+        upsert=True,
+    )
+
+    if bot.em_manutencao:
+        embed = discord.Embed(
+            title="🔧 Manutenção ativada",
+            description=MENSAGEM_MANUTENCAO,
+            color=discord.Color.orange(),
+        )
+    else:
+        embed = discord.Embed(
+            title="✅ Manutenção desativada",
+            description="O bot foi reativado e os comandos estão disponíveis novamente.",
+            color=discord.Color.green(),
+        )
+    await ctx.send(embed=embed)
+
+
+async def _carregar_estado_manutencao():
+    """Recupera o estado persistente da manutenção antes de o bot ficar online."""
+    if db is None:
+        bot.em_manutencao = False
+        print("[MANUTENÇÃO][AVISO] Banco indisponível; iniciando sem manutenção.")
+        return
+    configuracao = await run_db(
+        db["ConfiguracaoBot"].find_one,
+        {"_id": "manutencao"},
+    )
+    bot.em_manutencao = bool(configuracao and configuracao.get("ativa", False))
+    print(f"[MANUTENÇÃO] Estado recuperado: {'ON' if bot.em_manutencao else 'OFF'}")
+
+
 @bot.event
 async def on_member_join(member):
     await cadastro_async([member])
@@ -186,7 +228,8 @@ async def on_ready():
     canal = bot.get_channel(1543040912912031775)
     print(f"Bot conectado como {bot.user}")
     if canal is not None and not _online_notificado:
-        embed = discord.Embed(title="🟢 | Online", description="Moon Tensura está online e pronto para o RPG", colour=0x1CAA00, timestamp=agora)
+        estado = "em manutenção" if getattr(bot, "em_manutencao", False) else "online e pronto para o RPG"
+        embed = discord.Embed(title="🟢 | Online", description=f"Moon Tensura está {estado}", colour=0x1CAA00, timestamp=agora)
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
         await canal.send(embed=embed)
         _online_notificado = True
@@ -217,7 +260,7 @@ async def carregar_extensoes():
         "comandos.RPG.Luta.comandos_luta",
         "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
         "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs",
-        "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento",
+        "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.nivel", "comandos.RPG.nascimento",
         "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_party", "comandos.RPG.correcoes_concorrencia",
         "comandos.RPG.progressao", "comandos.RPG.status_habilidades", "comandos.RPG.recuperacao", "comandos.RPG.loja",
         "comandos.RPG.inventario", "comandos.RPG.usarhab",
@@ -226,7 +269,6 @@ async def carregar_extensoes():
         "comandos.ADMINISTRACAO.autorole_commands", "comandos.ADMINISTRACAO.autorole", "comandos.ADMINISTRACAO.configurações",
         "comandos.ADMINISTRACAO.canais_comandos", "comandos.ADMINISTRACAO.moderacao", "comandos.ADMINISTRACAO.automod",
         "comandos.ADMINISTRACAO.boas_vindas", "comandos.ADMINISTRACAO.logs", "comandos.ADMINISTRACAO.ajuda",
-        "comandos.ADMINISTRACAO.manutencao",
     ]
     for extensao in extensoes:
         try:
@@ -245,8 +287,9 @@ if not TOKEN:
 async def main():
     try:
         async with bot:
-            await carregar_extensoes()
             await ensure_indexes()
+            await _carregar_estado_manutencao()
+            await carregar_extensoes()
             await _recuperar_combates_orfaos()
             await bot.start(TOKEN)
     finally:
