@@ -214,7 +214,7 @@ async def _carregar_extensao_com_recuperacao_de_conflito(extensao):
 
 async def carregar_extensoes():
     extensoes = [
-        "comandos.RPG.luta", "comandos.RPG.correcoes_monstros", "comandos.RPG.correcoes_luta_segura",
+        "comandos.RPG.luta",
         "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
         "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs",
         "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.desregistro_geral", "comandos.RPG.nivel", "comandos.RPG.nascimento",
