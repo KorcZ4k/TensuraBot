@@ -9,21 +9,24 @@ from discord.ext import commands
 from database.python.mongodb import db, run_db
 
 
-# O main.py já embeleza Context.send. Alguns módulos, porém, enviam mensagens
-# diretamente pelo canal. Este fallback garante que esses envios também usem
-# Embed, sem alterar mensagens que já são embeds.
+# O main.py embeleza Context.send. Alguns pontos do bot enviam diretamente
+# pelo canal; este fallback transforma apenas mensagens de texto sem embed.
 _messageable_send_original = discord.abc.Messageable.send
 
 
 async def _messageable_send_com_embed(self, *args, **kwargs):
     content = kwargs.get("content")
+    args_sem_content = args
+
+    # Messageable.send aceita content tanto posicional quanto por keyword.
+    # Removemos o argumento posicional antes de adicionar o embed para não
+    # passar "content" duas vezes ao método original.
     if content is None and args and isinstance(args[0], str):
         content = args[0]
+        args_sem_content = args[1:]
 
     tem_embed = kwargs.get("embed") is not None or bool(kwargs.get("embeds"))
     if isinstance(content, str) and content.strip() and not tem_embed:
-        if args and isinstance(args[0], str):
-            args = (None, *args[1:])
         kwargs["content"] = None
         embed = discord.Embed(
             description=content[:4096],
@@ -33,7 +36,7 @@ async def _messageable_send_com_embed(self, *args, **kwargs):
         embed.set_footer(text="Tensura Moon - Korczak Technologies!")
         kwargs["embed"] = embed
 
-    return await _messageable_send_original(self, *args, **kwargs)
+    return await _messageable_send_original(self, *args_sem_content, **kwargs)
 
 
 if not getattr(discord.abc.Messageable.send, "_tensura_embellished", False):
