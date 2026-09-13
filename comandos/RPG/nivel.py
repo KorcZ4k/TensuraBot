@@ -68,10 +68,14 @@ def _processar_niveis():
 class Nivel(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.verificar_niveis.start()
 
     def cog_unload(self):
         self.verificar_niveis.cancel()
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self.verificar_niveis.is_running():
+            self.verificar_niveis.start()
 
     @tasks.loop(seconds=5)
     async def verificar_niveis(self):
@@ -113,10 +117,6 @@ class Nivel(commands.Cog):
         if membro is not None:
             embed.set_thumbnail(url=membro.display_avatar.url)
         await canal.send(embed=embed)
-
-    @verificar_niveis.before_loop
-    async def antes_de_verificar_niveis(self):
-        await self.bot.wait_until_ready()
 
 
 async def setup(bot):
