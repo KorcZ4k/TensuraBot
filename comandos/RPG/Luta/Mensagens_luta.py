@@ -50,21 +50,41 @@ _MONSTROS_IMAGENS = {
 
 
 def _imagem_ataque(nome: str) -> str | None:
-    chave = _normalizar(nome).replace("👊", "").replace("🦵", "").replace("🛡️", "").replace("💨", "").strip()
-    chave = chave.replace("início do combate", "ataque")
+    chave = _normalizar(nome)
+    for emoji in ("👊", "🦵", "🛡️", "💨"):
+        chave = chave.replace(_normalizar(emoji), "")
+    chave = chave.replace("início do combate", "ataque").replace("inicio do combate", "ataque").strip()
     return IMAGENS.get(_GOLPES_IMAGENS.get(chave, "")) or IMAGENS.get("ataque-luta-url")
 
 
-def _imagem_monstro(nome: str) -> str | None:
+def _dados_oponente(oponente) -> tuple[str, str]:
+    """Retorna (id, nome) preservando o ID real do monstro."""
+    if isinstance(oponente, dict):
+        return _normalizar(oponente.get("id", "")), str(oponente.get("nome") or oponente.get("id") or "-")
+    texto = str(oponente or "-")
+    return _normalizar(texto), texto
+
+
+def _imagem_monstro(oponente) -> str | None:
+    monstro_id, nome = _dados_oponente(oponente)
+    if isinstance(oponente, dict) and oponente.get("tipo") != "monstro":
+        return None
+
+    # Primeiro usa o ID exato criado pelo motor (slime, goblin, etc.).
+    if monstro_id in _MONSTROS_IMAGENS:
+        return IMAGENS.get(_MONSTROS_IMAGENS[monstro_id])
+
+    # Compatibilidade quando só o nome foi passado.
     chave = _normalizar(nome)
     for monstro, imagem in _MONSTROS_IMAGENS.items():
-        if monstro in chave:
+        if chave == monstro or chave.startswith(monstro + " "):
             return IMAGENS.get(imagem)
     return IMAGENS.get("monstro-luta-url") if nome and nome != "-" else None
 
 
-def painel(*, atacante: str = "User", ataque: str = "Ataque", vida: str | int = "-", mana: str | int = "-", dano: str | int = "-", efeito: str = "Nenhum", alvo: str = "-", turno: str | int = "-", oponente: str = "-", vida_oponente: str | int = "-", extra: str = "", cor=None) -> discord.Embed:
-    """Monta o painel padrão Moon Tensura com as imagens do Imagens.json."""
+def painel(*, atacante: str = "User", ataque: str = "Ataque", vida: str | int = "-", mana: str | int = "-", dano: str | int = "-", efeito: str = "Nenhum", alvo: str = "-", turno: str | int = "-", oponente="-", vida_oponente: str | int = "-", extra: str = "", cor=None) -> discord.Embed:
+    """Monta o painel padrão Moon Tensura usando as imagens do Imagens.json."""
+    _, nome_oponente = _dados_oponente(oponente)
     texto = (
         "╭────────────────────────────────────────────╮\n"
         "│              🌙  MOON TENSURA              │\n"
@@ -78,19 +98,32 @@ def painel(*, atacante: str = "User", ataque: str = "Ataque", vida: str | int = 
         f"│ │ → 🎯 | Alvo: {alvo}\n"
         f"│ │ → 🔄 | Turno: {turno}\n"
         "├ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┤\n"
-        f"│ │ → 👹 | Oponente: {oponente}\n"
+        f"│ │ → 👹 | Oponente: {nome_oponente}\n"
         f"│ │ → ❤️ | Vida: {vida_oponente}\n"
     )
     if extra:
         texto += f"│ │ → ℹ️ | {extra}\n"
     texto += "╰────────────────────────────────────────────╯"
-    mensagem = discord.Embed(title="🌙 MOON TENSURA", description=texto, color=cor or discord.Color.blurple(), timestamp=discord.utils.utcnow())
+
+    mensagem = discord.Embed(
+        title="🌙 MOON TENSURA",
+        description=texto,
+        color=cor or discord.Color.blurple(),
+        timestamp=discord.utils.utcnow(),
+    )
+
     imagem_ataque = _imagem_ataque(ataque)
     imagem_monstro = _imagem_monstro(oponente)
-    if imagem_ataque:
-        mensagem.set_image(url=imagem_ataque)
+
+    # Em PvE a imagem designada do monstro tem prioridade como imagem principal.
+    # A imagem do golpe fica como thumbnail para não substituir o monstro.
     if imagem_monstro:
-        mensagem.set_thumbnail(url=imagem_monstro)
+        mensagem.set_image(url=imagem_monstro)
+        if imagem_ataque:
+            mensagem.set_thumbnail(url=imagem_ataque)
+    elif imagem_ataque:
+        mensagem.set_image(url=imagem_ataque)
+
     mensagem.set_footer(text=FOOTER)
     return mensagem
 
@@ -146,4 +179,17 @@ def ordem_velocidade(participantes) -> discord.Embed:
 
 
 def acao(*, atacante: dict | None, defensor: dict | None, nome_ataque: str, dano=0, efeito="Nenhum", turno="-", extra="", cor=None) -> discord.Embed:
-    return painel(atacante=_nome(atacante, "User"), ataque=nome_ataque, vida=_vida(atacante), mana=_mana(atacante), dano=dano, efeito=efeito or "Nenhum", alvo=_nome(defensor), turno=turno, oponente=_nome(defensor), vida_oponente=_vida(defensor), extra=extra, cor=cor)
+    return painel(
+        atacante=_nome(atacante, "User"),
+        ataque=nome_ataque,
+        vida=_vida(atacante),
+        mana=_mana(atacante),
+        dano=dano,
+        efeito=efeito or "Nenhum",
+        alvo=_nome(defensor),
+        turno=turno,
+        oponente=defensor or "-",
+        vida_oponente=_vida(defensor),
+        extra=extra,
+        cor=cor,
+    )
