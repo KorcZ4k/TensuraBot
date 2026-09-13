@@ -9,7 +9,6 @@ from __future__ import annotations
 from discord.ext import commands
 
 from ..luta import (
-    Luta,
     _desmaiar as _legacy_desmaiar,
     _defesa as _legacy_defesa,
     _esquiva as _legacy_esquiva,
@@ -22,6 +21,7 @@ from ..luta import (
     _soco as _legacy_soco,
     _chute as _legacy_chute,
 )
+from .sistemas_luta import Luta
 
 
 async def luta(ctx):
