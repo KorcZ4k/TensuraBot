@@ -33,7 +33,12 @@ def painel(*, atacante: str = "User", ataque: str = "Ataque", vida: str | int = 
     if extra:
         texto += f"│ │ → ℹ️ | {extra}\n"
     texto += "╰────────────────────────────────────────────╯"
-    mensagem = discord.Embed(title="🌙 MOON TENSURA", description=f"```text\n{texto}\n```", color=cor or discord.Color.blurple(), timestamp=discord.utils.utcnow())
+    mensagem = discord.Embed(
+        title="🌙 MOON TENSURA",
+        description=texto,
+        color=cor or discord.Color.blurple(),
+        timestamp=discord.utils.utcnow(),
+    )
     mensagem.set_footer(text=FOOTER)
     return mensagem
 
