@@ -29,12 +29,12 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("ataque.get(\"defensor_id\")", text)
         self.assertEqual(text.count("async def _resolver_ataque"), 1)
 
-    def test_luta_is_the_only_public_fight_extension(self):
+    def test_luta_is_the_only_public_fight_command_owner(self):
         main = source("main.py")
         luta = source("comandos/RPG/luta.py")
         self.assertIn('"comandos.RPG.luta"', main)
         self.assertNotIn('"comandos.RPG.correcoes_luta"', main)
-        self.assertNotIn('"comandos.RPG.correcoes_monstros"', main)
+        self.assertIn('"comandos.RPG.correcoes_monstros"', main)
         self.assertIn("async def _pve", luta)
         self.assertIn("async def _monstros", luta)
         self.assertIn("luta_db.iniciar_cooldown_monstro", luta)
