@@ -26,7 +26,7 @@ class CombatHardeningTests(unittest.TestCase):
         text = source("comandos/RPG/luta.py")
         self.assertIn("class Luta(commands.Cog)", text)
         self.assertIn("async def _resolver_ataque", text)
-        self.assertIn("ataque.get(\"defensor_id\")", text)
+        self.assertIn('ataque.get("defensor_id")', text)
         self.assertEqual(text.count("async def _resolver_ataque"), 1)
 
     def test_luta_is_the_only_public_fight_command_owner(self):
@@ -34,12 +34,35 @@ class CombatHardeningTests(unittest.TestCase):
         luta = source("comandos/RPG/luta.py")
         self.assertIn('"comandos.RPG.luta"', main)
         self.assertNotIn('"comandos.RPG.correcoes_luta"', main)
-        self.assertIn('"comandos.RPG.correcoes_monstros"', main)
+        self.assertNotIn('"comandos.RPG.correcoes_monstros"', main)
+        self.assertNotIn('"comandos.RPG.correcoes_luta_segura"', main)
         self.assertIn("async def _pve", luta)
         self.assertIn("async def _monstros", luta)
         self.assertIn("luta_db.iniciar_cooldown_monstro", luta)
         self.assertIn("luta_db.cancelar_cooldown_monstro", luta)
         self.assertIn("⏳", luta)
+
+    def test_no_duplicate_combat_cogs_remain(self):
+        self.assertFalse((ROOT / "comandos/RPG/correcoes_monstros.py").exists())
+        self.assertFalse((ROOT / "comandos/RPG/correcoes_luta_segura.py").exists())
+        self.assertIn("class Luta(commands.Cog)", source("comandos/RPG/luta.py"))
+
+    def test_public_commands_are_module_callbacks_without_self_binding(self):
+        text = source("comandos/RPG/luta.py")
+        for signature in (
+            "async def _luta(ctx)",
+            "async def _monstros(ctx)",
+            "async def _pve(ctx, *, monstro_tipo: str = \"\")",
+            "async def _pvp(ctx, membro: Optional[discord.Member] = None)",
+            "async def _soco(ctx)",
+            "async def _chute(ctx)",
+            "async def _defesa(ctx)",
+            "async def _esquiva(ctx)",
+            "async def _fugir(ctx)",
+            "async def _matar(ctx)",
+            "async def _desmaiar(ctx)",
+        ):
+            self.assertIn(signature, text)
 
     def test_legacy_patch_modules_do_not_override_canonical_resolver(self):
         for relative in (
@@ -89,13 +112,19 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("Cooldowns_Monstros", text)
         self.assertIn("iniciar_cooldown_monstro", text)
         self.assertIn("cancelar_cooldown_monstro", text)
-        self.assertIn('timedelta(hours=horas)', text)
+        self.assertIn("timedelta(hours=horas)", text)
 
     def test_pve_command_enforces_monster_cooldown(self):
         text = source("comandos/RPG/luta.py")
         self.assertIn("luta_db.iniciar_cooldown_monstro", text)
         self.assertIn("luta_db.cancelar_cooldown_monstro", text)
         self.assertIn("⏳", text)
+
+    def test_pve_reserves_cooldown_only_after_validation(self):
+        text = source("comandos/RPG/luta.py")
+        self.assertLess(text.index("monstro_id = cog._encontrar_monstro"), text.index("luta_db.pode_lutar"))
+        self.assertLess(text.index("luta_db.pode_lutar"), text.index("luta_db.iniciar_cooldown_monstro"))
+        self.assertLess(text.index("luta_db.iniciar_cooldown_monstro"), text.index("criar_monstro"))
 
     def test_rest_and_meditation_always_restore_life(self):
         text = source("database/python/status_async.py")
