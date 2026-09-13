@@ -140,7 +140,7 @@ async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
         efeito=efeito,
         alvo=defensor.get("nome", "-"),
         turno=dados.get("turno", "-"),
-        oponente=defensor.get("nome", "-"),
+        oponente=defensor,
         vida_oponente=(
             f"{max(0, int(float(defensor.get('vida', 0) or 0)))}/{max(1, int(float(defensor.get('vida_maxima', defensor.get('vida', 0)) or 1)))}"
             if defensor else "-"
