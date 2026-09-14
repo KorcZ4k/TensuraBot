@@ -24,7 +24,7 @@ from ..luta import (
     _chute as _legacy_chute,
 )
 from .sistemas_luta import Luta
-from .Mensagens_luta import painel
+from .Mensagens_luta import imagens_combate, painel
 
 
 async def luta(ctx):
@@ -98,7 +98,7 @@ def _dados_painel(ctx):
 
 
 async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
-    """Força toda saída dos comandos de luta para o painel Moon Tensura."""
+    """Converte a saída do combate para o painel e resolve as imagens pelo motor."""
     comando = getattr(self.command, "name", "").casefold()
     parent = getattr(getattr(self.command, "parent", None), "name", "").casefold()
     if comando not in _LUTA_COMANDOS and parent not in {"luta", "fight", "combate"}:
@@ -107,21 +107,27 @@ async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
     dados = _dados_painel(self)
     atacante = dados.get("atacante") or {"nome": getattr(self.author, "display_name", "User"), "vida": 0, "mana": 0}
     defensor = dados.get("defensor") or {}
+    ataque_pendente = dados.get("ataque", {})
     texto = str(content or "")
     if embed is not None:
         texto = " ".join(filter(None, [embed.title or "", embed.description or ""]))
         for campo in embed.fields:
             texto += f" {campo.name}: {campo.value}"
 
-    ataque_nome = dados.get("ataque", {}).get("nome") or comando or "Ataque"
+    ataque_nome = ataque_pendente.get("nome") or comando or "Ataque"
     if comando == "soco":
-        ataque_nome = "👊 Soco"
+        ataque_nome = "Soco"
     elif comando == "chute":
-        ataque_nome = "🦵 Chute"
+        ataque_nome = "Chute"
     elif comando == "defesa":
-        ataque_nome = "🛡️ Defesa"
+        ataque_nome = "Defesa"
     elif comando == "esquiva":
-        ataque_nome = "💨 Esquiva"
+        ataque_nome = "Esquiva"
+
+    # A imagem é resolvida exclusivamente por Mensagens_luta.
+    # Para monstros, usamos o ID real do participante (ex.: slime, goblin, lobo).
+    monstro_id = defensor.get("id") if defensor.get("tipo") == "monstro" else None
+    imagem_ataque, imagem_monstro = imagens_combate(ataque_nome, monstro_id)
 
     dano_match = re.search(r"\*\*(\d+)\s+de dano", texto, re.IGNORECASE)
     dano = dano_match.group(1) if dano_match else "-"
@@ -146,12 +152,12 @@ async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
             if defensor else "-"
         ),
         extra=texto[:500] if texto and comando not in {"soco", "chute", "defesa", "esquiva"} else "",
+        imagem_ataque=imagem_ataque,
+        imagem_oponente=imagem_monstro,
     )
     return await _SEND_ORIGINAL(self, content=None, embed=panel, **kwargs)
 
 
-# A camada visual fica aplicada apenas aos comandos de combate; comandos
-# administrativos e demais módulos continuam usando o envio normal.
 commands.Context.send = _send_interface_luta
 
 
