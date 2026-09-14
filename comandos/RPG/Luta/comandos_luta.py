@@ -95,22 +95,12 @@ async def _cog(ctx) -> Optional[Luta]:
 
 async def luta(ctx):
     embed = painel(
-        atacante=ctx.author.display_name,
-        ataque="Comandos",
-        vida="-",
-        mana="-",
-        dano="-",
-        efeito="Ajuda",
-        alvo="-",
-        turno="-",
-        oponente="-",
-        vida_oponente="-",
-        extra=(
-            "**`!luta monstros`** — lista os monstros\n"
-            "**`!luta pve <monstro>`** — inicia PvE\n"
-            "**`!luta pvp @jogador`** — inicia PvP\n"
-            "**`!soco` · `!chute` · `!defesa` · `!esquiva` · `!fugir`**"
-        ),
+        atacante=ctx.author.display_name, ataque="Comandos", vida="-", mana="-", dano="-", efeito="Ajuda",
+        alvo="-", turno="-", oponente="-", vida_oponente="-",
+        extra=("**`!luta monstros`** — lista os monstros\n"
+               "**`!luta pve <monstro>`** — inicia PvE\n"
+               "**`!luta pvp @jogador`** — inicia PvP\n"
+               "**`!soco` · `!chute` · `!defesa` · `!esquiva` · `!fugir`**"),
         cor=discord.Color.blurple(),
     )
     await ctx.send(embed=embed)
@@ -131,18 +121,9 @@ async def monstros(ctx):
                 f"**💰 Hunos:** {dados.get('hunos_recompensa', 0)} | **🔷 TP:** {dados.get('tp_recompensa', 0)}"
             )
         embed = painel(
-            atacante=ctx.author.display_name,
-            ataque="Lista de monstros",
-            vida="-",
-            mana="-",
-            dano="-",
-            efeito="Consulta",
-            alvo="Todos",
-            turno="-",
-            oponente="Monstros",
-            vida_oponente="-",
-            extra="\n".join(linhas),
-            cor=discord.Color.dark_red(),
+            atacante=ctx.author.display_name, ataque="Lista de monstros", vida="-", mana="-", dano="-",
+            efeito="Consulta", alvo="Todos", turno="-", oponente="Monstros", vida_oponente="-",
+            extra="\n".join(linhas), cor=discord.Color.dark_red(),
         )
         await ctx.send(embed=embed)
 
@@ -175,7 +156,6 @@ async def pve(ctx, *, monstro_tipo: str = ""):
         if not jogador:
             await ctx.send(embed=_embed_erro("PvE", "Você precisa ter um personagem registrado para lutar."))
             return
-        # Na interface de combate, nome de jogador é sempre o nome do Discord.
         jogador["nome"] = ctx.author.display_name
         reserva = await run_db(luta_db.iniciar_cooldown_monstro, user_id, guild_id, str(monstro_id))
         if not reserva.get("sucesso"):
@@ -201,43 +181,27 @@ async def pve(ctx, *, monstro_tipo: str = ""):
             dados = luta_db.MONSTROS.get(str(monstro_id), {})
             atributos = dados.get("atributos_base", {}) or {}
             linhas = [
-                f"**👤 Jogador:** {ctx.author.display_name}",
-                f"**👹 Monstro:** {defensor.get('nome', monstro_id)}",
-                f"**❤️ Vida:** {_vida(defensor)}",
-                f"**⚔️ Dano base:** {dados.get('dano_base', 0)}",
-                f"**🎚️ Nível:** {defensor.get('nivel', 1)}",
-                "",
-                "**📊 ATRIBUTOS DO MONSTRO**",
-                f"**💪 Força:** {atributos.get('Força', 0)}",
-                f"**🛡️ Defesa:** {atributos.get('Defesa', 0)}",
-                f"**❤️ Vitalidade:** {atributos.get('Vitalidade', 0)}",
-                f"**⚡ Velocidade:** {atributos.get('Velocidade', 0)}",
-                f"**🎯 Destreza:** {atributos.get('Destreza', 0)}",
-                f"**✨ Magia:** {atributos.get('Magia', 0)}",
-                f"**🍀 Sorte:** {atributos.get('Sorte', 0)}",
-                f"**🧠 Inteligência:** {atributos.get('Inteligencia', atributos.get('Inteligência', 0))}",
-                "",
+                f"**👤 Jogador:** {ctx.author.display_name}", f"**👹 Monstro:** {defensor.get('nome', monstro_id)}",
+                f"**❤️ Vida:** {_vida(defensor)}", f"**⚔️ Dano base:** {dados.get('dano_base', 0)}",
+                f"**🎚️ Nível:** {defensor.get('nivel', 1)}", "", "**📊 ATRIBUTOS DO MONSTRO**",
+                f"**💪 Força:** {atributos.get('Força', 0)}", f"**🛡️ Defesa:** {atributos.get('Defesa', 0)}",
+                f"**❤️ Vitalidade:** {atributos.get('Vitalidade', 0)}", f"**⚡ Velocidade:** {atributos.get('Velocidade', 0)}",
+                f"**🎯 Destreza:** {atributos.get('Destreza', 0)}", f"**✨ Magia:** {atributos.get('Magia', 0)}",
+                f"**🍀 Sorte:** {atributos.get('Sorte', 0)}", f"**🧠 Inteligência:** {atributos.get('Inteligencia', atributos.get('Inteligência', 0))}", "",
                 f"**👊 Golpes:** {', '.join(str(g) for g in dados.get('golpes', [])) or 'Nenhum'}",
                 f"**✨ XP:** {dados.get('xp_recompensa', 0)} | **💰 Hunos:** {dados.get('hunos_recompensa', 0)} | **🔷 TP:** {dados.get('tp_recompensa', 0)}",
             ]
             panel = painel(
-                atacante=ctx.author.display_name,
-                ataque="Apresentação do monstro",
-                vida=_vida(atacante),
-                mana=_mana(atacante),
-                dano=dados.get("dano_base", 0),
-                efeito="Apresentação",
-                alvo=defensor.get("nome", monstro_id),
-                turno=combate.get("numero_turno", 1),
-                oponente=defensor,
-                vida_oponente=_vida(defensor),
-                extra="\n".join(linhas),
-                cor=discord.Color.red(),
+                atacante=ctx.author.display_name, ataque="Apresentação do monstro", vida=_vida(atacante), mana=_mana(atacante),
+                dano=dados.get("dano_base", 0), efeito="Apresentação", alvo=defensor.get("nome", monstro_id),
+                turno=combate.get("numero_turno", 1), oponente=defensor, vida_oponente=_vida(defensor),
+                extra="\n".join(linhas), cor=discord.Color.red(),
             )
             url = imagem_monstro(monstro)
             arquivo = await _baixar_imagem_monstro(url)
             if arquivo is not None:
-                panel.set_image(url=f"attachment://{arquivo.filename}")
+                filename = arquivo.filename
+                panel.set_image(url=f"attachment://{filename}")
             elif url:
                 panel.set_image(url=url)
             cog.preparar_embed(ctx, panel, arquivo=arquivo)
@@ -363,16 +327,8 @@ async def fugir(ctx):
             return
         sucesso = random.random() < (0.15 if not combate.get("pvp") else 0.10)
         embed = painel(
-            atacante=ctx.author.display_name,
-            ataque="resultado",
-            vida=_vida(jogador),
-            mana=_mana(jogador),
-            dano="-",
-            efeito="Fuga",
-            alvo="Combate",
-            turno=combate.get("numero_turno", 1),
-            oponente="-",
-            vida_oponente="-",
+            atacante=ctx.author.display_name, ataque="resultado", vida=_vida(jogador), mana=_mana(jogador), dano="-",
+            efeito="Fuga", alvo="Combate", turno=combate.get("numero_turno", 1), oponente="-", vida_oponente="-",
             extra=f"**{'🏃 Fuga realizada com sucesso!' if sucesso else '❌ Não conseguiu fugir do combate.'}**",
             cor=discord.Color.green() if sucesso else discord.Color.orange(),
         )
@@ -430,13 +386,11 @@ async def setup(bot):
     grupo.add_command(_comando(pvp, "pvp", help="Inicia um combate PvP."))
     bot.add_command(grupo)
     comandos = (
-        (soco, "soco", {}),
-        (chute, "chute", {}),
+        (soco, "soco", {}), (chute, "chute", {}),
         (defesa, "defesa", {"aliases": ["defender", "def", "shield", "block", "bloquear", "bloqueio"]}),
         (esquiva, "esquiva", {"aliases": ["esquivar", "desviar", "dodge", "desvio"]}),
         (fugir, "fugir", {"aliases": ["fuga", "escape", "escapar", "run"]}),
-        (matar, "matar", {}),
-        (desmaiar, "desmaiar", {}),
+        (matar, "matar", {}), (desmaiar, "desmaiar", {}),
     )
     for callback, nome, opcoes in comandos:
         bot.add_command(_comando(callback, nome, **opcoes))
