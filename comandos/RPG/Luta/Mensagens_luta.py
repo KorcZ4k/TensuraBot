@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import unicodedata
 from pathlib import Path
 
 import discord
@@ -14,7 +15,9 @@ def _carregar_imagens():
     caminho = Path(__file__).resolve().parents[3] / "database" / "json" / "Imagens.json"
     try:
         with caminho.open("r", encoding="utf-8") as arquivo:
-            return json.load(arquivo).get("Imagens", {})
+            dados = json.load(arquivo)
+        imagens = dados.get("Imagens", {})
+        return imagens if isinstance(imagens, dict) else {}
     except (OSError, ValueError, TypeError) as erro:
         print(f"[LUTA][IMAGENS] Erro ao carregar Imagens.json: {erro}")
         return {}
@@ -23,40 +26,53 @@ def _carregar_imagens():
 IMAGENS = _carregar_imagens()
 
 
+def _normalizar_nome(valor):
+    texto = unicodedata.normalize("NFKD", str(valor or "")).casefold().strip()
+    return "".join(c for c in texto if not unicodedata.combining(c))
+
+
 def imagem_ataque(nome):
+    # O combate nunca deve mostrar imagem de ataque.
     return None
 
 
 def imagem_monstro(monstro):
-    monstro = str(monstro or "").lower().strip()
-    if monstro == "slime":
+    """Retorna EXCLUSIVAMENTE a URL cadastrada para o monstro."""
+    nome = _normalizar_nome(monstro)
+    if nome == "slime":
         return IMAGENS.get("slime-luta-url")
-    elif monstro == "goblin":
+    elif nome == "goblin":
         return IMAGENS.get("goblin-luta-url")
-    elif monstro == "lobo":
+    elif nome == "lobo":
         return IMAGENS.get("lobo-luta-url")
-    elif monstro == "orc":
+    elif nome == "orc":
         return IMAGENS.get("orc-luta-url")
-    elif monstro == "esqueleto":
+    elif nome == "esqueleto":
         return IMAGENS.get("esqueleto-luta-url")
-    elif monstro == "dragao":
+    elif nome == "dragao":
         return IMAGENS.get("dragao-luta-url")
-    elif monstro == "titan":
+    elif nome == "titan":
         return IMAGENS.get("titan-luta-url")
-    elif monstro == "fenix":
+    elif nome == "fenix":
         return IMAGENS.get("fenix-luta-url")
-    elif monstro == "demonio":
+    elif nome == "demonio":
         return IMAGENS.get("demonio-luta-url")
     return None
 
 
 def imagens_combate(nome_ataque, monstro=None):
+    # Primeiro valor mantido apenas por compatibilidade. Nunca é usado para
+    # montar o painel e deliberadamente permanece None.
     return None, imagem_monstro(monstro)
 
 
 def _imagem_monstro(oponente):
     if isinstance(oponente, dict):
-        return imagem_monstro(oponente.get("id") or oponente.get("monstro_id") or oponente.get("nome"))
+        return imagem_monstro(
+            oponente.get("id")
+            or oponente.get("monstro_id")
+            or oponente.get("nome")
+        )
     return imagem_monstro(oponente)
 
 
@@ -100,11 +116,17 @@ def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", ef
         texto += f"│ │ → ℹ️ | {extra}\n"
     texto += "╰────────────────────────────────────────────╯"
 
-    mensagem = discord.Embed(title="🌙 MOON TENSURA", description=texto, color=cor or discord.Color.blurple(), timestamp=discord.utils.utcnow())
+    mensagem = discord.Embed(
+        title="🌙 MOON TENSURA",
+        description=texto,
+        color=cor or discord.Color.blurple(),
+        timestamp=discord.utils.utcnow(),
+    )
 
-    # SOMENTE a imagem do monstro pode ser exibida no combate.
+    # REGRA ABSOLUTA: o painel só recebe imagem do monstro.
+    # imagem_ataque é propositalmente ignorada.
     url_monstro = imagem_oponente
-    if url_monstro is None and isinstance(oponente, dict) and oponente.get("tipo") == "monstro":
+    if url_monstro is None and isinstance(oponente, dict):
         url_monstro = _imagem_monstro(oponente)
     if url_monstro:
         mensagem.set_image(url=url_monstro)
