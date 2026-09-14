@@ -17,18 +17,64 @@ class Luta(_LutaLegada):
         return monstro_id
 
     def _id_monstro(self, defensor):
-        """Obtém o identificador do monstro sem depender de um único campo."""
+        """Obtém o ID/nome do monstro usado por Mensagens_luta para buscar a imagem."""
         defensor = defensor or {}
-        if defensor.get("tipo") == "monstro":
-            return defensor.get("id") or defensor.get("monstro_id") or defensor.get("nome")
-        return None
+        return (
+            defensor.get("id")
+            or defensor.get("monstro_id")
+            or defensor.get("nome")
+            if defensor.get("tipo") == "monstro"
+            else None
+        )
 
     def _imagens_da_luta(self, ataque, defensor):
-        """Fluxo único: sistema -> Mensagens_luta -> URLs -> sistema."""
+        """Fluxo único: sistema -> Mensagens_luta -> URLs do Imagens.json."""
         ataque = ataque or {}
         nome_ataque = ataque.get("nome", "Ataque")
         monstro_id = self._id_monstro(defensor)
         return imagens_combate(nome_ataque, monstro_id)
+
+    async def _mostrar_inicio(self, ctx):
+        """Mostra o início do combate já com a imagem do monstro resolvida."""
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo"):
+            return
+
+        atacante = self._obter_atacante(combate)
+        defensor = self._obter_defensor(combate)
+
+        # No primeiro turno do PvE não existe ataque_pendente. Portanto a
+        # imagem precisa ser resolvida diretamente do participante monstro.
+        if not defensor:
+            defensor = next(
+                (
+                    participante
+                    for participante in combate.get("participantes", [])
+                    if participante.get("tipo") == "monstro"
+                ),
+                None,
+            )
+
+        if not atacante or not defensor:
+            return
+
+        imagem_ataque, imagem_monstro = imagens_combate("início do combate", self._id_monstro(defensor))
+        mensagem = painel(
+            atacante=atacante.get("nome", "User"),
+            ataque="início do combate",
+            vida=f"{max(0, int(float(atacante.get('vida', 0) or 0)))}/{max(1, int(float(atacante.get('vida_maxima', atacante.get('vida', 0)) or 1)))}",
+            mana=int(float(atacante.get("mana", 0) or 0)),
+            dano="-",
+            efeito="Nenhum",
+            alvo=defensor.get("nome", "-"),
+            turno=combate.get("numero_turno", 1),
+            oponente=defensor,
+            vida_oponente=f"{max(0, int(float(defensor.get('vida', 0) or 0)))}/{max(1, int(float(defensor.get('vida_maxima', defensor.get('vida', 0)) or 1)))}",
+            extra="Combate PvE iniciado.",
+            imagem_ataque=imagem_ataque,
+            imagem_oponente=imagem_monstro,
+        )
+        await ctx.send(embed=mensagem)
 
     async def _anunciar_ataque(self, ctx):
         combate = self._obter_combate(ctx.channel.id)
