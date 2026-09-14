@@ -1,13 +1,12 @@
-"""Comandos públicos do sistema de combate.
-
-Este é o único ponto de registro dos comandos de luta. O motor fica em
-``sistemas_luta`` e a apresentação em ``Mensagens_luta``.
-"""
+"""Comandos públicos do sistema de combate."""
 
 from __future__ import annotations
 
+import io
 import re
 
+import aiohttp
+import discord
 from discord.ext import commands
 
 from ..luta import (
@@ -94,7 +93,8 @@ def _dados_painel(ctx):
         defensor = next(
             (
                 p for p in combate.get("participantes", [])
-                if p.get("id") or p.get("monstro_id") or p.get("nome")
+                if p.get("tipo") == "monstro"
+                or p.get("monstro_id")
             ),
             None,
         )
@@ -108,10 +108,36 @@ def _dados_painel(ctx):
     }
 
 
+async def _baixar_imagem_monstro(url):
+    """Baixa a imagem definida em Imagens.json para anexá-la ao Discord.
+
+    Isso evita depender do Discord conseguir buscar novamente uma URL CDN
+    assinada no momento em que o embed é renderizado.
+    """
+    if not url or not isinstance(url, str):
+        return None
+    try:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=timeout) as sessao:
+            async with sessao.get(url) as resposta:
+                if resposta.status != 200:
+                    print(f"[LUTA][IMAGEM] HTTP {resposta.status} ao baixar imagem do monstro")
+                    return None
+                dados = await resposta.read()
+                if not dados:
+                    print("[LUTA][IMAGEM] Imagem do monstro veio vazia")
+                    return None
+                return discord.File(io.BytesIO(dados), filename="monstro.png")
+    except Exception as erro:
+        print(f"[LUTA][IMAGEM] Falha ao baixar imagem do monstro: {type(erro).__name__}: {erro}")
+        return None
+
+
 async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
-    """Converte a saída do combate para o painel e resolve a imagem do monstro."""
-    comando = getattr(self.command, "name", "").casefold()
-    parent = getattr(getattr(self.command, "parent", None), "name", "").casefold()
+    """Converte a saída do combate para o painel e anexa só a imagem do monstro."""
+    comando_obj = getattr(self, "command", None)
+    comando = getattr(comando_obj, "name", "").casefold()
+    parent = getattr(getattr(comando_obj, "parent", None), "name", "").casefold()
     if comando not in _LUTA_COMANDOS and parent not in {"luta", "fight", "combate"}:
         return await _SEND_ORIGINAL(self, content=content, embed=embed, **kwargs)
 
@@ -135,23 +161,20 @@ async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
     elif comando == "esquiva":
         ataque_nome = "Esquiva"
 
-    # O ID do monstro é usado diretamente. Não depende de tipo="monstro".
-    monstro_id = (
-        defensor.get("id")
-        or defensor.get("monstro_id")
-        or defensor.get("nome")
-    )
+    monstro_id = None
+    if defensor.get("tipo") == "monstro" or defensor.get("monstro_id"):
+        monstro_id = defensor.get("id") or defensor.get("monstro_id")
+
     if not monstro_id:
         monstro_id = next(
             (
-                p.get("id") or p.get("monstro_id") or p.get("nome")
+                p.get("id") or p.get("monstro_id")
                 for p in dados.get("combate", {}).get("participantes", [])
-                if p.get("id") or p.get("monstro_id") or p.get("nome")
+                if p.get("tipo") == "monstro" or p.get("monstro_id")
             ),
             None,
         )
 
-    # imagem_ataque é deliberadamente ignorada pelo painel.
     _, imagem_monstro = imagens_combate(ataque_nome, monstro_id)
 
     dano_match = re.search(r"\*\*(\d+)\s+de dano", texto, re.IGNORECASE)
@@ -180,6 +203,14 @@ async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
         imagem_ataque=None,
         imagem_oponente=imagem_monstro,
     )
+
+    # Nunca anexa imagem de ataque. Quando houver imagem de monstro, ela vai
+    # como arquivo e o embed aponta para attachment://monstro.png.
+    arquivo = await _baixar_imagem_monstro(imagem_monstro)
+    if arquivo is not None:
+        panel.set_image(url="attachment://monstro.png")
+        kwargs["file"] = arquivo
+
     return await _SEND_ORIGINAL(self, content=None, embed=panel, **kwargs)
 
 
