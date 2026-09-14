@@ -17,11 +17,7 @@ async def _defesa_jogador_ui(self, ctx, acao):
 
 
 async def _ui_editar_seguro(self, combate, embed, view=True):
-    """Edita a mensagem sem enviar attachments=[] ao Discord.
-
-    Alguns ambientes/versoes de discord.py rejeitam o campo attachments vazio
-    em edicoes de mensagens. A UI de combate nao precisa dele para avancar.
-    """
+    """Edita a mensagem sem enviar attachments=[] ao Discord."""
     mensagem = combate.get("ui_message")
     if mensagem is None:
         return
@@ -40,7 +36,13 @@ async def _ui_editar_seguro(self, combate, embed, view=True):
 
 
 async def _ui_context_send_seguro(self, content=None, **kwargs):
-    """Mantem resultado/erro na mesma mensagem e deixa Avancar disponivel."""
+    """Mostra mensagens sem transformar erros em um resultado avancavel.
+
+    Uma acao invalida (por exemplo, usar !defesa enquanto o monstro ainda
+    precisa atacar) deve informar o erro, mas PRESERVAR a etapa real do motor.
+    Antes isso mudava ui_stage para ``result``; o proximo clique em Avancar
+    entao chamava _proximo_turno e pulava a vez do monstro.
+    """
     combate = self._combate
     atacante = self._get_participante(combate, combate.get("vencedor_id")) or self._atacante(combate) or {}
     defensor = self._get_participante(combate, combate.get("perdedor_id")) or self._defensor(combate) or {}
@@ -48,14 +50,31 @@ async def _ui_context_send_seguro(self, content=None, **kwargs):
     extra = content or ""
     if embed is not None and embed.description:
         extra = embed.description if not extra else f"{extra}\n{embed.description}"
+
+    eh_erro = "❌" in extra
+    etapa_anterior = combate.get("ui_stage", "attributes")
+    aguardando_anterior = combate.get("ui_waiting_advance", False)
+
     padrao = painel(
-        atacante=atacante.get("nome", "User"), ataque="resultado", vida=self._vida(atacante),
-        mana=atacante.get("mana", 0), dano="-", efeito="Nenhum", alvo=defensor.get("nome", "-"),
-        turno=combate.get("numero_turno", 1), oponente=defensor, vida_oponente=self._vida(defensor),
-        extra=extra or "Atualizacao do combate.", cor=discord.Color.blurple(),
+        atacante=atacante.get("nome", "User"), ataque="resultado",
+        vida=self._vida(atacante), mana=atacante.get("mana", 0),
+        dano="-", efeito="Erro" if eh_erro else "Nenhum",
+        alvo=defensor.get("nome", "-"), turno=combate.get("numero_turno", 1),
+        oponente=defensor, vida_oponente=self._vida(defensor),
+        extra=extra or "Atualizacao do combate.",
+        cor=discord.Color.red() if eh_erro else discord.Color.blurple(),
     )
-    combate["ui_stage"] = "result"
-    combate["ui_waiting_advance"] = True
+
+    # ERRO DE ACAO: nao altera a maquina de estados.
+    # Assim, se estava em "turn" (vez do monstro), Avancar continua executando
+    # o ataque do monstro; nao e possivel usar uma acao invalida para pular turno.
+    if not eh_erro:
+        combate["ui_stage"] = "result"
+        combate["ui_waiting_advance"] = True
+    else:
+        combate["ui_stage"] = etapa_anterior
+        combate["ui_waiting_advance"] = aguardando_anterior
+
     view = self._owner._ui_views.get(self._message.id) if self._owner else None
     if view is None and self._owner:
         view = _AvancarView(self._owner)
