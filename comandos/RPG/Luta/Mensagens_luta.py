@@ -97,6 +97,15 @@ def _rotulo_acao(ataque):
         "resultado da defesa": "🛡️ | Resultado da defesa",
         "stun": "⛓️ | Stun",
         "⛓️ stun": "⛓️ | Stun",
+        "apresentação do monstro": "👹 | Apresentação do monstro",
+        "lista de monstros": "👹 | Lista de monstros",
+        "comandos": "📖 | Comandos",
+        "status": "📊 | Status",
+        "🛌 descanso": "🛌 | Descanso",
+        "🧘 meditação": "🧘 | Meditação",
+        "⏰ recuperação": "⏰ | Recuperação",
+        "⚔️ pvp": "⚔️ | PvP",
+        "defenda-se": "🛡️ | Defesa",
     }
     normalizado = texto.casefold()
     if normalizado in genericos:
