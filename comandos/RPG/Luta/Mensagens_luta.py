@@ -49,7 +49,8 @@ _MONSTROS_IMAGENS = {
 }
 
 
-def _imagem_ataque(nome: str) -> str | None:
+def imagem_ataque(nome: str) -> str | None:
+    """Retorna somente a URL do golpe solicitada pelo sistema de luta."""
     chave = _normalizar(nome)
     for emoji in ("👊", "🦵", "🛡️", "💨"):
         chave = chave.replace(_normalizar(emoji), "")
@@ -57,8 +58,25 @@ def _imagem_ataque(nome: str) -> str | None:
     return IMAGENS.get(_GOLPES_IMAGENS.get(chave, "")) or IMAGENS.get("ataque-luta-url")
 
 
+def imagem_monstro(monstro_id: str) -> str | None:
+    """Retorna a URL do monstro pelo ID exato usado por criar_monstro()."""
+    chave = _normalizar(monstro_id)
+    nome_imagem = _MONSTROS_IMAGENS.get(chave)
+    if nome_imagem:
+        return IMAGENS.get(nome_imagem)
+    return IMAGENS.get("monstro-luta-url") if chave else None
+
+
+def imagens_combate(nome_ataque: str, monstro_id: str | None = None) -> tuple[str | None, str | None]:
+    """Ponto único: recebe os IDs do motor e devolve as duas imagens corretas."""
+    return imagem_ataque(nome_ataque), imagem_monstro(monstro_id or "")
+
+
+def _imagem_ataque(nome: str) -> str | None:
+    return imagem_ataque(nome)
+
+
 def _dados_oponente(oponente) -> tuple[str, str]:
-    """Retorna (id, nome) preservando o ID real do monstro."""
     if isinstance(oponente, dict):
         return _normalizar(oponente.get("id", "")), str(oponente.get("nome") or oponente.get("id") or "-")
     texto = str(oponente or "-")
@@ -67,23 +85,21 @@ def _dados_oponente(oponente) -> tuple[str, str]:
 
 def _imagem_monstro(oponente) -> str | None:
     monstro_id, nome = _dados_oponente(oponente)
-    if isinstance(oponente, dict) and oponente.get("tipo") != "monstro":
+    if isinstance(oponente, dict):
+        if oponente.get("tipo") == "monstro":
+            return imagem_monstro(monstro_id)
         return None
-
-    # Primeiro usa o ID exato criado pelo motor (slime, goblin, etc.).
     if monstro_id in _MONSTROS_IMAGENS:
-        return IMAGENS.get(_MONSTROS_IMAGENS[monstro_id])
-
-    # Compatibilidade quando só o nome foi passado.
+        return imagem_monstro(monstro_id)
     chave = _normalizar(nome)
-    for monstro, imagem in _MONSTROS_IMAGENS.items():
+    for monstro in _MONSTROS_IMAGENS:
         if chave == monstro or chave.startswith(monstro + " "):
-            return IMAGENS.get(imagem)
+            return imagem_monstro(monstro)
     return IMAGENS.get("monstro-luta-url") if nome and nome != "-" else None
 
 
-def painel(*, atacante: str = "User", ataque: str = "Ataque", vida: str | int = "-", mana: str | int = "-", dano: str | int = "-", efeito: str = "Nenhum", alvo: str = "-", turno: str | int = "-", oponente="-", vida_oponente: str | int = "-", extra: str = "", cor=None) -> discord.Embed:
-    """Monta o painel padrão Moon Tensura usando as imagens do Imagens.json."""
+def painel(*, atacante: str = "User", ataque: str = "Ataque", vida: str | int = "-", mana: str | int = "-", dano: str | int = "-", efeito: str = "Nenhum", alvo: str = "-", turno: str | int = "-", oponente="-", vida_oponente: str | int = "-", extra: str = "", cor=None, imagem_ataque: str | None = None, imagem_oponente: str | None = None) -> discord.Embed:
+    """Monta o painel padrão. As URLs podem vir diretamente do motor da luta."""
     _, nome_oponente = _dados_oponente(oponente)
     texto = (
         "╭────────────────────────────────────────────╮\n"
@@ -105,25 +121,16 @@ def painel(*, atacante: str = "User", ataque: str = "Ataque", vida: str | int = 
         texto += f"│ │ → ℹ️ | {extra}\n"
     texto += "╰────────────────────────────────────────────╯"
 
-    mensagem = discord.Embed(
-        title="🌙 MOON TENSURA",
-        description=texto,
-        color=cor or discord.Color.blurple(),
-        timestamp=discord.utils.utcnow(),
-    )
+    mensagem = discord.Embed(title="🌙 MOON TENSURA", description=texto, color=cor or discord.Color.blurple(), timestamp=discord.utils.utcnow())
+    url_ataque = imagem_ataque if imagem_ataque is not None else _imagem_ataque(ataque)
+    url_monstro = imagem_oponente if imagem_oponente is not None else _imagem_monstro(oponente)
 
-    imagem_ataque = _imagem_ataque(ataque)
-    imagem_monstro = _imagem_monstro(oponente)
-
-    # Em PvE a imagem designada do monstro tem prioridade como imagem principal.
-    # A imagem do golpe fica como thumbnail para não substituir o monstro.
-    if imagem_monstro:
-        mensagem.set_image(url=imagem_monstro)
-        if imagem_ataque:
-            mensagem.set_thumbnail(url=imagem_ataque)
-    elif imagem_ataque:
-        mensagem.set_image(url=imagem_ataque)
-
+    if url_monstro:
+        mensagem.set_image(url=url_monstro)
+        if url_ataque:
+            mensagem.set_thumbnail(url=url_ataque)
+    elif url_ataque:
+        mensagem.set_image(url=url_ataque)
     mensagem.set_footer(text=FOOTER)
     return mensagem
 
