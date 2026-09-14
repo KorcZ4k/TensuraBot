@@ -46,12 +46,12 @@ class _UIContext:
                 embed.description = f"{texto}\n\n{content}".strip()
             kwargs["embed"] = embed
 
-        # A mensagem de combate já possui a imagem inicial como attachment.
-        # Não criamos novas mensagens/attachments a cada etapa.
         kwargs.pop("file", None)
         kwargs.pop("files", None)
         self._combate["ui_stage"] = "result"
         self._combate["ui_waiting_advance"] = True
+        # O attachment da apresentação inicial deve desaparecer ao editar a mensagem.
+        kwargs.setdefault("attachments", [])
         await self._message.edit(**kwargs)
         return self._message
 
@@ -124,14 +124,16 @@ class Luta(_LutaLegada):
         mensagem = combate.get("ui_message")
         if mensagem is None:
             return
+        kwargs = {"embed": embed, "attachments": []}
         if view:
             view_obj = self._ui_views.get(mensagem.id)
             if view_obj is None:
                 view_obj = _AvancarView(self)
                 self._ui_views[mensagem.id] = view_obj
-            await mensagem.edit(embed=embed, view=view_obj)
+            kwargs["view"] = view_obj
         else:
-            await mensagem.edit(embed=embed, view=None)
+            kwargs["view"] = None
+        await mensagem.edit(**kwargs)
 
     def _ui_context(self, ctx, combate):
         mensagem = combate.get("ui_message")
@@ -280,9 +282,7 @@ class Luta(_LutaLegada):
         if not atacante or not defensor:
             return
         if atacante.get("tipo") != "jogador" or str(atacante.get("id")) != str(ctx.author.id):
-            await ctx.send(
-                f"❌ É a vez de **{atacante.get('nome', 'outro jogador')}**."
-            )
+            await ctx.send(f"❌ É a vez de **{atacante.get('nome', 'outro jogador')}**.")
             return
 
         golpe = luta_db.GOLPES.get(tipo_ataque, {})
@@ -392,30 +392,22 @@ class Luta(_LutaLegada):
         combate = self._obter_combate(interaction.channel.id)
         mensagem = combate.get("ui_message") if combate else None
         if not combate or not combate.get("ativo") or mensagem is None:
-            await interaction.response.send_message(
-                "❌ Este combate não está mais ativo.", ephemeral=True
-            )
+            await interaction.response.send_message("❌ Este combate não está mais ativo.", ephemeral=True)
             return
         if interaction.message is None or interaction.message.id != mensagem.id:
-            await interaction.response.send_message(
-                "❌ Esta tela não pertence ao combate atual.", ephemeral=True
-            )
+            await interaction.response.send_message("❌ Esta tela não pertence ao combate atual.", ephemeral=True)
             return
 
-        # Só o jogador que iniciou o combate pode avançar a interface.
         participante_jogador = next(
             (p for p in combate.get("participantes", []) if p.get("tipo") == "jogador"),
             None,
         )
         if participante_jogador and str(participante_jogador.get("id")) != str(interaction.user.id):
-            await interaction.response.send_message(
-                "❌ Apenas o jogador deste combate pode avançar a tela.", ephemeral=True
-            )
+            await interaction.response.send_message("❌ Apenas o jogador deste combate pode avançar a tela.", ephemeral=True)
             return
 
         await interaction.response.defer()
         async with self._lock(interaction.channel.id):
-            # O estado pode ter mudado enquanto a interação aguardava o lock.
             mensagem_atual = combate.get("ui_message")
             if not combate.get("ativo") or mensagem_atual is None or mensagem_atual.id != interaction.message.id:
                 return
