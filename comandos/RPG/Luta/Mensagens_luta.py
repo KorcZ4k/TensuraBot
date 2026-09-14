@@ -32,7 +32,6 @@ def _normalizar_nome(valor):
 
 
 def imagem_ataque(nome):
-    # imagem_ataque é propositalmente ignorada; ataques não exibem imagem.
     return None
 
 
@@ -52,12 +51,10 @@ def imagem_monstro(monstro):
 
 
 def imagem_golpe(nome):
-    # Imagens de golpes continuam desativadas na interface de combate.
     return None
 
 
 def imagens_combate(nome_ataque, monstro=None):
-    # A imagem do monstro é usada apenas na apresentação inicial do PvE.
     return None, imagem_monstro(monstro)
 
 
@@ -80,7 +77,6 @@ def _mana(p):
 
 
 def _nome(p, padrao="-"):
-    """Obtém nome de participante ou representa valores simples sem quebrar o embed."""
     if isinstance(p, dict):
         return str(p.get("nome") or padrao)
     if p is None:
@@ -95,23 +91,14 @@ def _linha(texto):
 def _rotulo_acao(ataque):
     texto = str(ataque or "").strip()
     genericos = {
-        "resultado": "📋 | Resultado",
-        "ordem de velocidade": "📋 | Ordem de velocidade",
-        "aguardando ação": "⏳ | Aguardando ação",
-        "início do combate": "⚔️ | Início do combate",
-        "finalização": "🏁 | Finalização",
-        "resultado da defesa": "🛡️ | Resultado da defesa",
-        "stun": "⛓️ | Stun",
-        "⛓️ stun": "⛓️ | Stun",
-        "apresentação do monstro": "👹 | Apresentação do monstro",
-        "lista de monstros": "👹 | Lista de monstros",
-        "comandos": "📖 | Comandos",
-        "status": "📊 | Status",
-        "🛌 descanso": "🛌 | Descanso",
-        "🧘 meditação": "🧘 | Meditação",
-        "⏰ recuperação": "⏰ | Recuperação",
-        "⚔️ pvp": "⚔️ | PvP",
-        "defenda-se": "🛡️ | Defesa",
+        "resultado": "📋 | Resultado", "ordem de velocidade": "📋 | Ordem de velocidade",
+        "aguardando ação": "⏳ | Aguardando ação", "início do combate": "⚔️ | Início do combate",
+        "finalização": "🏁 | Finalização", "resultado da defesa": "🛡️ | Resultado da defesa",
+        "stun": "⛓️ | Stun", "⛓️ stun": "⛓️ | Stun",
+        "apresentação do monstro": "👹 | Apresentação do monstro", "lista de monstros": "👹 | Lista de monstros",
+        "comandos": "📖 | Comandos", "status": "📊 | Status", "🛌 descanso": "🛌 | Descanso",
+        "🧘 meditação": "🧘 | Meditação", "⏰ recuperação": "⏰ | Recuperação",
+        "⚔️ pvp": "⚔️ | PvP", "defenda-se": "🛡️ | Defesa",
     }
     return genericos.get(texto.casefold())
 
@@ -120,77 +107,99 @@ def _limpar_marcacao(texto):
     return str(texto).replace("**", "").strip()
 
 
-def _campo_status(linhas, inicio, fim=None):
-    trecho = linhas[inicio:fim]
-    return "\n".join(_limpar_marcacao(linha) for linha in trecho if str(linha).strip())
+def _extrair_valor(linhas, prefixos, padrao="-"):
+    if isinstance(prefixos, str):
+        prefixos = (prefixos,)
+    for linha in linhas:
+        linha = _limpar_marcacao(linha)
+        for prefixo in prefixos:
+            if linha.startswith(prefixo):
+                return linha.split(":", 1)[1].strip() if ":" in linha else linha
+    return padrao
 
 
 def _painel_status(*, atacante, vida, mana, extra, cor, imagem_oponente=None):
-    """Painel de ficha pensado para leitura rápida no Discord."""
-    linhas = [str(linha) for linha in str(extra or "").splitlines()]
-    linhas = [_limpar_marcacao(linha) for linha in linhas]
+    """Ficha pública: moldura obrigatória, negrito e leitura rápida no Discord."""
+    linhas = [_limpar_marcacao(l) for l in str(extra or "").splitlines() if str(l).strip()]
 
-    if any("Este personagem está morto" in linha for linha in linhas):
-        destaque = "💀 **Este personagem está morto!**"
-    else:
-        destaque = "✨ **Ficha de personagem**"
+    nome = _extrair_valor(linhas, "👤 Nome:", atacante)
+    personagem = _extrair_valor(linhas, "🧬 Personagem:", "Não definido")
+    raca = _extrair_valor(linhas, "🧬 Raça:", "Não definida")
+    nivel = _extrair_valor(linhas, "📈 Nível:", "0")
+    situacao = _extrair_valor(linhas, "📌 Situação:", "ativo")
+    experiencia = _extrair_valor(linhas, ("⭐ XP:", "⭐ Experiência:"), "-")
+    vida_txt = _extrair_valor(linhas, "❤️ Vida:", str(vida))
+    mana_txt = _extrair_valor(linhas, "💧 Mana:", str(mana))
+    magiculas = _extrair_valor(linhas, "✨ Magículas:", "0")
+    tp = _extrair_valor(linhas, "✨ TP:", "0")
 
-    nome = next((l.split(":", 1)[1].strip() for l in linhas if l.startswith("👤 Nome:")), atacante)
-    personagem = next((l.split(":", 1)[1].strip() for l in linhas if l.startswith("🧬 Personagem:")), "Não definido")
-    raca = next((l.split(":", 1)[1].strip() for l in linhas if l.startswith("🧬 Raça:")), "Não definida")
-    nivel = next((l.split(":", 1)[1].strip() for l in linhas if l.startswith("📈 Nível:")), "0")
-    situacao = next((l.split(":", 1)[1].strip() for l in linhas if l.startswith("📌 Situação:")), "ativo")
-    xp = next((l.split(":", 1)[1].strip() for l in linhas if l.startswith("⭐ XP:")), "-")
-    vida_txt = next((l.split(":", 1)[1].strip() for l in linhas if l.startswith("❤️ Vida:")), str(vida))
-    mana_txt = next((l.split(":", 1)[1].strip() for l in linhas if l.startswith("💧 Mana:")), str(mana))
-    magiculas = next((l.split(":", 1)[1].strip() for l in linhas if l.startswith("✨ Magículas:")), "0")
-    tp = next((l.split(":", 1)[1].strip() for l in linhas if l.startswith("✨ TP:")), "0")
-
+    # Cada atributo fica obrigatoriamente em sua própria linha.
+    mapa_atributos = (
+        ("💪", "Força"), ("🛡️", "Defesa"), ("❤️", "Vitalidade"), ("⚡", "Velocidade"),
+        ("🎯", "Destreza"), ("✨", "Magia"), ("🍀", "Sorte"), ("🧠", "Inteligência"),
+    )
     atributos = []
-    for linha in linhas:
-        if any(linha.startswith(prefixo) for prefixo in ("Força:", "Vitalidade:", "Destreza:", "Magia:")):
-            atributos.append(linha)
-    # As linhas originais trazem dois atributos por linha.
-    atributos = "\n".join(atributos) or "Nenhum atributo disponível."
+    for emoji, nome_atributo in mapa_atributos:
+        valor = None
+        for linha in linhas:
+            partes = [parte.strip() for parte in linha.split("|")]
+            for parte in partes:
+                limpo = _limpar_marcacao(parte)
+                if limpo.startswith(f"{nome_atributo}:"):
+                    valor = limpo.split(":", 1)[1].strip()
+                    break
+            if valor is not None:
+                break
+        atributos.append((emoji, nome_atributo, valor if valor is not None else "0"))
 
     recuperacao = []
-    for linha in linhas:
-        if linha.startswith("Descanso:") or linha.startswith("Meditação:"):
-            recuperacao.append(linha)
-    recuperacao_txt = "\n".join(recuperacao) or "Sem informações de recuperação."
+    for emoji, nome_rec in (("🛌", "Descanso"), ("🧘", "Meditação")):
+        valor = _extrair_valor(linhas, f"{nome_rec}:", None)
+        if valor is not None:
+            recuperacao.append((emoji, nome_rec, valor))
 
-    barras = []
-    for linha in linhas:
-        if linha.startswith("XP visual:") or linha.startswith("Vida visual:") or linha.startswith("Mana visual:"):
-            barras.append(linha)
-    barras_txt = "\n".join(barras) or "Sem barras disponíveis."
+    if not recuperacao:
+        recuperacao = [("🔄", "Status", "Disponível para consulta")]
 
+    linhas_saida = [
+        "╭────────────────────────────────────────────╮",
+        "│              🌙 MOON TENSURA               │",
+        "├────────────────────────────────────────────┤",
+        f"│ ⋮ → 👤 | Jogador: {nome}",
+        f"│ ⋮ → 🧬 | Personagem: {personagem}",
+        f"│ ⋮ → 🧬 | Raça: {raca}",
+        f"│ ⋮ → 🎚️ | Nível: {nivel}",
+        f"│ ⋮ → 📌 | Situação: {situacao}",
+        f"│ ⋮ → ⭐ | Experiência: {experiencia}",
+        f"│ ⋮ → ❤️ | Vida: {vida_txt}",
+        f"│ ⋮ → 💧 | Mana: {mana_txt}",
+        f"│ ⋮ → ✨ | Magículas: {magiculas}",
+        f"│ ⋮ → 🔷 | TP: {tp}",
+        "├────────────────────────────────────────────┤",
+        "│ │ → 📊 | ATRIBUTOS DO PERSONAGEM",
+    ]
+    linhas_saida.extend(f"│ │ → {emoji} | {nome_atributo}: {valor}" for emoji, nome_atributo, valor in atributos)
+    linhas_saida.extend([
+        "├────────────────────────────────────────────┤",
+        "│ │ → 🔄 | RECUPERAÇÃO",
+    ])
+    linhas_saida.extend(f"│ │ → {emoji} | {nome_rec}: {valor}" for emoji, nome_rec, valor in recuperacao)
+    linhas_saida.append("╰────────────────────────────────────────────╯")
+
+    descricao = "\n".join(_linha(linha) for linha in linhas_saida)
     embed = discord.Embed(
-        title="🌙 MOON TENSURA • STATUS",
-        description=f"{destaque}\n\n👤 **{nome}**\n🎭 **{personagem}** • {raca}\n📈 **Nível {nivel}** • {situacao}",
+        title="🌙 MOON TENSURA",
+        description=descricao,
         color=cor or discord.Color.blurple(),
         timestamp=discord.utils.utcnow(),
     )
-    embed.add_field(name="❤️ Recursos", value=f"**Vida:** {vida_txt}\n**Mana:** {mana_txt}", inline=True)
-    embed.add_field(name="⭐ Progressão", value=f"**XP:** {xp}\n**TP:** {tp}\n**Magículas:** {magiculas}", inline=True)
-    embed.add_field(name="📊 Atributos", value=atributos, inline=False)
-    embed.add_field(name="📈 Barras", value=barras_txt, inline=False)
-    embed.add_field(name="🔄 Recuperação", value=recuperacao_txt, inline=False)
-    embed.set_thumbnail(url=imagem_oponente) if imagem_oponente else None
     embed.set_footer(text=FOOTER)
     return embed
 
 
 def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", efeito="Nenhum", alvo="-", turno="-", oponente="-", vida_oponente="-", extra="", cor=None, imagem_ataque=None, imagem_oponente=None):
     if str(ataque or "").strip().casefold() == "status":
-        return _painel_status(
-            atacante=atacante,
-            vida=vida,
-            mana=mana,
-            extra=extra,
-            cor=cor,
-            imagem_oponente=imagem_oponente,
-        )
+        return _painel_status(atacante=atacante, vida=vida, mana=mana, extra=extra, cor=cor, imagem_oponente=imagem_oponente)
 
     nome_oponente = _nome(oponente, str(oponente) if not isinstance(oponente, dict) else "-")
     texto_ataque = str(ataque or "").strip()
@@ -212,7 +221,7 @@ def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", ef
         f"│ ⋮ → 🔷 | Mana de: {mana}",
         "├────────────────────────────────────────────┤",
         f"│ │ → ⚔️ | Dano: {dano}",
-        f"│ │ → ✦  | Efeito: {efeito}",
+        f"│ │ → ✦ | Efeito: {efeito}",
         f"│ │ → 🎯 | Alvo: {alvo}",
         f"│ │ → 🔄 | Turno: {turno}",
         "├ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┤",
@@ -237,7 +246,7 @@ def resultado(texto, *, status=None):
 
 
 def turno(numero, atacante, defensor):
-    return painel(ataque="aguardando ação", alvo=defensor, turno=numero, oponente=defensor, extra="Escolha sua ação de combate.", cor=discord.Color.green())
+    return painel(atacante=atacante, ataque="aguardando ação", alvo=defensor, turno=numero, oponente=defensor, extra="Escolha sua ação de combate.", cor=discord.Color.green())
 
 
 def ataque(numero, nome_ataque, atacante, defensor, status):
