@@ -32,7 +32,7 @@ def _normalizar_nome(valor):
 
 
 def imagem_ataque(nome):
-    # Imagens de ataque continuam desativadas na interface de combate.
+    # imagem_ataque é propositalmente ignorada; ataques não exibem imagem.
     return None
 
 
