@@ -164,10 +164,10 @@ class CombatHardeningTests(unittest.TestCase):
     def test_single_message_ui_adapts_engine_sends_and_finalization(self):
         text = source("comandos/RPG/Luta/sistemas_luta.py")
         self.assertIn('async def send(self, content=None, **kwargs):', text)
-        self.assertIn('await self._message.edit(**kwargs)', text)
+        self.assertIn('self._message.edit(embed=padrao, attachments=[], view=view)', text)
+        self.assertIn('attachments=[]', text)
         self.assertIn('ui_waiting_advance', text)
-        self.assertIn('ui_ctx = self._ui_context(ctx, combate)', text)
-        self.assertIn('await self._finalizar(ui_ctx, motivo="vida")', text)
+        self.assertIn('await self._finalizar(self._ui_context(ctx, combate), motivo="vida")', text)
         self.assertIn('await self._aplicar_efeitos_inicio(ui_ctx, atacante)', text)
 
     def test_monster_turn_is_not_auto_resolved_in_single_message_ui(self):
