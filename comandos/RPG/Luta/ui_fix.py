@@ -70,33 +70,29 @@ async def _ui_context_send_seguro(self, content=None, **kwargs):
 
 
 async def _resolver_defesa_ui(self, ctx, combate, ataque, defensor, atacante):
-    """Resolve a defesa diretamente, sem chamar o resolver legado."""
+    """Resolve defesa sem depender do resolver legado."""
     if atacante is None or defensor is None:
         raise RuntimeError("atacante ou defensor ausente")
 
     if ataque.get("tipo") == "magia":
         dano, resultado = self._dano_magia(atacante, defensor, ataque)
-        if resultado == "esquivou":
-            mensagem = f"💨 **{defensor.get('nome')}** esquivou da magia!"
-        else:
-            vida_antes = int(float(defensor.get("vida", 0) or 0))
-            defensor["vida"] = max(0, vida_antes - max(0, int(dano)))
-            mensagem = f"✨ **{atacante.get('nome')}** causou **{max(0, int(dano))} de dano mágico** em **{defensor.get('nome')}**."
-            efeito = self._aplicar_efeito(defensor, ataque.get("efeito"))
-            if efeito:
-                mensagem += f"\n⚠️ Efeito: **{efeito.title()}**."
     else:
         dano, resultado = self._dano_fisico(atacante, defensor, ataque)
-        if resultado == "esquivou":
-            mensagem = f"💨 **{defensor.get('nome')}** esquivou do ataque!"
+
+    if resultado == "esquivou":
+        mensagem = f"💨 **{defensor.get('nome')}** esquivou do ataque!"
+    else:
+        dano = max(0, int(dano))
+        vida_antes = int(float(defensor.get("vida", 0) or 0))
+        defensor["vida"] = max(0, vida_antes - dano)
+        if ataque.get("tipo") == "magia":
+            mensagem = f"✨ **{atacante.get('nome')}** causou **{dano} de dano mágico** em **{defensor.get('nome')}**."
         else:
-            dano = max(0, int(dano))
-            vida_antes = int(float(defensor.get("vida", 0) or 0))
-            defensor["vida"] = max(0, vida_antes - dano)
             mensagem = f"⚔️ **{atacante.get('nome')}** causou **{dano} de dano** em **{defensor.get('nome')}**."
-            efeito = self._aplicar_efeito(defensor, ataque.get("efeito"))
-            if efeito:
-                mensagem += f"\n⚠️ Efeito: **{efeito.title()}**."
+        efeito = self._aplicar_efeito(defensor, ataque.get("efeito"))
+        if efeito:
+            nome_efeito = efeito.get("nome", efeito.get("tipo", "Efeito")) if isinstance(efeito, dict) else str(efeito)
+            mensagem += f"\n⚠️ Efeito: **{str(nome_efeito).title()}**."
 
     defensor["defesa_ativa"] = False
     defensor["esquiva_ativa"] = False
@@ -104,8 +100,8 @@ async def _resolver_defesa_ui(self, ctx, combate, ataque, defensor, atacante):
     combate["ataque_pendente"] = None
     combate["fase"] = "ataque"
 
-    resultado = self._condicao_vitoria(combate)
-    if resultado and not combate.get("pvp"):
+    resultado_vitoria = self._condicao_vitoria(combate)
+    if resultado_vitoria and not combate.get("pvp"):
         await self._salvar(combate)
         await self._finalizar(ctx, motivo="vida", vencedor=atacante, perdedor=defensor)
         return
@@ -165,12 +161,13 @@ async def _executar_defesa_ui(self, ctx, acao, embed=None):
         return
 
 
-# O balanceamento dos monstros substitui _dano_fisico/_dano_magia e chama
-# _regras_monstro. O metodo é definido no módulo de balanceamento, mas precisa
-# estar exposto na classe Luta para esses wrappers funcionarem na UI.
+# O balanceamento chama _regras_monstro a partir dos wrappers de dano.
+# O metodo real pertence ao modulo de balanceamento; a ponte evita importar
+# o simbolo com `from ... import`, que quebra quando o balanceamento o mantem
+# como funcao interna de _patch_luta.
 def _regras_monstro_compat(self, dano, resultado, atacante, defensor):
-    from ..monstros_balanceamento import _regras_monstro
-    return _regras_monstro(self, dano, resultado, atacante, defensor)
+    from .. import monstros_balanceamento
+    return monstros_balanceamento._regras_monstro(self, dano, resultado, atacante, defensor)
 
 
 Luta._regras_monstro = _regras_monstro_compat
