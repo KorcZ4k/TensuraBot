@@ -350,7 +350,7 @@ class Luta(_LutaLegada):
         await self._mostrar_ataque_ui(combate)
 
     def _dano_fisico(self, atacante, defensor, ataque):
-        """Defesa normal: Força + Defesa; 3 pontos de defesa reduzem 1 de dano."""
+        """Defesa normal: Força + Defesa; 100 de defesa reduz 33,33% do dano."""
         if defensor.get("esquiva_ativa"):
             defensor["esquiva_ativa"] = False
             velocidade = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
@@ -367,10 +367,11 @@ class Luta(_LutaLegada):
             defensor["defesa_magica_ativa"] = False
             defensor["defesa_magica_valor"] = 0
         elif defensor.get("defesa_ativa"):
-            defesa = float(defensor.get("defesa", 0) or 0)
-            if defesa <= 0:
-                defesa = float(defensor.get("Força", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
-            dano = max(0.0, dano - defesa / 3.0)
+            forca = float(defensor.get("Força", defensor.get("forca", 0)) or 0)
+            defesa = float(defensor.get("Defesa", defensor.get("defesa", 0)) or 0)
+            defesa_total = max(0.0, forca + defesa)
+            reducao = min(1.0, defesa_total / 300.0)
+            dano *= 1.0 - reducao
         defensor["defesa_ativa"] = False
         return max(0, int(dano)), "atingiu"
 
@@ -406,7 +407,7 @@ class Luta(_LutaLegada):
                 # O stun consome o turno atual e NÃO permite que o monstro ataque.
                 combate["ui_stage"] = "result"
                 combate["ui_waiting_advance"] = True
-                await self._ui_editar(combate, painel(atacante=atacante.get("nome", "Participante"), ataque="⛓️ STUN", vida=self._vida(atacante), mana=atacante.get("mana", 0), dano=0, efeito="Stun", alvo="-", turno=combate.get("numero_turno", 1), oponente="-", vida_oponente="-", extra=f"**{atacante.get('nome', 'Participante')}** está atordoado e perde este turno.", cor=discord.Color.orange()))
+                await self._ui_editar(combate, painel(atacante=atacante.get("nome", "Participante"), ataque="stun", vida=self._vida(atacante), mana=atacante.get("mana", 0), dano=0, efeito="Stun", alvo="-", turno=combate.get("numero_turno", 1), oponente="-", vida_oponente="-", extra=f"**{atacante.get('nome', 'Participante')}** está atordoado e perde este turno.", cor=discord.Color.orange()))
                 return
             combate["ui_stage"] = "turn"
             await self._ui_editar(combate, self._embed_turno_monstro(combate) if atacante.get("tipo") == "monstro" else self._embed_aguarde_jogador(combate))
