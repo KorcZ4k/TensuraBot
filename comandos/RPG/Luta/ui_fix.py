@@ -1,23 +1,23 @@
 """Correcoes de integracao entre comandos de combate e a UI de Avancar."""
 
+import asyncio
+import traceback
+
 import discord
 
-from .sistemas_luta import Luta, _UIContext, _AvancarView
+from .sistemas_luta import Luta, _UIContext, _AvancarView, _vivo
 from .Mensagens_luta import painel
 
 
 async def _ataque_jogador_ui(self, ctx, tipo_ataque):
-    """Usa o fluxo UI em vez do metodo legado que cria mensagens separadas."""
     return await self.executar_ataque_jogador(ctx, tipo_ataque, None)
 
 
 async def _defesa_jogador_ui(self, ctx, acao):
-    """Resolve defesa/esquiva na mesma mensagem e libera o proximo Avancar."""
     return await _executar_defesa_ui(self, ctx, acao, None)
 
 
 async def _ui_editar_seguro(self, combate, embed, view=True):
-    """Edita a mensagem sem enviar attachments=[] ao Discord."""
     mensagem = combate.get("ui_message")
     if mensagem is None:
         return
@@ -36,7 +36,6 @@ async def _ui_editar_seguro(self, combate, embed, view=True):
 
 
 async def _ui_context_send_seguro(self, content=None, **kwargs):
-    """Mostra mensagens na tela unica sem corromper a maquina de estados."""
     combate = self._combate
     atacante = self._get_participante(combate, combate.get("vencedor_id")) or self._atacante(combate) or {}
     defensor = self._get_participante(combate, combate.get("perdedor_id")) or self._defensor(combate) or {}
@@ -70,8 +69,54 @@ async def _ui_context_send_seguro(self, content=None, **kwargs):
     return self._message
 
 
+async def _resolver_defesa_ui(self, ctx, combate, ataque, defensor, atacante):
+    """Resolve a defesa diretamente, sem chamar o resolver legado."""
+    if atacante is None or defensor is None:
+        raise RuntimeError("atacante ou defensor ausente")
+
+    if ataque.get("tipo") == "magia":
+        dano, resultado = self._dano_magia(atacante, defensor, ataque)
+        if resultado == "esquivou":
+            mensagem = f"💨 **{defensor.get('nome')}** esquivou da magia!"
+        else:
+            vida_antes = int(float(defensor.get("vida", 0) or 0))
+            defensor["vida"] = max(0, vida_antes - max(0, int(dano)))
+            mensagem = f"✨ **{atacante.get('nome')}** causou **{max(0, int(dano))} de dano mágico** em **{defensor.get('nome')}**."
+            efeito = self._aplicar_efeito(defensor, ataque.get("efeito"))
+            if efeito:
+                mensagem += f"\n⚠️ Efeito: **{efeito.title()}**."
+    else:
+        dano, resultado = self._dano_fisico(atacante, defensor, ataque)
+        if resultado == "esquivou":
+            mensagem = f"💨 **{defensor.get('nome')}** esquivou do ataque!"
+        else:
+            dano = max(0, int(dano))
+            vida_antes = int(float(defensor.get("vida", 0) or 0))
+            defensor["vida"] = max(0, vida_antes - dano)
+            mensagem = f"⚔️ **{atacante.get('nome')}** causou **{dano} de dano** em **{defensor.get('nome')}**."
+            efeito = self._aplicar_efeito(defensor, ataque.get("efeito"))
+            if efeito:
+                mensagem += f"\n⚠️ Efeito: **{efeito.title()}**."
+
+    defensor["defesa_ativa"] = False
+    defensor["esquiva_ativa"] = False
+    combate.setdefault("historico", []).append(mensagem)
+    combate["ataque_pendente"] = None
+    combate["fase"] = "ataque"
+
+    resultado = self._condicao_vitoria(combate)
+    if resultado and not combate.get("pvp"):
+        await self._salvar(combate)
+        await self._finalizar(ctx, motivo="vida", vencedor=atacante, perdedor=defensor)
+        return
+
+    await self._salvar(combate)
+    await asyncio.sleep(0.05)
+    await self._ui_context(ctx, combate).send(mensagem)
+
+
 async def _executar_defesa_ui(self, ctx, acao, embed=None):
-    """Fluxo deterministico da defesa, independente do callback legado."""
+    """Fluxo deterministico da defesa, sem depender do resolver legado."""
     combate = self._obter_combate(ctx.channel.id)
     if not combate or not combate.get("ativo"):
         if combate and combate.get("ui_message"):
@@ -97,25 +142,29 @@ async def _executar_defesa_ui(self, ctx, acao, embed=None):
         await ui.send(f"❌ É **{defensor.get('nome', 'outro jogador')}** quem deve defender este ataque.", _luta_error=True)
         return
 
-    # A defesa foi aceita. A partir daqui o botão Avançar não pode interferir
-    # até que o ataque seja efetivamente resolvido.
+    atacante = self._participante(combate, ataque.get("atacante_id"))
+    if not atacante or not _vivo(atacante):
+        await ui.send("❌ O atacante não está mais disponível para resolver este ataque.", _luta_error=True)
+        return
+
     defensor["defesa_ativa"] = acao == "defesa"
     defensor["esquiva_ativa"] = acao == "esquiva"
+    ataque["_resolvendo"] = True
     combate["ui_stage"] = "resolving"
     combate["ui_waiting_advance"] = False
     try:
-        await self._resolver_ataque(ui)
+        await _resolver_defesa_ui(self, ui, combate, ataque, defensor, atacante)
     except Exception as erro:
         print(f"[LUTA][DEFESA][ERRO] {type(erro).__name__}: {erro}")
+        traceback.print_exc()
         if combate.get("ativo") and combate.get("ataque_pendente") is ataque:
             ataque.pop("_resolvendo", None)
             combate["ui_stage"] = "defense_action"
             combate["ui_waiting_advance"] = False
-            await ui.send(f"❌ Erro ao resolver a defesa: `{type(erro).__name__}`.", _luta_error=True)
+            await ui.send(f"❌ Erro ao resolver a defesa: `{type(erro).__name__}: {erro}`.", _luta_error=True)
+        return
 
 
-# Os comandos publicos usam executar_*. Esta atribuicao garante que o fluxo
-# de defesa acima seja o unico caminho executado pela UI/comando !defesa.
 Luta._ataque_jogador = _ataque_jogador_ui
 Luta._defesa_jogador = _defesa_jogador_ui
 Luta.executar_defesa_jogador = _executar_defesa_ui
