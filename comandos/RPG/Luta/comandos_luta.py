@@ -6,6 +6,7 @@ esse Embed; não existe monkeypatch global de Context.send aqui.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import random
 from typing import Optional
@@ -36,14 +37,6 @@ def _vida(p: dict) -> str:
 
 def _mana(p: dict) -> str:
     return str(int(float((p or {}).get("mana", 0) or 0)))
-
-
-def _atributos(p: dict) -> str:
-    atributos = (p or {}).get("atributos_base") or (p or {}).get("atributos") or {}
-    if not atributos:
-        nomes = ("Força", "Defesa", "Vitalidade", "Velocidade", "Destreza", "Magia", "Sorte", "Inteligencia")
-        atributos = {nome: (p or {}).get(nome, (p or {}).get(nome.lower(), 0)) for nome in nomes}
-    return "\n".join(f"**{nome}:** {valor}" for nome, valor in atributos.items()) or "Sem atributos cadastrados."
 
 
 def _embed_status(*, titulo: str, atacante: dict, defensor: dict, turno: int, descricao: str, dano: int = 0, mana: int = 0, efeito: str = "Nenhum") -> discord.Embed:
@@ -120,28 +113,21 @@ async def pve(ctx, *, monstro_tipo: str = ""):
     cog = await _cog(ctx)
     if cog is None:
         return
-
     async with cog._lock(ctx.channel.id):
         if cog._combate_ativo(ctx.channel.id):
-            await ctx.send(embed=_embed_erro("PvE", "Já existe um combate ativo neste canal."))
-            return
+            await ctx.send(embed=_embed_erro("PvE", "Já existe um combate ativo neste canal.")); return
         monstro_id = cog._encontrar_monstro(monstro_tipo)
         if not monstro_id:
-            await ctx.send(embed=_embed_erro("PvE", f"Monstro `{monstro_tipo}` não encontrado. Use `!luta monstros`."))
-            return
-
+            await ctx.send(embed=_embed_erro("PvE", f"Monstro `{monstro_tipo}` não encontrado. Use `!luta monstros`.")); return
         guild_id = str(ctx.guild.id)
         user_id = str(ctx.author.id)
         verificacao = await run_db(luta_db.pode_lutar, user_id, guild_id)
         if not verificacao.get("pode"):
-            await ctx.send(embed=_embed_erro("PvE", verificacao.get("mensagem", "Você não pode lutar.")))
-            return
+            await ctx.send(embed=_embed_erro("PvE", verificacao.get("mensagem", "Você não pode lutar."))); return
         jogador = await _criar_participante(user_id, guild_id)
         if not jogador:
-            await ctx.send(embed=_embed_erro("PvE", "Você precisa ter um personagem registrado para lutar."))
-            return
+            await ctx.send(embed=_embed_erro("PvE", "Você precisa ter um personagem registrado para lutar.")); return
         jogador["nome"] = jogador.get("nome") or ctx.author.display_name
-
         reserva = await run_db(luta_db.iniciar_cooldown_monstro, user_id, guild_id, str(monstro_id))
         if not reserva.get("sucesso"):
             segundos = int(reserva.get("segundos_restantes", 0) or 0)
@@ -149,9 +135,7 @@ async def pve(ctx, *, monstro_tipo: str = ""):
             minutos = resto // 60
             restante = f"{horas}h {minutos}min" if horas else f"{max(1, minutos)}min"
             nome = luta_db.MONSTROS.get(str(monstro_id), {}).get("nome", str(monstro_id))
-            await ctx.send(embed=_embed_erro("PvE", f"Você já lutou contra **{nome}**. Tente novamente em **{restante}**."))
-            return
-
+            await ctx.send(embed=_embed_erro("PvE", f"Você já lutou contra **{nome}**. Tente novamente em **{restante}**.")); return
         fim_cooldown = reserva.get("fim")
         try:
             monstro = await run_db(luta_db.criar_monstro, str(monstro_id), 1)
@@ -160,7 +144,6 @@ async def pve(ctx, *, monstro_tipo: str = ""):
             combate = cog._novo_combate([jogador, monstro], guild_id)
             cog.combates[ctx.channel.id] = combate
             await cog._marcar_combate([jogador], guild_id, "ativo_combate")
-
             atacante = cog._obter_atacante(combate)
             defensor = cog._obter_defensor(combate)
             dados_monstro = luta_db.MONSTROS.get(str(monstro_id), {})
@@ -168,38 +151,7 @@ async def pve(ctx, *, monstro_tipo: str = ""):
             atributos = dados_monstro.get("atributos_base", {})
             atributos_texto = "\n".join(f"**{nome}:** {valor}" for nome, valor in atributos.items()) or "Sem atributos cadastrados."
             golpes = ", ".join(str(g) for g in dados_monstro.get("golpes", [])) or "Nenhum"
-
-            inicio = discord.Embed(
-                title=f"🌙 MOON TENSURA — {dados_monstro.get('emoji', '👹')} {defensor.get('nome', monstro_id)}",
-                description=(
-                    "╭────────────────────────────────────────────╮\n"
-                    "│              🌙  MOON TENSURA              │\n"
-                    "├────────────────────────────────────────────┤\n"
-                    f"│ ⋮ → 👤 | Jogador: {atacante.get('nome', ctx.author.display_name)}\n"
-                    f"│ ⋮ → 👹 | Monstro: {defensor.get('nome', monstro_id)}\n"
-                    f"│ ⋮ → ❤️ | Vida: {_vida(defensor)}\n"
-                    f"│ ⋮ → ⚔️ | Dano base: {dados_monstro.get('dano_base', 0)}\n"
-                    f"│ ⋮ → 🎚️ | Nível: {defensor.get('nivel', 1)}\n"
-                    "├────────────────────────────────────────────┤\n"
-                    "│ │ → 📊 | ATRIBUTOS DO MONSTRO                │\n"
-                    f"│ │ → 💪 | Força: {atributos.get('Força', 0)}\n"
-                    f"│ │ → 🛡️ | Defesa: {atributos.get('Defesa', 0)}\n"
-                    f"│ │ → ❤️ | Vitalidade: {atributos.get('Vitalidade', 0)}\n"
-                    f"│ │ → ⚡ | Velocidade: {atributos.get('Velocidade', 0)}\n"
-                    f"│ │ → 🎯 | Destreza: {atributos.get('Destreza', 0)}\n"
-                    f"│ │ → ✨ | Magia: {atributos.get('Magia', 0)}\n"
-                    f"│ │ → 🍀 | Sorte: {atributos.get('Sorte', 0)}\n"
-                    f"│ │ → 🧠 | Inteligencia: {atributos.get('Inteligencia', 0)}\n"
-                    "├────────────────────────────────────────────┤\n"
-                    f"│ │ → 👊 | Golpes: {golpes}\n"
-                    f"│ │ → ✨ | XP: {dados_monstro.get('xp_recompensa', 0)}\n"
-                    f"│ │ → 💰 | Hunos: {dados_monstro.get('hunos_recompensa', 0)}\n"
-                    f"│ │ → 🔷 | TP: {dados_monstro.get('tp_recompensa', 0)}\n"
-                    f"│ │ → 🔄 | Turno: {combate.get('numero_turno', 1)}\n"
-                    "╰────────────────────────────────────────────╯"
-                ),
-                color=discord.Color.red(),
-            )
+            inicio = discord.Embed(title=f"🌙 MOON TENSURA — {dados_monstro.get('emoji', '👹')} {defensor.get('nome', monstro_id)}", description=("╭────────────────────────────────────────────╮\n" "│              🌙  MOON TENSURA              │\n" "├────────────────────────────────────────────┤\n" f"│ ⋮ → 👤 | Jogador: {atacante.get('nome', ctx.author.display_name)}\n" f"│ ⋮ → 👹 | Monstro: {defensor.get('nome', monstro_id)}\n" f"│ ⋮ → ❤️ | Vida: {_vida(defensor)}\n" f"│ ⋮ → ⚔️ | Dano base: {dados_monstro.get('dano_base', 0)}\n" f"│ ⋮ → 🎚️ | Nível: {defensor.get('nivel', 1)}\n" "├────────────────────────────────────────────┤\n" "│ │ → 📊 | ATRIBUTOS DO MONSTRO                │\n" f"│ │ → 💪 | Força: {atributos.get('Força', 0)}\n" f"│ │ → 🛡️ | Defesa: {atributos.get('Defesa', 0)}\n" f"│ │ → ❤️ | Vitalidade: {atributos.get('Vitalidade', 0)}\n" f"│ │ → ⚡ | Velocidade: {atributos.get('Velocidade', 0)}\n" f"│ │ → 🎯 | Destreza: {atributos.get('Destreza', 0)}\n" f"│ │ → ✨ | Magia: {atributos.get('Magia', 0)}\n" f"│ │ → 🍀 | Sorte: {atributos.get('Sorte', 0)}\n" f"│ │ → 🧠 | Inteligencia: {atributos.get('Inteligencia', 0)}\n" "├────────────────────────────────────────────┤\n" f"│ │ → 👊 | Golpes: {golpes}\n" f"│ │ → ✨ | XP: {dados_monstro.get('xp_recompensa', 0)}\n" f"│ │ → 💰 | Hunos: {dados_monstro.get('hunos_recompensa', 0)}\n" f"│ │ → 🔷 | TP: {dados_monstro.get('tp_recompensa', 0)}\n" f"│ │ → 🔄 | Turno: {combate.get('numero_turno', 1)}\n" "╰────────────────────────────────────────────╯"), color=discord.Color.red())
             inicio.add_field(name="📊 Atributos completos", value=atributos_texto, inline=False)
             inicio.set_footer(text=FOOTER)
             arquivo = await _baixar_imagem_monstro(url)
@@ -222,38 +174,31 @@ async def pve(ctx, *, monstro_tipo: str = ""):
 
 async def pvp(ctx, membro: Optional[discord.Member] = None):
     if ctx.guild is None:
-        await ctx.send(embed=_embed_erro("PvP", "Este comando só funciona em servidor."))
-        return
+        await ctx.send(embed=_embed_erro("PvP", "Este comando só funciona em servidor.")); return
     if membro is None:
         membro = next((m for m in ctx.message.mentions if not m.bot and m.id != ctx.author.id), None)
     if membro is None or membro.bot or membro.id == ctx.author.id:
-        await ctx.send(embed=_embed_erro("PvP", "Mencione um membro válido. Exemplo: `!luta pvp @jogador`"))
-        return
+        await ctx.send(embed=_embed_erro("PvP", "Mencione um membro válido. Exemplo: `!luta pvp @jogador`")); return
     cog = await _cog(ctx)
-    if cog is None:
-        return
+    if cog is None: return
     async with cog._lock(ctx.channel.id):
         if cog._combate_ativo(ctx.channel.id):
-            await ctx.send(embed=_embed_erro("PvP", "Já existe um combate ativo neste canal."))
-            return
+            await ctx.send(embed=_embed_erro("PvP", "Já existe um combate ativo neste canal.")); return
         guild_id = str(ctx.guild.id)
         jogadores = []
         for usuario in (ctx.author, membro):
             verificacao = await run_db(luta_db.pode_lutar, str(usuario.id), guild_id)
             if not verificacao.get("pode"):
-                await ctx.send(embed=_embed_erro("PvP", f"{usuario.display_name}: {verificacao.get('mensagem', 'não pode lutar.')}"))
-                return
+                await ctx.send(embed=_embed_erro("PvP", f"{usuario.display_name}: {verificacao.get('mensagem', 'não pode lutar.')}")); return
             jogador = await _criar_participante(usuario.id, guild_id)
             if not jogador:
-                await ctx.send(embed=_embed_erro("PvP", f"{usuario.display_name} não possui personagem registrado."))
-                return
+                await ctx.send(embed=_embed_erro("PvP", f"{usuario.display_name} não possui personagem registrado.")); return
             jogador["nome"] = jogador.get("nome") or usuario.display_name
             jogadores.append(jogador)
         combate = cog._novo_combate(jogadores, guild_id, pvp=True)
         cog.combates[ctx.channel.id] = combate
         await cog._marcar_combate(jogadores, guild_id, "ativo_combate")
-        atacante = cog._obter_atacante(combate)
-        defensor = cog._obter_defensor(combate)
+        atacante = cog._obter_atacante(combate); defensor = cog._obter_defensor(combate)
         inicio = _embed_status(titulo="⚔️ PvP", atacante=atacante, defensor=defensor, turno=combate.get("numero_turno", 1), descricao="Duelo PvP iniciado.")
         cog.preparar_embed(ctx, inicio)
         await cog._mostrar_inicio(ctx)
@@ -262,10 +207,7 @@ async def pvp(ctx, membro: Optional[discord.Member] = None):
 async def soco(ctx):
     cog = await _cog(ctx)
     if cog is None: return
-    combate = cog._obter_combate(ctx.channel.id)
-    atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
-    defensor = cog._obter_defensor(combate) if combate else {"nome": "-"}
-    golpe = luta_db.GOLPES["soco"]
+    combate = cog._obter_combate(ctx.channel.id); atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}; defensor = cog._obter_defensor(combate) if combate else {"nome": "-"}; golpe = luta_db.GOLPES["soco"]
     embed = _embed_status(titulo="👊 Soco", atacante=atacante, defensor=defensor, turno=combate.get("numero_turno", 1) if combate else 1, descricao=golpe.get("descricao", "Um soco básico."), dano=int(golpe.get("dano_base", 0)), mana=int(golpe.get("custo_mana", 0)), efeito=golpe.get("efeito", "Nenhum"))
     async with cog._lock(ctx.channel.id): await cog.executar_ataque_jogador(ctx, "soco", embed=embed)
 
@@ -273,10 +215,7 @@ async def soco(ctx):
 async def chute(ctx):
     cog = await _cog(ctx)
     if cog is None: return
-    combate = cog._obter_combate(ctx.channel.id)
-    atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
-    defensor = cog._obter_defensor(combate) if combate else {"nome": "-"}
-    golpe = luta_db.GOLPES["chute"]
+    combate = cog._obter_combate(ctx.channel.id); atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}; defensor = cog._obter_defensor(combate) if combate else {"nome": "-"}; golpe = luta_db.GOLPES["chute"]
     embed = _embed_status(titulo="🦶 Chute", atacante=atacante, defensor=defensor, turno=combate.get("numero_turno", 1) if combate else 1, descricao=golpe.get("descricao", "Um chute poderoso."), dano=int(golpe.get("dano_base", 0)), mana=int(golpe.get("custo_mana", 0)), efeito=golpe.get("efeito", "Nenhum"))
     async with cog._lock(ctx.channel.id): await cog.executar_ataque_jogador(ctx, "chute", embed=embed)
 
@@ -284,10 +223,7 @@ async def chute(ctx):
 async def defesa(ctx):
     cog = await _cog(ctx)
     if cog is None: return
-    combate = cog._obter_combate(ctx.channel.id)
-    atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
-    defensor = cog._obter_defensor(combate) if combate else atacante
-    golpe = luta_db.GOLPES["defesa"]
+    combate = cog._obter_combate(ctx.channel.id); atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}; defensor = cog._obter_defensor(combate) if combate else atacante; golpe = luta_db.GOLPES["defesa"]
     embed = _embed_status(titulo="🛡️ Defesa", atacante=defensor, defensor=atacante, turno=combate.get("numero_turno", 1) if combate else 1, descricao=golpe.get("descricao", "Reduz o dano do próximo ataque."), mana=int(golpe.get("custo_mana", 0)), efeito="Redução de dano")
     async with cog._lock(ctx.channel.id): await cog.executar_defesa_jogador(ctx, "defesa", embed=embed)
 
@@ -295,10 +231,7 @@ async def defesa(ctx):
 async def esquiva(ctx):
     cog = await _cog(ctx)
     if cog is None: return
-    combate = cog._obter_combate(ctx.channel.id)
-    atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
-    defensor = cog._obter_defensor(combate) if combate else atacante
-    golpe = luta_db.GOLPES["esquiva"]
+    combate = cog._obter_combate(ctx.channel.id); atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}; defensor = cog._obter_defensor(combate) if combate else atacante; golpe = luta_db.GOLPES["esquiva"]
     embed = _embed_status(titulo="💨 Esquiva", atacante=defensor, defensor=atacante, turno=combate.get("numero_turno", 1) if combate else 1, descricao=golpe.get("descricao", "Tenta desviar do próximo ataque."), mana=int(golpe.get("custo_mana", 0)), efeito="Tentativa de esquiva")
     async with cog._lock(ctx.channel.id): await cog.executar_defesa_jogador(ctx, "esquiva", embed=embed)
 
@@ -308,27 +241,18 @@ async def fugir(ctx):
     if cog is None: return
     async with cog._lock(ctx.channel.id):
         combate = cog._obter_combate(ctx.channel.id)
-        if not combate or not combate.get("ativo"):
-            await ctx.send(embed=_embed_erro("Fuga", "Você não está em combate.")); return
+        if not combate or not combate.get("ativo"): await ctx.send(embed=_embed_erro("Fuga", "Você não está em combate.")); return
         jogador = cog._participante(combate, str(ctx.author.id))
-        if not jogador or jogador.get("tipo") != "jogador":
-            await ctx.send(embed=_embed_erro("Fuga", "Você não participa deste combate.")); return
+        if not jogador or jogador.get("tipo") != "jogador": await ctx.send(embed=_embed_erro("Fuga", "Você não participa deste combate.")); return
         fuga = discord.Embed(title="🌙 MOON TENSURA", description=f"🏃 **{jogador.get('nome')}** tenta fugir do combate.", color=discord.Color.orange())
-        if random.random() >= (0.15 if not combate.get("pvp") else 0.10):
-            fuga.description = f"❌ **{jogador.get('nome')}** não conseguiu fugir."
-            await ctx.send(embed=fuga); return
-        combate["ativo"] = False
-        await cog._salvar(combate)
-        cog.combates.pop(ctx.channel.id, None)
-        fuga.description = f"🏃 **{jogador.get('nome')}** conseguiu fugir!"
-        await ctx.send(embed=fuga)
+        if random.random() >= (0.15 if not combate.get("pvp") else 0.10): fuga.description = f"❌ **{jogador.get('nome')}** não conseguiu fugir."; await ctx.send(embed=fuga); return
+        combate["ativo"] = False; await cog._salvar(combate); cog.combates.pop(ctx.channel.id, None); fuga.description = f"🏃 **{jogador.get('nome')}** conseguiu fugir!"; await ctx.send(embed=fuga)
 
 
 async def matar(ctx):
     cog = await _cog(ctx)
     if cog is None: return
-    combate = cog._obter_combate(ctx.channel.id)
-    vencedor = cog._participante(combate, combate.get("vencedor_id")) if combate else None
+    combate = cog._obter_combate(ctx.channel.id); vencedor = cog._participante(combate, combate.get("vencedor_id")) if combate else None
     embed = discord.Embed(title="🌙 MOON TENSURA", description=f"☠️ **{vencedor.get('nome')}** escolheu finalizar o PvP com morte." if vencedor else "☠️ Finalização por morte.", color=discord.Color.dark_red())
     cog.preparar_embed(ctx, embed)
     async with cog._lock(ctx.channel.id): await cog._finalizar_pvp(ctx, "morte")
@@ -337,8 +261,7 @@ async def matar(ctx):
 async def desmaiar(ctx):
     cog = await _cog(ctx)
     if cog is None: return
-    combate = cog._obter_combate(ctx.channel.id)
-    vencedor = cog._participante(combate, combate.get("vencedor_id")) if combate else None
+    combate = cog._obter_combate(ctx.channel.id); vencedor = cog._participante(combate, combate.get("vencedor_id")) if combate else None
     embed = discord.Embed(title="🌙 MOON TENSURA", description=f"💤 **{vencedor.get('nome')}** escolheu finalizar o PvP por desmaio." if vencedor else "💤 Finalização por desmaio.", color=discord.Color.orange())
     cog.preparar_embed(ctx, embed)
     async with cog._lock(ctx.channel.id): await cog._finalizar_pvp(ctx, "desmaio")
@@ -351,17 +274,11 @@ def _comando(callback, nome, **kwargs):
 async def setup(bot):
     cog = bot.get_cog("Luta")
     if cog is None:
-        cog = Luta(bot)
-        await bot.add_cog(cog)
-    for nome in ("luta", "fight", "combate", "soco", "chute", "defesa", "defender", "def", "shield", "block", "bloquear", "bloqueio", "esquiva", "esquivar", "desviar", "dodge", "desvio", "fugir", "fuga", "escape", "escapar", "run", "matar", "desmaiar"):
-        bot.remove_command(nome)
+        cog = Luta(bot); await bot.add_cog(cog)
+    for nome in ("luta", "fight", "combate", "soco", "chute", "defesa", "defender", "def", "shield", "block", "bloquear", "bloqueio", "esquiva", "esquivar", "desviar", "dodge", "desvio", "fugir", "fuga", "escape", "escapar", "run", "matar", "desmaiar"): bot.remove_command(nome)
     grupo = commands.Group(luta, name="luta", aliases=["fight", "combate"], invoke_without_command=True, help="Sistema de combate.")
-    grupo.add_command(_comando(monstros, "monstros", help="Lista os monstros disponíveis."))
-    grupo.add_command(_comando(pve, "pve", help="Inicia um combate PvE."))
-    grupo.add_command(_comando(pvp, "pvp", help="Inicia um combate PvP."))
-    bot.add_command(grupo)
+    grupo.add_command(_comando(monstros, "monstros", help="Lista os monstros disponíveis.")); grupo.add_command(_comando(pve, "pve", help="Inicia um combate PvE.")); grupo.add_command(_comando(pvp, "pvp", help="Inicia um combate PvP.")); bot.add_command(grupo)
     comandos = ((soco, "soco", {}), (chute, "chute", {}), (defesa, "defesa", {"aliases": ["defender", "def", "shield", "block", "bloquear", "bloqueio"]}), (esquiva, "esquiva", {"aliases": ["esquivar", "desviar", "dodge", "desvio"]}), (fugir, "fugir", {"aliases": ["fuga", "escape", "escapar", "run"]}), (matar, "matar", {}), (desmaiar, "desmaiar", {}))
-    for callback, nome, opcoes in comandos:
-        bot.add_command(_comando(callback, nome, **opcoes))
+    for callback, nome, opcoes in comandos: bot.add_command(_comando(callback, nome, **opcoes))
     comando_luta = bot.get_command("luta")
     print("[LUTA][REGISTRO]", f"luta={bool(comando_luta)}", f"monstros={bool(comando_luta and comando_luta.get_command('monstros'))}", f"pve={bool(comando_luta and comando_luta.get_command('pve'))}", "arquitetura=embed-no-comando")
