@@ -149,10 +149,33 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn('kwargs["file"] = arquivo', text)
         self.assertNotIn("imagem_ataque=imagem_ataque", text)
 
-    def test_monster_turn_is_automatically_started_when_monster_is_faster(self):
+    def test_single_message_combat_ui_requires_manual_advance(self):
         text = source("comandos/RPG/Luta/sistemas_luta.py")
-        self.assertIn('if atacante.get("tipo") == "monstro":', text)
-        self.assertIn("await self._ataque_monstro(ctx)", text)
+        self.assertIn("class _AvancarView(discord.ui.View):", text)
+        self.assertIn('custom_id="luta:avancar"', text)
+        self.assertIn('label="Avançar"', text)
+        self.assertIn('combate["ui_stage"] = "attributes"', text)
+        self.assertIn('combate["ui_stage"] = "velocity"', text)
+        self.assertIn('combate["ui_stage"] = "attack"', text)
+        self.assertIn('combate["ui_stage"] = "result"', text)
+        self.assertIn('await self._proximo_turno(interaction)', text)
+        self.assertIn('await self._resolver_ataque(self._ui_context(interaction, combate))', text)
+
+    def test_single_message_ui_adapts_engine_sends_and_finalization(self):
+        text = source("comandos/RPG/Luta/sistemas_luta.py")
+        self.assertIn('async def send(self, content=None, **kwargs):', text)
+        self.assertIn('await self._message.edit(**kwargs)', text)
+        self.assertIn('ui_waiting_advance', text)
+        self.assertIn('ui_ctx = self._ui_context(ctx, combate)', text)
+        self.assertIn('await self._finalizar(ui_ctx, motivo="vida")', text)
+        self.assertIn('await self._aplicar_efeitos_inicio(ui_ctx, atacante)', text)
+
+    def test_monster_turn_is_not_auto_resolved_in_single_message_ui(self):
+        text = source("comandos/RPG/Luta/sistemas_luta.py")
+        self.assertIn('if atacante and atacante.get("tipo") == "monstro":', text)
+        self.assertIn('await self._criar_ataque_monstro_ui(combate)', text)
+        self.assertIn('elif stage == "attack":', text)
+        self.assertIn('await self._resolver_ataque(self._ui_context(interaction, combate))', text)
 
     def test_hardening_modules_remain_valid_python(self):
         for relative in (
