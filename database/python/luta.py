@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from pymongo import ReturnDocument
 
-MONSTRO_COOLDOWN_HORAS = 6
+MONSTRO_COOLDOWN_HORAS = 12
 
 
 def _carregar_golpes():
