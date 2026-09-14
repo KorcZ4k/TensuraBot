@@ -231,7 +231,7 @@ class Luta(_LutaLegada):
             descricao=f"**{atacante.get('nome')}** atacou **{defensor.get('nome')}**.",
             efeito=efeito or "Nenhum",
         )
-        url = imagem_golpe(ataque.get("tipo") or ataque.get("nome"))
+        url = imagem_golpe(ataque.get("tipo")) or imagem_golpe(ataque.get("nome"))
         if url:
             embed.set_image(url=url)
         if defensor.get("tipo") == "jogador":
@@ -251,7 +251,7 @@ class Luta(_LutaLegada):
         if embed is None:
             return
         ataque = (combate or {}).get("ataque_pendente") or {}
-        url = imagem_golpe(ataque.get("tipo") or ataque.get("nome"))
+        url = imagem_golpe(ataque.get("tipo")) or imagem_golpe(ataque.get("nome"))
         if url:
             embed.set_image(url=url)
         kwargs = {"embed": embed}
@@ -416,7 +416,8 @@ class Luta(_LutaLegada):
         await interaction.response.defer()
         async with self._lock(interaction.channel.id):
             # O estado pode ter mudado enquanto a interação aguardava o lock.
-            if not combate.get("ativo") or combate.get("ui_message") is not interaction.message:
+            mensagem_atual = combate.get("ui_message")
+            if not combate.get("ativo") or mensagem_atual is None or mensagem_atual.id != interaction.message.id:
                 return
 
             stage = combate.get("ui_stage", "attributes")
