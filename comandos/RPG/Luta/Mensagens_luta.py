@@ -24,34 +24,11 @@ IMAGENS = _carregar_imagens()
 
 
 def imagem_ataque(nome):
-    nome = str(nome or "").lower().strip()
-    if nome == "soco":
-        return IMAGENS.get("soco-luta-url")
-    elif nome == "chute":
-        return IMAGENS.get("chute-luta-url")
-    elif nome == "golpe pesado":
-        return IMAGENS.get("golpe-pesado-luta-url")
-    elif nome == "golpe rapido":
-        return IMAGENS.get("golpe-rapido-luta-url")
-    elif nome == "golpe magico":
-        return IMAGENS.get("golpe-magico-luta-url")
-    elif nome == "golpe supremo":
-        return IMAGENS.get("golpe-supremo-luta-url")
-    elif nome == "defesa":
-        return IMAGENS.get("defesa-luta-url")
-    elif nome == "esquiva":
-        return IMAGENS.get("esquiva-luta-url")
-    elif nome == "magia":
-        return IMAGENS.get("magia-luta-url")
-    elif nome == "habilidade":
-        return IMAGENS.get("habilidade-luta-url")
-    return IMAGENS.get("ataque-luta-url")
+    return None
 
 
 def imagem_monstro(monstro):
-    """Mapeamento explícito: ID do monstro -> imagem exclusiva."""
     monstro = str(monstro or "").lower().strip()
-
     if monstro == "slime":
         return IMAGENS.get("slime-luta-url")
     elif monstro == "goblin":
@@ -74,7 +51,7 @@ def imagem_monstro(monstro):
 
 
 def imagens_combate(nome_ataque, monstro=None):
-    return imagem_ataque(nome_ataque), imagem_monstro(monstro)
+    return None, imagem_monstro(monstro)
 
 
 def _imagem_monstro(oponente):
@@ -125,25 +102,19 @@ def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", ef
 
     mensagem = discord.Embed(title="🌙 MOON TENSURA", description=texto, color=cor or discord.Color.blurple(), timestamp=discord.utils.utcnow())
 
-    # Monstro sempre tem prioridade. Nunca usar imagem genérica de ataque no lugar dele.
+    # SOMENTE a imagem do monstro pode ser exibida no combate.
     url_monstro = imagem_oponente
     if url_monstro is None and isinstance(oponente, dict) and oponente.get("tipo") == "monstro":
         url_monstro = _imagem_monstro(oponente)
-
     if url_monstro:
         mensagem.set_image(url=url_monstro)
-    elif imagem_ataque:
-        mensagem.set_image(url=imagem_ataque)
 
     mensagem.set_footer(text=FOOTER)
     return mensagem
 
 
 def embed(titulo, descricao="", *, cor=None, imagem=None):
-    mensagem = painel(extra=f"{titulo}: {descricao}" if descricao else titulo, cor=cor)
-    if imagem:
-        mensagem.set_image(url=imagem)
-    return mensagem
+    return painel(extra=f"{titulo}: {descricao}" if descricao else titulo, cor=cor)
 
 
 def resultado(texto, *, status=None):
