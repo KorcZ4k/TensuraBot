@@ -79,7 +79,12 @@ def _mana(p):
 
 
 def _nome(p, padrao="-"):
-    return str((p or {}).get("nome") or padrao)
+    """Obtém nome de participante ou representa valores simples sem quebrar o embed."""
+    if isinstance(p, dict):
+        return str(p.get("nome") or padrao)
+    if p is None:
+        return str(padrao)
+    return str(p)
 
 
 def _linha(texto):
@@ -137,7 +142,7 @@ def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", ef
         f"│ │ → ✦  | Efeito: {efeito}",
         f"│ │ → 🎯 | Alvo: {alvo}",
         f"│ │ → 🔄 | Turno: {turno}",
-        "├ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┤",
+        "├ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┤",
         f"│ │ → 👹 | Oponente: {nome_oponente}",
         f"│ │ → ❤️ | Vida: {vida_oponente}",
     ]
