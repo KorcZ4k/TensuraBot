@@ -17,18 +17,12 @@ class Luta(_LutaLegada):
         return monstro_id
 
     def _id_monstro(self, defensor):
-        """Obtém o ID/nome do monstro usado por Mensagens_luta para buscar a imagem."""
+        """Obtém diretamente o ID/nome do monstro para buscar sua imagem."""
         defensor = defensor or {}
-        return (
-            defensor.get("id")
-            or defensor.get("monstro_id")
-            or defensor.get("nome")
-            if defensor.get("tipo") == "monstro"
-            else None
-        )
+        return defensor.get("id") or defensor.get("monstro_id") or defensor.get("nome")
 
     def _imagens_da_luta(self, ataque, defensor):
-        """Fluxo único: sistema -> Mensagens_luta -> URLs do Imagens.json."""
+        """Retorna somente a imagem do monstro; ataque nunca possui imagem."""
         ataque = ataque or {}
         nome_ataque = ataque.get("nome", "Ataque")
         monstro_id = self._id_monstro(defensor)
@@ -43,14 +37,16 @@ class Luta(_LutaLegada):
         atacante = self._obter_atacante(combate)
         defensor = self._obter_defensor(combate)
 
-        # No primeiro turno do PvE não existe ataque_pendente. Portanto a
-        # imagem precisa ser resolvida diretamente do participante monstro.
         if not defensor:
             defensor = next(
                 (
                     participante
                     for participante in combate.get("participantes", [])
-                    if participante.get("tipo") == "monstro"
+                    if participante.get("id")
+                    and (
+                        participante.get("tipo") == "monstro"
+                        or participante.get("monstro_id")
+                    )
                 ),
                 None,
             )
@@ -58,7 +54,10 @@ class Luta(_LutaLegada):
         if not atacante or not defensor:
             return
 
-        imagem_ataque, imagem_monstro = imagens_combate("início do combate", self._id_monstro(defensor))
+        _, imagem_monstro = imagens_combate(
+            "início do combate",
+            self._id_monstro(defensor),
+        )
         mensagem = painel(
             atacante=atacante.get("nome", "User"),
             ataque="início do combate",
@@ -71,7 +70,7 @@ class Luta(_LutaLegada):
             oponente=defensor,
             vida_oponente=f"{max(0, int(float(defensor.get('vida', 0) or 0)))}/{max(1, int(float(defensor.get('vida_maxima', defensor.get('vida', 0)) or 1)))}",
             extra="Combate PvE iniciado.",
-            imagem_ataque=imagem_ataque,
+            imagem_ataque=None,
             imagem_oponente=imagem_monstro,
         )
         await ctx.send(embed=mensagem)
@@ -87,7 +86,7 @@ class Luta(_LutaLegada):
         if not ataque or not atacante or not defensor:
             return
 
-        imagem_ataque, imagem_monstro = self._imagens_da_luta(ataque, defensor)
+        _, imagem_monstro = self._imagens_da_luta(ataque, defensor)
         mensagem = painel(
             atacante=atacante.get("nome", "User"),
             ataque=ataque.get("nome", "Ataque"),
@@ -100,7 +99,7 @@ class Luta(_LutaLegada):
             oponente=defensor,
             vida_oponente=f"{max(0, int(float(defensor.get('vida', 0) or 0)))}/{max(1, int(float(defensor.get('vida_maxima', defensor.get('vida', 0)) or 1)))}",
             extra=f"Quem deve defender: {defensor.get('nome', 'Jogador')}",
-            imagem_ataque=imagem_ataque,
+            imagem_ataque=None,
             imagem_oponente=imagem_monstro,
         )
         await ctx.send(embed=mensagem)
