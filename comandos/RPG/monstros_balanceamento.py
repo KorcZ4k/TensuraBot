@@ -76,7 +76,7 @@ def _patch_luta():
     original_efeito = Luta._aplicar_efeito
     original_proximo_turno = Luta._proximo_turno
     original_criar_ataque = Luta._criar_ataque
-    
+
     def criar_ataque_boss(self, combate, tipo, atacante, defensor, **dados):
         mid = str(atacante.get("boss_id", atacante.get("id", "")))
         if mid == "slime-rei":
@@ -250,6 +250,23 @@ def _patch_luta():
                     await ctx.send("🐉 **Fúria Dracônica:** +30% Dano, +20% Velocidade e o Sopro agora causa **4× Dano**!")
         await original_proximo_turno(self, ctx)
 
+    async def recompensar_sem_tp(self, combate):
+        resultado = self._condicao_vitoria(combate)
+        if resultado != "jogadores" or luta_db.db is None:
+            return 0, 0
+        xp = sum(int(float(p.get("xp_recompensa", 0) or 0)) for p in combate.get("participantes", []) if p.get("tipo") == "monstro")
+        hunos = sum(int(float(p.get("hunos_recompensa", 0) or 0)) for p in combate.get("participantes", []) if p.get("tipo") == "monstro")
+        vivos = [p for p in combate.get("participantes", []) if p.get("tipo") == "jogador" and _vivo(p)]
+        if not vivos:
+            return xp, hunos
+        for i, p in enumerate(vivos):
+            ganho_xp = xp // len(vivos) + (1 if i < xp % len(vivos) else 0)
+            ganho_hunos = hunos // len(vivos) + (1 if i < hunos % len(vivos) else 0)
+            filtro = {"ID": str(p.get("id")), "guild_id": str(combate.get("guild_id"))}
+            await luta_db.run_db(luta_db.db["Jogadores"].update_one, filtro, {"$inc": {"XP": ganho_xp}})
+            await luta_db.run_db(luta_db.db["Hunos"].update_one, filtro, {"$inc": {"carteira": ganho_hunos}}, upsert=True)
+        return xp, hunos
+
     Luta._criar_ataque = criar_ataque_boss
     Luta._ataque_monstro = ataque_monstro_boss
     Luta._resolver_ataque = resolver_boss
@@ -258,6 +275,7 @@ def _patch_luta():
     Luta._dano_magia = magia_boss
     Luta._aplicar_efeito = efeito_boss
     Luta._proximo_turno = proximo_turno_boss
+    Luta._recompensar = recompensar_sem_tp
 
 
 _patch_luta()
