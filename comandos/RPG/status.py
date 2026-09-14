@@ -12,10 +12,12 @@ from discord.ext import commands
 from database.python.mongodb import db, run_db
 from database.python import status_async as status_db
 from comandos.RPG.barra_status import barra_mana, barra_vida, barra_xp
+from comandos.RPG.Luta.Mensagens_luta import painel
 
 fuso = datetime.timezone(datetime.timedelta(hours=-3))
 BASE_DIR = Path(__file__).resolve().parents[2]
 RACAS_FILE = BASE_DIR / "database" / "json" / "racas.json"
+FOOTER = "Tensura Moon - Korczak Technologies!"
 
 
 def carregar_racas():
@@ -42,6 +44,27 @@ def aplicar_bonus(valor, bonus):
     return int(valor * (1 + bonus))
 
 
+def _interface_status(*, membro, titulo, extra, cor, vida="-", mana="-", efeito="Status", turno="-", oponente="-", vida_oponente="-"):
+    """Cria a mesma moldura Moon Tensura usada nas telas de combate."""
+    embed = painel(
+        atacante=membro.display_name,
+        ataque=titulo,
+        vida=vida,
+        mana=mana,
+        dano="-",
+        efeito=efeito,
+        alvo="-",
+        turno=turno,
+        oponente=oponente,
+        vida_oponente=vida_oponente,
+        extra=extra,
+        cor=cor,
+    )
+    embed.set_thumbnail(url=membro.display_avatar.url)
+    embed.set_footer(text=FOOTER)
+    return embed
+
+
 class Status(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -51,9 +74,12 @@ class Status(commands.Cog):
         membro = membro or ctx.author
         jogador = await status_db.obter_status(membro.id, ctx.guild.id)
         if jogador is None:
-            embed = discord.Embed(title="| Erro", description=f"**{membro.mention} não possui um personagem registrado.**", color=discord.Color.red(), timestamp=discord.utils.utcnow())
-            embed.set_thumbnail(url=membro.display_avatar.url)
-            embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+            embed = _interface_status(
+                membro=membro,
+                titulo="resultado",
+                extra=f"❌ {membro.mention} não possui um personagem registrado.",
+                cor=discord.Color.red(),
+            )
             await ctx.send(embed=embed)
             return
 
@@ -63,27 +89,50 @@ class Status(commands.Cog):
             "Destreza": 0, "Magia": 0, "Sorte": 0, "Vida": 0, "Vida_Maxima": 0,
             "Mana": 0, "Mana Total": 0, "inteligencia": 0, "Situação": "ativo"
         }.items()}
-        embed = discord.Embed(title="📊 Status do Personagem", color=0x8B0000 if vals["Situação"] != "morto" else discord.Color.red(), timestamp=datetime.datetime.now(fuso))
-        embed.set_thumbnail(url=membro.display_avatar.url)
+        cor = 0x8B0000 if vals["Situação"] != "morto" else discord.Color.red()
+        linhas = [
+            f"**👤 Nome:** {membro.display_name}",
+            f"**🧬 Personagem:** {vals['Nome']}",
+            f"**🧬 Raça:** {vals['Raça']}",
+            f"**📈 Nível:** {vals['Nivel']}",
+            f"**📌 Situação:** {vals['Situação']}",
+            f"**⭐ XP:** {vals['XP']}/{vals['XP_maximo']}",
+            f"**❤️ Vida:** {vals['Vida']}/{vals['Vida_Maxima']}",
+            f"**💧 Mana:** {vals['Mana']}/{vals['Mana Total']}",
+            f"**✨ Magículas:** {vals['Magiculas']}",
+            f"**✨ TP:** {vals['TP']}",
+            "",
+            "**⚔️ ATRIBUTOS**",
+            f"**Força:** {vals['Força']} | **Defesa:** {vals['Defesa']}",
+            f"**Vitalidade:** {vals['Vitalidade']} | **Velocidade:** {vals['Velocidade']}",
+            f"**Destreza:** {vals['Destreza']} | **Inteligência:** {vals['inteligencia']}",
+            f"**Magia:** {vals['Magia']} | **Sorte:** {vals['Sorte']}",
+        ]
         if vals["Situação"] == "morto":
-            embed.description = "💀 **Este personagem está morto!**"
-        embed.add_field(name="👤 Personagem", value=f"**Nome:** {vals['Nome']}\n**Raça:** {vals['Raça']}\n**Nível:** {vals['Nivel']}\n**Situação:** {vals['Situação']}", inline=False)
-        embed.add_field(name=":star: XP", value=f"{barra_xp(vals['XP'], vals['XP_maximo'])}\n**{vals['XP']}/{vals['XP_maximo']}**", inline=False)
-        embed.add_field(name="❤️ Vida", value=f"{barra_vida(vals['Vida'], vals['Vida_Maxima'])}\n**{vals['Vida']}/{vals['Vida_Maxima']}**", inline=False)
-        embed.add_field(name="💧 Mana", value=f"{barra_mana(vals['Mana'], vals['Mana Total'])}\n**{vals['Mana']}/{vals['Mana Total']}**", inline=False)
-        embed.add_field(name="✨ Magiculas", value=f"**{vals['Magiculas']}**", inline=True)
-        embed.add_field(name="✨ Pontos de Treinamento", value=f"**{vals['TP']} TP**", inline=True)
-        embed.add_field(name="⚔️ Atributos", value=(
-            f"**Força:** {vals['Força']}\n**Defesa:** {vals['Defesa']}\n**Vitalidade:** {vals['Vitalidade']}\n"
-            f"**Destreza:** {vals['Destreza']}\n**Velocidade:** {vals['Velocidade']}\n**Inteligência:** {vals['inteligencia']}\n"
-            f"**Magia:** {vals['Magia']}\n**Sorte:** {vals['Sorte']}"
-        ), inline=False)
+            linhas.insert(0, "**💀 Este personagem está morto!**")
         cd1 = await status_db.get_cooldown_recuperacao(str(membro.id), str(ctx.guild.id), "descanso")
         cd2 = await status_db.get_cooldown_recuperacao(str(membro.id), str(ctx.guild.id), "meditacao")
         fmt = lambda v: "✅ Disponível" if v == 0 else f"⏰ {int(v)}h"
-        embed.add_field(name="🔄 Recuperação", value=f"**Descanso:** {fmt(cd1)}\n**Meditação:** {fmt(cd2)}", inline=False)
-        embed.set_footer(text="Tensura Moon - Korczak Technologies!")
-        embed.set_image(url="https://media.discordapp.net/attachments/1543063886939299962/1543811582537105478/ChatGPT_Image_29_de_ago._de_2026_18_39_01.png?ex=6a96e2d3&is=6a959153&hm=400fd5cd195a8a13aa97386a0208a39b675b93e657b1b1afeeba08a4533cc335&=&format=webp&quality=lossless&width=1280&height=511")
+        linhas.extend([
+            "",
+            "**🔄 RECUPERAÇÃO**",
+            f"**Descanso:** {fmt(cd1)}",
+            f"**Meditação:** {fmt(cd2)}",
+            f"**XP visual:** {barra_xp(vals['XP'], vals['XP_maximo'])}",
+            f"**Vida visual:** {barra_vida(vals['Vida'], vals['Vida_Maxima'])}",
+            f"**Mana visual:** {barra_mana(vals['Mana'], vals['Mana Total'])}",
+        ])
+        embed = _interface_status(
+            membro=membro,
+            titulo="Status",
+            extra="\n".join(linhas),
+            cor=cor,
+            vida=f"{vals['Vida']}/{vals['Vida_Maxima']}",
+            mana=f"{vals['Mana']}/{vals['Mana Total']}",
+            efeito=vals["Situação"],
+            oponente="Ficha",
+            vida_oponente="-",
+        )
         await ctx.send(embed=embed)
 
     @commands.command(name="registrar")
@@ -92,7 +141,7 @@ class Status(commands.Cog):
         player = db["Jogadores"]
         jogador = await run_db(player.find_one, {"ID": user_id, "guild_id": guild_id})
         if jogador is None:
-            await ctx.send("❌ Você não possui uma ficha pendente. Contate um Administrador.")
+            await ctx.send(f"❌ Você não possui uma ficha pendente. Contate um Administrador.")
             return
         if jogador.get("Situação") == "ativo":
             await ctx.send("❌ Você já está registrado.")
@@ -134,7 +183,7 @@ class Status(commands.Cog):
         e.add_field(name="⚔️ Atributos", value=f"**Força:** {a['Força']}\n**Defesa:** {a['Defesa']}\n**Vitalidade:** {a['Vitalidade']}\n**Velocidade:** {a['Velocidade']}\n**Destreza:** {a['Destreza']}\n**Magia:** {a['Magia']}\n**Sorte:** {a['Sorte']}\n**Inteligência:** {a['inteligencia']}", inline=False)
         e.add_field(name="📊 Informações", value="**Nível:** 1\n**XP:** 0\n**TP:** 0", inline=False)
         e.set_thumbnail(url=ctx.author.display_avatar.url)
-        e.set_footer(text="Tensura Moon - Korczak Technologies!")
+        e.set_footer(text=FOOTER)
         await ctx.send(embed=e)
 
     @commands.command(name="desregistrar", aliases=["desregist", "dregistrar", "dregist"])
@@ -142,7 +191,7 @@ class Status(commands.Cog):
     async def desregistrar(self, ctx, membro: discord.Member = None):
         if membro is None:
             embed = discord.Embed(title="| Desregistrar", description="❌ Você precisa mencionar um jogador.\n\nUse: `!desregistrar @usuário`", color=discord.Color.red(), timestamp=discord.utils.utcnow())
-            embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+            embed.set_footer(text=FOOTER)
             await ctx.send(embed=embed)
             return
         p = db["Jogadores"]
@@ -150,51 +199,63 @@ class Status(commands.Cog):
         if j is None or j.get("Situação") != "ativo":
             embed = discord.Embed(title="| Desregistrar", description="❌ Esse jogador não possui um personagem ativo.", color=discord.Color.red(), timestamp=discord.utils.utcnow())
             embed.set_thumbnail(url=membro.display_avatar.url)
-            embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+            embed.set_footer(text=FOOTER)
             await ctx.send(embed=embed)
             return
         r = await run_db(p.update_one, {"_id": j["_id"], "Situação": "ativo"}, {"$set": {"Nome": None, "Raça": None, "Nivel": 0, "XP": 0, "XP_maximo": 0, "TP": 0, "Força": 0, "Defesa": 0, "Vitalidade": 0, "Velocidade": 0, "Destreza": 0, "Magia": 0, "Sorte": 0, "inteligencia": 0, "Magiculas": 0, "Vida": 0, "Vida_Maxima": 0, "Mana": 0, "Mana Total": 0, "Situação": "pendente", "ultimo_treino": {}, "ultima_recuperacao": {}}})
         if r.modified_count == 0:
             embed = discord.Embed(title="| Desregistrar", description="❌ Não foi possível desregistrar esse jogador.", color=discord.Color.red(), timestamp=discord.utils.utcnow())
-            embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+            embed.set_footer(text=FOOTER)
             await ctx.send(embed=embed)
             return
         embed = discord.Embed(title="| Desregistro concluído", description=f"🗑️ O personagem de **{membro.mention}** foi desregistrado com sucesso.\n\nA ficha voltou para o estado **pendente** e poderá ser registrada novamente.", color=discord.Color.orange(), timestamp=discord.utils.utcnow())
         embed.set_thumbnail(url=membro.display_avatar.url)
-        embed.set_footer(text="Tensura Moon - Korczak Technologies!")
+        embed.set_footer(text=FOOTER)
         await ctx.send(embed=embed)
 
     async def _recuperacao(self, ctx, tipo, titulo, cor, footer):
         uid, gid = str(ctx.author.id), str(ctx.guild.id)
         if await status_db.esta_morto(uid, gid):
-            await ctx.send(embed=discord.Embed(title="| Erro", description=f"❌ Você está morto. Não pode {tipo}.", color=discord.Color.red(), timestamp=discord.utils.utcnow()))
+            await ctx.send(embed=_interface_status(membro=ctx.author, titulo="resultado", extra=f"❌ Você está morto. Não pode {tipo}.", cor=discord.Color.red()))
             return
         r = await status_db.recuperar_mana(uid, gid, tipo)
         if not r["sucesso"]:
-            await ctx.send(embed=discord.Embed(title="| Erro", description=r["mensagem"], color=discord.Color.red(), timestamp=discord.utils.utcnow()))
+            await ctx.send(embed=_interface_status(membro=ctx.author, titulo="resultado", extra=f"❌ {r['mensagem']}", cor=discord.Color.red()))
             return
-        e = discord.Embed(title=titulo, description=r["mensagem"], color=cor, timestamp=discord.utils.utcnow())
-        e.add_field(name="💙 Mana Recuperada", value=f"+{r['mana_recuperada']} mana ({r['percentual']:.0f}% da mana total)", inline=True)
-        e.add_field(name="💙 Mana Atual", value=f"{r['mana_atual']}/{r['mana_maxima']}", inline=True)
-        e.add_field(name="⏰ Cooldown", value=f"{r['cooldown_horas']} horas", inline=True)
+        extra = (
+            f"**{r['mensagem']}**\n\n"
+            f"**💙 Mana Recuperada:** +{r['mana_recuperada']} ({r['percentual']:.0f}% da mana total)\n"
+            f"**💙 Mana Atual:** {r['mana_atual']}/{r['mana_maxima']}\n"
+            f"**⏰ Cooldown:** {r['cooldown_horas']} horas"
+        )
+        e = _interface_status(
+            membro=ctx.author,
+            titulo=titulo,
+            extra=extra,
+            cor=cor,
+            mana=f"{r['mana_atual']}/{r['mana_maxima']}",
+            efeito="Recuperação",
+            oponente="Mana",
+            vida_oponente="-",
+        )
         e.set_footer(text=footer)
         await ctx.send(embed=e)
 
     @commands.command(name="descanso", aliases=["desc"])
-    async def descanso(self, ctx): await self._recuperacao(ctx, "descanso", "🛌 Descanso", discord.Color.blue(), "Use !meditacao para recuperar mais mana")
+    async def descanso(self, ctx):
+        await self._recuperacao(ctx, "descanso", "🛌 Descanso", discord.Color.blue(), "Use !meditacao para recuperar mais mana")
 
     @commands.command(name="meditacao", aliases=["meditar", "med"])
-    async def meditacao(self, ctx): await self._recuperacao(ctx, "meditacao", "🧘 Meditação", discord.Color.purple(), "Use !descanso para uma recuperação mais rápida")
+    async def meditacao(self, ctx):
+        await self._recuperacao(ctx, "meditacao", "🧘 Meditação", discord.Color.purple(), "Use !descanso para uma recuperação mais rápida")
 
     @commands.command(name="recuperacao", aliases=["rec", "cooldownmana"])
     async def recuperacao(self, ctx):
         uid, gid = str(ctx.author.id), str(ctx.guild.id)
         a, b = await asyncio.gather(status_db.get_cooldown_recuperacao(uid, gid, "descanso"), status_db.get_cooldown_recuperacao(uid, gid, "meditacao"))
         fmt = lambda v: "✅ Disponível" if v == 0 else (f"⏰ {int(v*60)} minutos" if v < 1 else f"⏰ {int(v)} horas")
-        e = discord.Embed(title="⏰ Cooldowns de Recuperação", description="Tempo restante para cada comando", color=discord.Color.blue(), timestamp=discord.utils.utcnow())
-        e.add_field(name="🛌 Descanso", value=fmt(a), inline=True)
-        e.add_field(name="🧘 Meditação", value=fmt(b), inline=True)
-        e.set_footer(text="Use !descanso ou !meditacao para recuperar mana")
+        extra = f"**🛌 Descanso:** {fmt(a)}\n**🧘 Meditação:** {fmt(b)}\n\n**Use !descanso ou !meditacao para recuperar mana.**"
+        e = _interface_status(membro=ctx.author, titulo="⏰ Recuperação", extra=extra, cor=discord.Color.blue(), efeito="Cooldown", oponente="Recuperação")
         await ctx.send(embed=e)
 
 
