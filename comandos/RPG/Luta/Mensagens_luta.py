@@ -115,10 +115,13 @@ def _rotulo_acao(ataque):
 
 def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", efeito="Nenhum", alvo="-", turno="-", oponente="-", vida_oponente="-", extra="", cor=None, imagem_ataque=None, imagem_oponente=None):
     nome_oponente = _nome(oponente, str(oponente) if not isinstance(oponente, dict) else "-")
+    texto_ataque = str(ataque or "").strip()
     rotulo = _rotulo_acao(ataque)
-    if rotulo:
+    if "sua vez" in texto_ataque.casefold() or "vez do monstro" in texto_ataque.casefold():
+        linha_acao = f"│ ⋮ → 👤 | Vez de {atacante}"
+    elif rotulo:
         linha_acao = f"│ ⋮ → {rotulo}"
-    elif str(ataque).casefold().startswith("vez de"):
+    elif texto_ataque.casefold().startswith("vez de"):
         linha_acao = f"│ ⋮ → 👤 | {ataque}"
     else:
         linha_acao = f"│ ⋮ → 👤 | {atacante} atacou usando {ataque}"
