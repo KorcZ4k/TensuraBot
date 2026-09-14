@@ -62,7 +62,10 @@ def _vivo(p):
 
 def _alvos(combate, atacante):
     equipe = atacante.get("equipe")
-    return [p for p in combate.get("participantes", []) if _vivo(p) and p is not atacante and p.get("equipe") != equipe]
+    return [
+        p for p in combate.get("participantes", [])
+        if _vivo(p) and p is not atacante and p.get("equipe") != equipe
+    ]
 
 
 def _patch_luta():
@@ -84,6 +87,12 @@ def _patch_luta():
             dados["efeito"] = {"nome": "corrosao", "valor": 10, "turnos": 3}
         elif mid == "lobo-alpha":
             dados["nome"] = "🦷 Mordida Predatória"
+        elif mid == "orc-rei":
+            dados["nome"] = "🩸 Investida Predatória"
+        elif mid == "fenix":
+            efeito = dict(dados.get("efeito") or {})
+            if not efeito or str(efeito.get("nome", "")).casefold() != "queimadura":
+                dados["efeito"] = {"nome": "queimadura", "valor": 10, "turnos": 3}
         return original_criar_ataque(self, combate, tipo, atacante, defensor, **dados)
 
     async def ataque_monstro_boss(self, ctx):
@@ -99,17 +108,24 @@ def _patch_luta():
         turno = int(combate.get("numero_turno", 1))
 
         if mid == "dragao-adulto" and turno % 4 == 0:
-            total_normal = _raw_normal_damage(atacante) + float(atacante.get("dano_base", 0) or 0)
             multiplicador = 4 if estado.get("furia_draconica") else 3
+            dano_normal = (
+                float(atacante.get("Força", 0) or 0)
+                + float(atacante.get("Velocidade", 0) or 0)
+                + float(atacante.get("dano_base", 0) or 0)
+            )
+            # O motor soma Força + Velocidade + dano_base. Para obter 3x/4x
+            # sem contar os atributos duas vezes, o adicional fica no dano_base.
+            dano_base = max(0, int(dano_normal * multiplicador - (dano_normal - float(atacante.get("dano_base", 0) or 0))))
             estado["sopro_elemental"] = True
             estado["sopro_multiplicador"] = multiplicador
-            dano_base = max(0, multiplicador * total_normal - _raw_normal_damage(atacante))
             self._criar_ataque(
                 combate, "ataque_monstro", atacante, defensor,
                 nome="🔥 Sopro Elemental", dano_base=dano_base,
                 efeito={"nome": "queimadura", "valor": 10, "turnos": 3},
                 com_arma=False, area=True, area_targets=_alvos(combate, atacante),
-                multiplicador_area=multiplicador)
+                multiplicador_area=multiplicador,
+            )
             await self._anunciar_ataque(ctx)
             return
 
@@ -118,9 +134,9 @@ def _patch_luta():
             for i in range(3):
                 servo = luta_db.criar_monstro("esqueleto", 1)
                 if servo:
-                    servo["id"] = f"esqueleto-invocado-{i+1}"
+                    servo["id"] = f"esqueleto-invocado-{i + 1}"
                     servo["monstro_id"] = "esqueleto"
-                    servo["nome"] = f"Esqueleto Invocado {i+1}"
+                    servo["nome"] = f"Esqueleto Invocado {i + 1}"
                     servo["equipe"] = atacante.get("equipe", "inimigos")
                     servo["invocado"] = True
                     servo["expira_turno"] = int(combate.get("numero_turno", 1)) + 6
@@ -135,8 +151,9 @@ def _patch_luta():
         bloqueado = await original_inicio(self, ctx, participante)
         if not _vivo(participante):
             return bloqueado
+        # Chama Eterna pertence somente à Fênix normal; nenhum boss recebe essa cura.
         mid = str(participante.get("boss_id", participante.get("id", "")))
-        if mid in BOSS_IDS or mid == "fenix":
+        if mid == "fenix":
             cura = max(1, int(float(participante.get("vida_maxima", 0)) * 0.04))
             antes = float(participante.get("vida", 0))
             participante["vida"] = min(float(participante.get("vida_maxima", antes)), antes + cura)
@@ -144,48 +161,58 @@ def _patch_luta():
                 await ctx.send(f"🔥 **{participante.get('nome')}** recuperou **{int(participante['vida'] - antes)} HP** pela Chama Eterna.")
         return bloqueado
 
+    def _reset_sequencia(estado, alvo_id):
+        if estado.get("alvo_id") != alvo_id:
+            estado["alvo_id"] = alvo_id
+            estado["acertos_consecutivos"] = 0
+
     def _regras_monstro(self, dano, resultado, atacante, defensor):
-        if resultado != "atingiu" or atacante.get("tipo") != "monstro":
-            return dano, resultado
         estado = _estado(atacante)
-        alvo_id = str(defensor.get("id"))
         mid = str(atacante.get("boss_id", atacante.get("id", "")))
+        alvo_id = str(defensor.get("id"))
+
+        if atacante.get("tipo") != "monstro":
+            return dano, resultado
+
+        if resultado != "atingiu":
+            # Qualquer ataque que não acerte quebra a sequência de acertos.
+            if mid in {"goblin-rei", "lobo-alpha", "orc-rei", "cavaleiro-esqueletico"}:
+                estado["acertos_consecutivos"] = 0
+            return dano, resultado
 
         if mid == "slime-rei":
-            efeitos = defensor.setdefault("efeitos", [])
-            corrosao = next((e for e in efeitos if str(e.get("nome", "")).casefold() == "corrosao"), None)
-            if corrosao:
-                corrosao["acumulo"] = min(3, int(corrosao.get("acumulo", 1)) + 1)
-                corrosao["turnos"] = 3
-            else:
-                efeitos.append({"nome": "corrosao", "turnos": 3, "valor": 10, "acumulo": 1})
+            # A criação do golpe já aplica o efeito; aqui não duplicamos o stack.
+            pass
 
-        if mid == "goblin-rei":
-            if estado.get("alvo_id") == alvo_id:
-                estado["acertos_consecutivos"] = int(estado.get("acertos_consecutivos", 0)) + 1
-            else:
-                estado["alvo_id"] = alvo_id; estado["acertos_consecutivos"] = 1
+        elif mid == "goblin-rei":
+            _reset_sequencia(estado, alvo_id)
+            estado["acertos_consecutivos"] = int(estado.get("acertos_consecutivos", 0)) + 1
+            # O crítico preparado só é consumido no ataque seguinte ao 3º stack.
+            if estado.pop("critico_pendente", False):
+                dano = int(dano * 2)
             if estado["acertos_consecutivos"] % 3 == 0:
                 estado["acumulos"] = min(3, int(estado.get("acumulos", 0)) + 1)
                 if estado["acumulos"] >= 3:
                     estado["critico_pendente"] = True
             dano = int(dano * (1 + 0.15 * int(estado.get("acumulos", 0))))
-            if estado.pop("critico_pendente", False):
-                dano *= 2
 
         elif mid in {"lobo-alpha", "orc-rei"}:
-            if estado.get("alvo_id") == alvo_id:
-                estado["acertos_consecutivos"] = int(estado.get("acertos_consecutivos", 0)) + 1
-            else:
-                estado["alvo_id"] = alvo_id; estado["acertos_consecutivos"] = 1
-            if estado.pop("furia_alvo_pendente", False):
+            _reset_sequencia(estado, alvo_id)
+            estado["acertos_consecutivos"] = int(estado.get("acertos_consecutivos", 0)) + 1
+            if estado.pop("furia_alvo_pendente", False) and estado.get("furia_alvo_id") == alvo_id:
                 dano = int(dano * 1.50)
+                estado["furia_alvo_id"] = None
             if float(defensor.get("vida", 0) or 0) - dano <= float(defensor.get("vida_maxima", 1) or 1) * 0.30:
                 estado["furia_alvo_pendente"] = True
+                estado["furia_alvo_id"] = alvo_id
             if estado["acertos_consecutivos"] % 3 == 0:
-                self._aplicar_efeito(defensor, {"nome": "sangramento_profundo", "valor": 10, "turnos": 3, "ignora_defesa": 0.50})
+                self._aplicar_efeito(defensor, {
+                    "nome": "sangramento_profundo", "valor": 10, "turnos": 3,
+                    "ignora_defesa": 0.50,
+                })
 
         elif mid == "cavaleiro-esqueletico":
+            _reset_sequencia(estado, alvo_id)
             estado["acertos_consecutivos"] = int(estado.get("acertos_consecutivos", 0)) + 1
             if estado["acertos_consecutivos"] % 3 == 0:
                 fraturas = int(estado.setdefault("fraturas", {}).get(alvo_id, 0)) + 1
@@ -194,21 +221,38 @@ def _patch_luta():
                 if fraturas >= 3:
                     self._aplicar_efeito(defensor, {"nome": "stun", "valor": 0, "turnos": 1})
                     estado["fraturas"][alvo_id] = 0
+
         return dano, resultado
+
+    def _aplicar_corrosao(self, dano, defensor):
+        corrosao = next((e for e in defensor.get("efeitos", []) if str(e.get("nome", "")).casefold() == "corrosao"), None)
+        if not corrosao:
+            return dano
+        stacks = min(3, max(1, int(corrosao.get("acumulo", 1))))
+        return int(dano * (1 - 0.10 * stacks))
 
     def fisico_boss(self, atacante, defensor, ataque):
         dano, resultado = original_fisico(self, atacante, defensor, ataque)
         if resultado == "atingiu" and atacante.get("tipo") == "jogador":
-            corrosao = next((e for e in defensor.get("efeitos", []) if str(e.get("nome", "")).casefold() == "corrosao"), None)
-            if corrosao:
-                dano = int(dano * (1 - 0.10 * min(3, int(corrosao.get("acumulo", 1)))))
+            dano = self._aplicar_corrosao(dano, defensor)
         if resultado == "atingiu" and _eh(defensor, "dragao-adulto"):
             dano = int(dano * 0.65)
+
+        # O sopro é em área e usa o mesmo cálculo de defesa/esquiva do motor.
         if resultado == "atingiu" and ataque.get("area"):
             for alvo in ataque.get("area_targets", []):
-                if alvo is not defensor and _vivo(alvo):
-                    dano_area = max(1, int(float(atacante.get("Força", 0)) + float(atacante.get("Velocidade", 0)) + float(ataque.get("dano_base", 0) or 0)))
-                    alvo["vida"] = max(0, float(alvo.get("vida", 0)) - dano_area)
+                if alvo is defensor or not _vivo(alvo):
+                    continue
+                dano_area, resultado_area = original_fisico(self, atacante, alvo, ataque)
+                if resultado_area != "atingiu":
+                    continue
+                if _eh(atacante, "dragao-adulto") and _estado(atacante).get("furia_draconica"):
+                    dano_area = int(dano_area * 1.30)
+                alvo["vida"] = max(0, float(alvo.get("vida", 0)) - dano_area)
+                efeito = ataque.get("efeito")
+                if efeito:
+                    self._aplicar_efeito(alvo, efeito)
+
         if resultado == "atingiu" and _eh(atacante, "dragao-adulto") and _estado(atacante).get("furia_draconica"):
             dano = int(dano * 1.30)
         return self._regras_monstro(dano, resultado, atacante, defensor)
@@ -216,9 +260,7 @@ def _patch_luta():
     def magia_boss(self, atacante, defensor, ataque):
         dano, resultado = original_magia(self, atacante, defensor, ataque)
         if resultado == "atingiu" and atacante.get("tipo") == "jogador":
-            corrosao = next((e for e in defensor.get("efeitos", []) if str(e.get("nome", "")).casefold() == "corrosao"), None)
-            if corrosao:
-                dano = int(dano * (1 - 0.10 * min(3, int(corrosao.get("acumulo", 1)))))
+            dano = self._aplicar_corrosao(dano, defensor)
         if resultado == "atingiu" and _eh(defensor, "dragao-adulto"):
             dano = int(dano * 0.70)
         if resultado == "atingiu" and _eh(atacante, "dragao-adulto") and _estado(atacante).get("furia_draconica"):
@@ -230,13 +272,27 @@ def _patch_luta():
             nome = str(efeito.get("nome", efeito.get("tipo", ""))).casefold()
             if _eh(defensor, "dragao-adulto") and nome in {"stun", "paralisia", "sono", "sleep", "prisao", "prisão"} and random.random() < 0.75:
                 return None
+            if nome == "corrosao":
+                efeitos = defensor.setdefault("efeitos", [])
+                atual = next((e for e in efeitos if str(e.get("nome", "")).casefold() == "corrosao"), None)
+                if atual:
+                    atual["acumulo"] = min(3, int(atual.get("acumulo", 1)) + int(efeito.get("acumulo", 1)))
+                    atual["turnos"] = int(efeito.get("turnos", 3) or 3)
+                    return atual
+                novo = dict(efeito)
+                novo["acumulo"] = min(3, int(novo.get("acumulo", 1) or 1))
+                efeitos.append(novo)
+                return novo
         return original_efeito(self, defensor, efeito)
 
     async def proximo_turno_boss(self, ctx):
         combate = self._obter_combate(ctx.channel.id)
         if combate:
             turno_atual = int(combate.get("numero_turno", 1))
-            combate["participantes"] = [p for p in combate.get("participantes", []) if not (p.get("invocado") and turno_atual >= int(p.get("expira_turno", 10**9)))]
+            combate["participantes"] = [
+                p for p in combate.get("participantes", [])
+                if not (p.get("invocado") and turno_atual >= int(p.get("expira_turno", 10**9)))
+            ]
             for p in combate.get("participantes", []):
                 if p.get("tipo") != "monstro":
                     continue
@@ -244,7 +300,6 @@ def _patch_luta():
                 estado = _estado(p)
                 if mid == "dragao-adulto" and not estado.get("furia_draconica") and float(p.get("vida", 0) or 0) <= float(p.get("vida_maxima", 1) or 1) * 0.25:
                     estado["furia_draconica"] = True
-                    p["dano_base"] = float(p.get("dano_base", 0)) * 1.30
                     p["Velocidade"] = float(p.get("Velocidade", 0)) * 1.20
                     p["velocidade"] = p["Velocidade"]
                     await ctx.send("🐉 **Fúria Dracônica:** +30% Dano, +20% Velocidade e o Sopro agora causa **4× Dano**!")
