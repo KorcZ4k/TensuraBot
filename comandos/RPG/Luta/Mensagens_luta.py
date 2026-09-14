@@ -32,6 +32,7 @@ def _normalizar_nome(valor):
 
 
 def imagem_ataque(nome):
+    # imagem_ataque é propositalmente ignorada; ataques não exibem imagem.
     return None
 
 
