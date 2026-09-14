@@ -93,8 +93,7 @@ def _dados_painel(ctx):
         defensor = next(
             (
                 p for p in combate.get("participantes", [])
-                if p.get("tipo") == "monstro"
-                or p.get("monstro_id")
+                if p.get("tipo") == "monstro" or p.get("monstro_id")
             ),
             None,
         )
@@ -109,17 +108,17 @@ def _dados_painel(ctx):
 
 
 async def _baixar_imagem_monstro(url):
-    """Baixa a imagem definida em Imagens.json para anexá-la ao Discord.
-
-    Isso evita depender do Discord conseguir buscar novamente uma URL CDN
-    assinada no momento em que o embed é renderizado.
-    """
+    """Baixa a imagem cadastrada e a envia como anexo do próprio combate."""
     if not url or not isinstance(url, str):
         return None
     try:
-        timeout = aiohttp.ClientTimeout(total=10)
-        async with aiohttp.ClientSession(timeout=timeout) as sessao:
-            async with sessao.get(url) as resposta:
+        timeout = aiohttp.ClientTimeout(total=15, connect=5)
+        headers = {
+            "User-Agent": "TensuraBot/1.0",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        }
+        async with aiohttp.ClientSession(timeout=timeout, headers=headers) as sessao:
+            async with sessao.get(url, allow_redirects=True) as resposta:
                 if resposta.status != 200:
                     print(f"[LUTA][IMAGEM] HTTP {resposta.status} ao baixar imagem do monstro")
                     return None
@@ -127,14 +126,17 @@ async def _baixar_imagem_monstro(url):
                 if not dados:
                     print("[LUTA][IMAGEM] Imagem do monstro veio vazia")
                     return None
-                return discord.File(io.BytesIO(dados), filename="monstro.png")
+                tipo = resposta.headers.get("Content-Type", "").casefold()
+                extensao = ".webp" if "webp" in tipo else ".gif" if "gif" in tipo else ".png"
+                nome = f"monstro{extensao}"
+                return discord.File(io.BytesIO(dados), filename=nome)
     except Exception as erro:
         print(f"[LUTA][IMAGEM] Falha ao baixar imagem do monstro: {type(erro).__name__}: {erro}")
         return None
 
 
 async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
-    """Converte a saída do combate para o painel e anexa só a imagem do monstro."""
+    """Converte a saída do combate para o painel e usa somente a imagem do monstro."""
     comando_obj = getattr(self, "command", None)
     comando = getattr(comando_obj, "name", "").casefold()
     parent = getattr(getattr(comando_obj, "parent", None), "name", "").casefold()
@@ -163,12 +165,12 @@ async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
 
     monstro_id = None
     if defensor.get("tipo") == "monstro" or defensor.get("monstro_id"):
-        monstro_id = defensor.get("id") or defensor.get("monstro_id")
+        monstro_id = defensor.get("id") or defensor.get("monstro_id") or defensor.get("nome")
 
     if not monstro_id:
         monstro_id = next(
             (
-                p.get("id") or p.get("monstro_id")
+                p.get("id") or p.get("monstro_id") or p.get("nome")
                 for p in dados.get("combate", {}).get("participantes", [])
                 if p.get("tipo") == "monstro" or p.get("monstro_id")
             ),
@@ -204,11 +206,10 @@ async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
         imagem_oponente=imagem_monstro,
     )
 
-    # Nunca anexa imagem de ataque. Quando houver imagem de monstro, ela vai
-    # como arquivo e o embed aponta para attachment://monstro.png.
     arquivo = await _baixar_imagem_monstro(imagem_monstro)
     if arquivo is not None:
-        panel.set_image(url="attachment://monstro.png")
+        filename = getattr(arquivo, "filename", "monstro.png")
+        panel.set_image(url=f"attachment://{filename}")
         kwargs["file"] = arquivo
 
     return await _SEND_ORIGINAL(self, content=None, embed=panel, **kwargs)
