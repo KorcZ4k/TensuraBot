@@ -22,7 +22,6 @@ def _carregar_imagens():
         print(f"[LUTA][IMAGENS] Erro ao carregar Imagens.json: {erro}")
         return {}
 
-
 IMAGENS = _carregar_imagens()
 
 
@@ -43,15 +42,9 @@ def imagem_monstro(monstro):
     else:
         valor = monstro
     mapa = {
-        "slime": "slime-luta-url",
-        "goblin": "goblin-luta-url",
-        "lobo": "lobo-luta-url",
-        "orc": "orc-luta-url",
-        "esqueleto": "esqueleto-luta-url",
-        "dragao": "dragao-luta-url",
-        "titan": "titan-luta-url",
-        "fenix": "fenix-luta-url",
-        "demonio": "demonio-luta-url",
+        "slime": "slime-luta-url", "goblin": "goblin-luta-url", "lobo": "lobo-luta-url",
+        "orc": "orc-luta-url", "esqueleto": "esqueleto-luta-url", "dragao": "dragao-luta-url",
+        "titan": "titan-luta-url", "fenix": "fenix-luta-url", "demonio": "demonio-luta-url",
     }
     url = IMAGENS.get(mapa.get(_normalizar_nome(valor)))
     return url if isinstance(url, str) and "discord" in url.lower() else None
@@ -89,27 +82,32 @@ def _nome(p, padrao="-"):
     return str((p or {}).get("nome") or padrao)
 
 
+def _linha(texto):
+    return f"**{texto}**"
+
+
 def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", efeito="Nenhum", alvo="-", turno="-", oponente="-", vida_oponente="-", extra="", cor=None, imagem_ataque=None, imagem_oponente=None):
     nome_oponente = _nome(oponente, str(oponente) if not isinstance(oponente, dict) else "-")
-    texto = (
-        "╭────────────────────────────────────────────╮\n"
-        "│              🌙  MOON TENSURA              │\n"
-        "├────────────────────────────────────────────┤\n"
-        f"│ ⋮ → 👤 | {atacante} atacou usando {ataque}\n"
-        f"│ ⋮ → ❤️ | Vida de {atacante}: {vida}\n"
-        f"│ ⋮ → 🔷 | Mana de: {mana}\n"
-        "├────────────────────────────────────────────┤\n"
-        f"│ │ → ⚔️ | Dano: {dano}\n"
-        f"│ │ → ✦  | Efeito: {efeito}\n"
-        f"│ │ → 🎯 | Alvo: {alvo}\n"
-        f"│ │ → 🔄 | Turno: {turno}\n"
-        "├ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┤\n"
-        f"│ │ → 👹 | Oponente: {nome_oponente}\n"
-        f"│ │ → ❤️ | Vida: {vida_oponente}\n"
-    )
+    linhas = [
+        "╭────────────────────────────────────────────╮",
+        "│              🌙  MOON TENSURA              │",
+        "├────────────────────────────────────────────┤",
+        f"│ ⋮ → 👤 | {atacante} atacou usando {ataque}",
+        f"│ ⋮ → ❤️ | Vida de {atacante}: {vida}",
+        f"│ ⋮ → 🔷 | Mana de: {mana}",
+        "├────────────────────────────────────────────┤",
+        f"│ │ → ⚔️ | Dano: {dano}",
+        f"│ │ → ✦  | Efeito: {efeito}",
+        f"│ │ → 🎯 | Alvo: {alvo}",
+        f"│ │ → 🔄 | Turno: {turno}",
+        "├ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┄ ┤",
+        f"│ │ → 👹 | Oponente: {nome_oponente}",
+        f"│ │ → ❤️ | Vida: {vida_oponente}",
+    ]
     if extra:
-        texto += f"│ │ → ℹ️ | {extra}\n"
-    texto += "╰────────────────────────────────────────────╯"
+        linhas.append(f"│ │ → ℹ️ | {extra}")
+    linhas.append("╰────────────────────────────────────────────╯")
+    texto = "\n".join(_linha(linha) for linha in linhas)
     mensagem = discord.Embed(title="🌙 MOON TENSURA", description=texto, color=cor or discord.Color.blurple(), timestamp=discord.utils.utcnow())
     mensagem.set_footer(text=FOOTER)
     return mensagem
