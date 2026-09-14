@@ -32,32 +32,26 @@ def _normalizar_nome(valor):
 
 
 def imagem_ataque(nome):
-    # imagem_ataque é propositalmente ignorada; golpes usam imagem_golpe.
+    # Imagens de ataque desativadas na interface de combate.
     return None
 
 
 def imagem_monstro(monstro):
-    if isinstance(monstro, dict):
-        valor = monstro.get("id") or monstro.get("monstro_id") or monstro.get("nome")
-    else:
-        valor = monstro
-    mapa = {"slime": "slime-luta-url", "goblin": "goblin-luta-url", "lobo": "lobo-luta-url", "orc": "orc-luta-url", "esqueleto": "esqueleto-luta-url", "dragao": "dragao-luta-url", "titan": "titan-luta-url", "fenix": "fenix-luta-url", "demonio": "demonio-luta-url"}
-    url = IMAGENS.get(mapa.get(_normalizar_nome(valor)))
-    return url if isinstance(url, str) and "discord" in url.lower() else None
+    # Imagens de monstro desativadas na interface de combate.
+    return None
 
 
 def imagem_golpe(nome):
-    mapa = {"soco": "soco-luta-url", "chute": "chute-luta-url", "golpe pesado": "golpe-pesado-luta-url", "golpe rapido": "golpe-rapido-luta-url", "golpe magico": "golpe-magico-luta-url", "golpe supremo": "golpe-supremo-luta-url", "defesa": "defesa-luta-url", "esquiva": "esquiva-luta-url", "magia": "magia-luta-url", "habilidade": "habilidade-luta-url", "ataque monstro": "ataque-monstro-luta-url", "pancada": "pancada-luta-url", "investida": "investida-luta-url", "corte": "corte-luta-url", "estocada": "estocada-luta-url", "mordida": "mordida-luta-url", "arranhar": "arranhar-luta-url", "machadada": "machadada-luta-url", "esmagamento": "esmagamento-luta-url", "golpe osseo": "golpe-osseo-luta-url", "garras": "garras-luta-url", "sopro de fogo": "sopro-de-fogo-luta-url", "garra sombria": "garra-sombria-luta-url", "chama sombria": "chama-sombria-luta-url", "soco colossal": "soco-colossal-luta-url", "bicada flamejante": "bicada-flamejante-luta-url", "asas flamejantes": "asas-flamejantes-luta-url"}
-    url = IMAGENS.get(mapa.get(_normalizar_nome(nome)))
-    return url if isinstance(url, str) and "discord" in url.lower() else None
+    # Imagens de golpes desativadas na interface de combate.
+    return None
 
 
 def imagens_combate(nome_ataque, monstro=None):
-    return None, imagem_monstro(monstro)
+    return None, None
 
 
 def _imagem_monstro(oponente):
-    return imagem_monstro(oponente)
+    return None
 
 
 def _vida(p):
@@ -100,8 +94,6 @@ def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", ef
         texto += f"│ │ → ℹ️ | {extra}\n"
     texto += "╰────────────────────────────────────────────╯"
     mensagem = discord.Embed(title="🌙 MOON TENSURA", description=texto, color=cor or discord.Color.blurple(), timestamp=discord.utils.utcnow())
-    if imagem_oponente:
-        mensagem.set_image(url=imagem_oponente)
     mensagem.set_footer(text=FOOTER)
     return mensagem
 
