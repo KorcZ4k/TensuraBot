@@ -90,12 +90,12 @@ def _dados_painel(ctx):
     ataque = combate.get("ataque_pendente") or {}
     defensor = cog._participante(combate, ataque.get("defensor_id")) if ataque else cog._obter_defensor(combate)
 
-    # No início do PvE ainda não existe ataque_pendente. Nesse ponto o
-    # defensor também pode não ser retornado pelo método de alvo, então
-    # pegamos diretamente o participante marcado como monstro.
     if not defensor:
         defensor = next(
-            (p for p in combate.get("participantes", []) if p.get("tipo") == "monstro"),
+            (
+                p for p in combate.get("participantes", [])
+                if p.get("id") or p.get("monstro_id") or p.get("nome")
+            ),
             None,
         )
 
@@ -109,7 +109,7 @@ def _dados_painel(ctx):
 
 
 async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
-    """Converte a saída do combate para o painel e resolve as imagens pelo motor."""
+    """Converte a saída do combate para o painel e resolve a imagem do monstro."""
     comando = getattr(self.command, "name", "").casefold()
     parent = getattr(getattr(self.command, "parent", None), "name", "").casefold()
     if comando not in _LUTA_COMANDOS and parent not in {"luta", "fight", "combate"}:
@@ -135,18 +135,24 @@ async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
     elif comando == "esquiva":
         ataque_nome = "Esquiva"
 
-    # A imagem do monstro vem SEMPRE do ID do participante criado pelo PvE.
-    # Ex.: criar_monstro("slime") -> id="slime" -> slime-luta-url.
-    monstro_id = None
-    if defensor.get("tipo") == "monstro":
-        monstro_id = defensor.get("id")
+    # O ID do monstro é usado diretamente. Não depende de tipo="monstro".
+    monstro_id = (
+        defensor.get("id")
+        or defensor.get("monstro_id")
+        or defensor.get("nome")
+    )
     if not monstro_id:
         monstro_id = next(
-            (p.get("id") for p in dados.get("combate", {}).get("participantes", []) if p.get("tipo") == "monstro"),
+            (
+                p.get("id") or p.get("monstro_id") or p.get("nome")
+                for p in dados.get("combate", {}).get("participantes", [])
+                if p.get("id") or p.get("monstro_id") or p.get("nome")
+            ),
             None,
         )
 
-    imagem_ataque, imagem_monstro = imagens_combate(ataque_nome, monstro_id)
+    # imagem_ataque é deliberadamente ignorada pelo painel.
+    _, imagem_monstro = imagens_combate(ataque_nome, monstro_id)
 
     dano_match = re.search(r"\*\*(\d+)\s+de dano", texto, re.IGNORECASE)
     dano = dano_match.group(1) if dano_match else "-"
@@ -171,7 +177,7 @@ async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
             if defensor else "-"
         ),
         extra=texto[:500] if texto and comando not in {"soco", "chute", "defesa", "esquiva"} else "",
-        imagem_ataque=imagem_ataque,
+        imagem_ataque=None,
         imagem_oponente=imagem_monstro,
     )
     return await _SEND_ORIGINAL(self, content=None, embed=panel, **kwargs)
