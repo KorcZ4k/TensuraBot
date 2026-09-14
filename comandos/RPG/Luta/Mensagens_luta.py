@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import unicodedata
 from pathlib import Path
 
 import discord
@@ -11,95 +10,112 @@ import discord
 FOOTER = "Tensura Moon - Korczak Technologies!"
 
 
-def _normalizar(texto: object) -> str:
-    return unicodedata.normalize("NFKD", str(texto or "")).encode("ascii", "ignore").decode().casefold().strip()
-
-
-def _carregar_imagens() -> dict[str, str]:
+def _carregar_imagens():
+    caminho = Path(__file__).resolve().parents[3] / "database" / "json" / "Imagens.json"
     try:
-        caminho = Path(__file__).resolve().parents[3] / "database" / "json" / "Imagens.json"
         with caminho.open("r", encoding="utf-8") as arquivo:
             return json.load(arquivo).get("Imagens", {})
     except (OSError, ValueError, TypeError) as erro:
-        print(f"[LUTA][IMAGENS] Não foi possível carregar Imagens.json: {erro}")
+        print(f"[LUTA][IMAGENS] Erro ao carregar Imagens.json: {erro}")
         return {}
 
 
 IMAGENS = _carregar_imagens()
 
-_GOLPES_IMAGENS = {
-    "soco": "soco-luta-url", "chute": "chute-luta-url",
-    "golpe pesado": "golpe-pesado-luta-url", "golpe rapido": "golpe-rapido-luta-url",
-    "golpe magico": "golpe-magico-luta-url", "golpe supremo": "golpe-supremo-luta-url",
-    "defesa": "defesa-luta-url", "esquiva": "esquiva-luta-url", "magia": "magia-luta-url",
-    "habilidade": "habilidade-luta-url", "ataque": "ataque-luta-url",
-    "pancada": "pancada-luta-url", "investida": "investida-luta-url", "corte": "corte-luta-url",
-    "estocada": "estocada-luta-url", "mordida": "mordida-luta-url", "arranhar": "arranhar-luta-url",
-    "machadada": "machadada-luta-url", "esmagamento": "esmagamento-luta-url",
-    "golpe osseo": "golpe-osseo-luta-url", "garras": "garras-luta-url", "sopro de fogo": "sopro-de-fogo-luta-url",
-    "garra sombria": "garra-sombria-luta-url", "chama sombria": "chama-sombria-luta-url",
-    "soco colossal": "soco-colossal-luta-url", "bicada flamejante": "bicada-flamejante-luta-url",
-    "asas flamejantes": "asas-flamejantes-luta-url",
-}
 
-_MONSTROS_IMAGENS = {
-    "slime": "slime-luta-url", "goblin": "goblin-luta-url", "lobo": "lobo-luta-url",
-    "orc": "orc-luta-url", "esqueleto": "esqueleto-luta-url", "dragao": "dragao-luta-url",
-    "titan": "titan-luta-url", "fenix": "fenix-luta-url", "demonio": "demonio-luta-url",
-}
+def imagem_ataque(nome):
+    nome = str(nome or "").lower().strip()
 
-
-def imagem_ataque(nome: str) -> str | None:
-    chave = _normalizar(nome)
-    chave = chave.replace("início do combate", "ataque").replace("inicio do combate", "ataque").strip()
-    nome_imagem = _GOLPES_IMAGENS.get(chave)
-    return IMAGENS.get(nome_imagem) if nome_imagem else None
-
-
-def imagem_monstro(monstro_id: str) -> str | None:
-    """Resolve somente a imagem do monstro, pelo ID ou pelo nome recebido pelo combate."""
-    chave = _normalizar(monstro_id)
-    if not chave:
-        return None
-
-    # Primeiro tenta o ID exato.
-    nome_imagem = _MONSTROS_IMAGENS.get(chave)
-    if nome_imagem:
-        return IMAGENS.get(nome_imagem)
-
-    # Depois aceita o nome do monstro (ex.: "Slime").
-    for monstro, chave_json in _MONSTROS_IMAGENS.items():
-        if chave == monstro or chave.startswith(monstro + " "):
-            return IMAGENS.get(chave_json)
-    return None
+    if nome == "soco":
+        return IMAGENS.get("soco-luta-url")
+    elif nome == "chute":
+        return IMAGENS.get("chute-luta-url")
+    elif nome == "golpe pesado":
+        return IMAGENS.get("golpe-pesado-luta-url")
+    elif nome == "golpe rapido":
+        return IMAGENS.get("golpe-rapido-luta-url")
+    elif nome == "golpe magico":
+        return IMAGENS.get("golpe-magico-luta-url")
+    elif nome == "golpe supremo":
+        return IMAGENS.get("golpe-supremo-luta-url")
+    elif nome == "defesa":
+        return IMAGENS.get("defesa-luta-url")
+    elif nome == "esquiva":
+        return IMAGENS.get("esquiva-luta-url")
+    elif nome == "magia":
+        return IMAGENS.get("magia-luta-url")
+    elif nome == "habilidade":
+        return IMAGENS.get("habilidade-luta-url")
+    else:
+        return IMAGENS.get("ataque-luta-url")
 
 
-def imagens_combate(nome_ataque: str, monstro_id: str | None = None) -> tuple[str | None, str | None]:
-    """Único ponto de resolução: sistema -> Mensagens_luta -> URLs do Imagens.json."""
-    return imagem_ataque(nome_ataque), imagem_monstro(monstro_id or "")
+def imagem_monstro(monstro):
+    """Escolha direta: monstro -> URL correspondente no Imagens.json."""
+    monstro = str(monstro or "").lower().strip()
+
+    if monstro == "slime":
+        imagem = IMAGENS.get("slime-luta-url")
+    elif monstro == "goblin":
+        imagem = IMAGENS.get("goblin-luta-url")
+    elif monstro == "lobo":
+        imagem = IMAGENS.get("lobo-luta-url")
+    elif monstro == "orc":
+        imagem = IMAGENS.get("orc-luta-url")
+    elif monstro == "esqueleto":
+        imagem = IMAGENS.get("esqueleto-luta-url")
+    elif monstro == "dragao":
+        imagem = IMAGENS.get("dragao-luta-url")
+    elif monstro == "titan":
+        imagem = IMAGENS.get("titan-luta-url")
+    elif monstro == "fenix":
+        imagem = IMAGENS.get("fenix-luta-url")
+    elif monstro == "demonio":
+        imagem = IMAGENS.get("demonio-luta-url")
+    else:
+        imagem = None
+
+    return imagem
 
 
-def _imagem_ataque(nome: str) -> str | None:
+def imagens_combate(nome_ataque, monstro=None):
+    imagem = imagem_monstro(monstro)
+    return imagem_ataque(nome_ataque), imagem
+
+
+def _imagem_ataque(nome):
     return imagem_ataque(nome)
 
 
-def _dados_oponente(oponente) -> tuple[str, str]:
+def _imagem_monstro(oponente):
     if isinstance(oponente, dict):
-        return _normalizar(oponente.get("id", "")), str(oponente.get("nome") or oponente.get("id") or "-")
-    texto = str(oponente or "-")
-    return _normalizar(texto), texto
+        monstro = oponente.get("id") or oponente.get("monstro_id") or oponente.get("nome")
+    else:
+        monstro = oponente
+    return imagem_monstro(monstro)
 
 
-def _imagem_monstro(oponente) -> str | None:
-    if isinstance(oponente, dict):
-        if oponente.get("tipo") == "monstro":
-            return imagem_monstro(oponente.get("id") or oponente.get("nome") or "")
-        return imagem_monstro(oponente.get("id") or oponente.get("nome") or "")
-    return imagem_monstro(oponente)
+def _vida(p):
+    if not p:
+        return "-"
+    vida = int(float(p.get("vida", 0) or 0))
+    maxima = int(float(p.get("vida_maxima", vida) or vida or 1))
+    return f"{max(0, vida)}/{max(1, maxima)}"
 
 
-def painel(*, atacante: str = "User", ataque: str = "Ataque", vida: str | int = "-", mana: str | int = "-", dano: str | int = "-", efeito: str = "Nenhum", alvo: str = "-", turno: str | int = "-", oponente="-", vida_oponente: str | int = "-", extra: str = "", cor=None, imagem_ataque: str | None = None, imagem_oponente: str | None = None) -> discord.Embed:
-    _, nome_oponente = _dados_oponente(oponente)
+def _mana(p):
+    if not p:
+        return "-"
+    return str(int(float(p.get("mana", 0) or 0)))
+
+
+def _nome(p, padrao="-"):
+    return str((p or {}).get("nome") or padrao)
+
+
+def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", efeito="Nenhum", alvo="-", turno="-", oponente="-", vida_oponente="-", extra="", cor=None, imagem_ataque=None, imagem_oponente=None):
+    nome_oponente = _nome(oponente, str(oponente) if not isinstance(oponente, dict) else "-")
+
     texto = (
         "╭────────────────────────────────────────────╮\n"
         "│              🌙  MOON TENSURA              │\n"
@@ -120,15 +136,18 @@ def painel(*, atacante: str = "User", ataque: str = "Ataque", vida: str | int = 
         texto += f"│ │ → ℹ️ | {extra}\n"
     texto += "╰────────────────────────────────────────────╯"
 
-    mensagem = discord.Embed(title="🌙 MOON TENSURA", description=texto, color=cor or discord.Color.blurple(), timestamp=discord.utils.utcnow())
+    mensagem = discord.Embed(
+        title="🌙 MOON TENSURA",
+        description=texto,
+        color=cor or discord.Color.blurple(),
+        timestamp=discord.utils.utcnow(),
+    )
+
     url_ataque = imagem_ataque if imagem_ataque is not None else _imagem_ataque(ataque)
     url_monstro = imagem_oponente if imagem_oponente is not None else _imagem_monstro(oponente)
 
-    # PvE: o monstro é a imagem principal. O golpe fica no thumbnail.
     if url_monstro:
         mensagem.set_image(url=url_monstro)
-        if url_ataque:
-            mensagem.set_thumbnail(url=url_ataque)
     elif url_ataque:
         mensagem.set_image(url=url_ataque)
 
@@ -136,57 +155,39 @@ def painel(*, atacante: str = "User", ataque: str = "Ataque", vida: str | int = 
     return mensagem
 
 
-def embed(titulo: str, descricao: str = "", *, cor=None, imagem: str | None = None) -> discord.Embed:
+def embed(titulo, descricao="", *, cor=None, imagem=None):
     mensagem = painel(extra=f"{titulo}: {descricao}" if descricao else titulo, cor=cor)
     if imagem:
         mensagem.set_image(url=imagem)
     return mensagem
 
 
-def _vida(p: dict | None) -> str:
-    if not p:
-        return "-"
-    vida = int(float(p.get("vida", 0) or 0))
-    maxima = int(float(p.get("vida_maxima", vida) or vida or 1))
-    return f"{max(0, vida)}/{max(1, maxima)}"
-
-
-def _mana(p: dict | None) -> str:
-    if not p:
-        return "-"
-    return str(int(float(p.get("mana", 0) or 0)))
-
-
-def _nome(p: dict | None, padrao: str = "-") -> str:
-    return str((p or {}).get("nome") or padrao)
-
-
-def resultado(texto: str, *, status: str | None = None) -> discord.Embed:
+def resultado(texto, *, status=None):
     return painel(extra=f"Resultado: {texto}" + (f" | Status: {status}" if status else ""), cor=discord.Color.red())
 
 
-def turno(numero: int, atacante: str, defensor: str) -> discord.Embed:
+def turno(numero, atacante, defensor):
     return painel(atacante=atacante, ataque="aguardando ação", alvo=defensor, turno=numero, oponente=defensor, extra="Escolha sua ação de combate.", cor=discord.Color.green())
 
 
-def ataque(numero: int, nome_ataque: str, atacante: str, defensor: str, status: str) -> discord.Embed:
+def ataque(numero, nome_ataque, atacante, defensor, status):
     return painel(atacante=atacante, ataque=nome_ataque, alvo=defensor, turno=numero, oponente=defensor, vida_oponente=status, cor=discord.Color.orange())
 
 
-def finalizacao(descricao: str, status: str, xp: int = 0, hunos: int = 0, *, venceu: bool = False) -> discord.Embed:
+def finalizacao(descricao, status, xp=0, hunos=0, *, venceu=False):
     return painel(ataque="finalização", efeito=f"XP +{xp} | Hunos +{hunos}", turno="fim", extra=descricao, oponente="Combate encerrado", vida_oponente=status, cor=discord.Color.green() if venceu else discord.Color.red())
 
 
-def inicio(*, pvp: bool, turno: int, atacante: str, defensor: str) -> discord.Embed:
+def inicio(*, pvp, turno, atacante, defensor):
     return painel(atacante=atacante, ataque="início do combate", alvo=defensor, turno=turno, oponente=defensor, extra="Combate PvP iniciado." if pvp else "Combate PvE iniciado.", cor=discord.Color.red())
 
 
-def ordem_velocidade(participantes) -> discord.Embed:
+def ordem_velocidade(participantes):
     ordem = " | ".join(f"{i + 1}. {p.get('nome')} ({int(float(p.get('Velocidade', p.get('velocidade', 0)) or 0))})" for i, p in enumerate(participantes)) or "Nenhum participante."
     return painel(ataque="ordem de velocidade", turno=1, oponente="Todos", extra=ordem, cor=discord.Color.blurple())
 
 
-def acao(*, atacante: dict | None, defensor: dict | None, nome_ataque: str, dano=0, efeito="Nenhum", turno="-", extra="", cor=None) -> discord.Embed:
+def acao(*, atacante, defensor, nome_ataque, dano=0, efeito="Nenhum", turno="-", extra="", cor=None):
     return painel(
         atacante=_nome(atacante, "User"),
         ataque=nome_ataque,
