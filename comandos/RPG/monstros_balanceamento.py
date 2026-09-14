@@ -159,8 +159,6 @@ def _patch_luta():
             participante["vida"] = min(float(participante.get("vida_maxima", antes)), antes + cura)
             if participante["vida"] > antes:
                 await ctx.send(f"🔥 **{participante.get('nome')}** recuperou **{int(participante['vida'] - antes)} HP** pela Chama Eterna.")
-        # Sangramento Profundo é DOT próprio e ignora 50% da defesa: metade da
-        # defesa é descontada do valor bruto, em vez da defesa completa.
         efeitos = participante.get("efeitos", [])
         defesa = max(0.0, float(participante.get("defesa", 0) or 0))
         dano_profundo = 0
@@ -356,6 +354,7 @@ def _patch_luta():
             await luta_db.run_db(luta_db.db["Hunos"].update_one, filtro, {"$inc": {"carteira": ganho_hunos}}, upsert=True)
         return xp, hunos
 
+    Luta._regras_monstro = _regras_monstro
     Luta._criar_ataque = criar_ataque_boss
     Luta._ataque_monstro = ataque_monstro_boss
     Luta._resolver_ataque = resolver_boss
