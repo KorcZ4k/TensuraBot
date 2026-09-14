@@ -33,7 +33,7 @@ class Luta(_LutaLegada):
         return f"{vida}/{maxima}"
 
     def _acao_embed(self, *, atacante, defensor, nome, emoji, turno, dano, mana, descricao, efeito="Nenhum"):
-        """Fallback visual apenas para ações automáticas do motor."""
+        """Fallback visual somente para ações automáticas do motor."""
         embed = discord.Embed(title=f"{emoji} {nome}", description=descricao, color=discord.Color.blurple())
         embed.add_field(name="👤 Atacante", value=atacante.get("nome", "User"), inline=True)
         embed.add_field(name="🎯 Alvo", value=defensor.get("nome", "-"), inline=True)
@@ -45,11 +45,14 @@ class Luta(_LutaLegada):
         embed.add_field(name="👹 Vida do alvo", value=self._vida(defensor), inline=True)
         return embed
 
-    async def mostrar_ataque(self, ctx, embed):
-        """Publica exatamente o Embed criado pelo comando que foi usado."""
+    async def mostrar_ataque(self, ctx, embed, arquivo=None):
+        """Publica exatamente o Embed criado pelo comando, sem imagem de ataque."""
         if embed is None:
             return
-        await ctx.send(embed=embed)
+        kwargs = {"embed": embed}
+        if arquivo is not None:
+            kwargs["file"] = arquivo
+        await ctx.send(**kwargs)
 
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
@@ -145,7 +148,12 @@ class Luta(_LutaLegada):
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
             return
-        embed = self._embeds_acao.pop(ctx.channel.id, None)
+        preparado = self._embeds_acao.pop(ctx.channel.id, None)
+        arquivo = None
+        if isinstance(preparado, tuple):
+            embed, arquivo = preparado
+        else:
+            embed = preparado
         if embed is None:
             atacante = self._obter_atacante(combate)
             defensor = self._obter_defensor(combate)
@@ -154,21 +162,26 @@ class Luta(_LutaLegada):
                 description=f"🔔 Turno {combate.get('numero_turno', 1)}\n⚡ {atacante.get('nome')} começa contra {defensor.get('nome')}.",
                 color=discord.Color.red(),
             )
-        await ctx.send(embed=embed)
+        kwargs = {"embed": embed}
+        if arquivo is not None:
+            kwargs["file"] = arquivo
+        await ctx.send(**kwargs)
+
         atacante = self._obter_atacante(combate)
-        if atacante and atacante.get("tipo") == "monstro":
+        if atacante.get("tipo") == "monstro":
             await asyncio.sleep(0.25)
             await self._ataque_monstro(ctx)
 
     async def _finalizar_pvp(self, ctx, motivo):
         """Publica primeiro o Embed criado por !matar/!desmaiar."""
-        embed = self._embeds_acao.pop(ctx.channel.id, None)
+        preparado = self._embeds_acao.pop(ctx.channel.id, None)
+        embed = preparado[0] if isinstance(preparado, tuple) else preparado
         if embed is not None:
             await ctx.send(embed=embed)
         return await super()._finalizar_pvp(ctx, motivo)
 
-    def preparar_embed(self, ctx, embed):
-        self._embeds_acao[ctx.channel.id] = embed
+    def preparar_embed(self, ctx, embed, arquivo=None):
+        self._embeds_acao[ctx.channel.id] = (embed, arquivo) if arquivo is not None else embed
 
     async def resultado_ataque(self, ctx):
         return await self._resolver_ataque(ctx)
