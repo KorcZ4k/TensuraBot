@@ -1,7 +1,6 @@
 """Motor de combate com interface de mensagem única e navegação por Avançar."""
 from __future__ import annotations
 
-import asyncio
 import random
 
 import discord
@@ -15,10 +14,11 @@ from .Mensagens_luta import imagem_golpe, painel
 class _UIContext:
     """Adapta Context/Interaction para manter todo o combate em uma mensagem."""
 
-    def __init__(self, original, message, combate=None):
+    def __init__(self, original, message, combate=None, owner=None):
         self._original = original
         self._message = message
-        self._combate = combate
+        self._combate = combate or {}
+        self._owner = owner
 
     @property
     def author(self):
@@ -36,33 +36,27 @@ class _UIContext:
         return getattr(self._original, name)
 
     async def send(self, content=None, **kwargs):
-        """Converte resultados/erros do motor para a interface padrão."""
-        combate = self._combate or {}
+        """Converte resultados e erros do motor para a interface padrão."""
+        combate = self._combate
         atacante = self._get_participante(combate, combate.get("vencedor_id")) or self._atacante(combate) or {}
         defensor = self._get_participante(combate, combate.get("perdedor_id")) or self._defensor(combate) or {}
         embed = kwargs.get("embed")
         extra = content or ""
         if embed is not None and embed.description:
             extra = embed.description if not extra else f"{extra}\n{embed.description}"
-        if not extra:
-            extra = "Atualização do combate."
         padrao = painel(
-            atacante=atacante.get("nome", "User"),
-            ataque="resultado",
-            vida=self._vida(atacante),
-            mana=atacante.get("mana", 0),
-            dano="-",
-            efeito="Nenhum",
-            alvo=defensor.get("nome", "-"),
-            turno=combate.get("numero_turno", 1),
-            oponente=defensor,
-            vida_oponente=self._vida(defensor),
-            extra=extra,
-            cor=discord.Color.blurple(),
+            atacante=atacante.get("nome", "User"), ataque="resultado", vida=self._vida(atacante),
+            mana=atacante.get("mana", 0), dano="-", efeito="Nenhum", alvo=defensor.get("nome", "-"),
+            turno=combate.get("numero_turno", 1), oponente=defensor, vida_oponente=self._vida(defensor),
+            extra=extra or "Atualização do combate.", cor=discord.Color.blurple(),
         )
-        self._combate["ui_stage"] = "result"
-        self._combate["ui_waiting_advance"] = True
-        await self._message.edit(embed=padrao, attachments=[], view=self._view())
+        combate["ui_stage"] = "result"
+        combate["ui_waiting_advance"] = True
+        view = self._owner._ui_views.get(self._message.id) if self._owner else None
+        if view is None and self._owner:
+            view = _AvancarView(self._owner)
+            self._owner._ui_views[self._message.id] = view
+        await self._message.edit(embed=padrao, attachments=[], view=view)
         return self._message
 
     @staticmethod
@@ -92,14 +86,6 @@ class _UIContext:
         if ataque.get("defensor_id") is not None:
             return _UIContext._get_participante(combate, ataque.get("defensor_id"))
         return None
-
-    def _view(self):
-        view = _AvancarView(self._owner)
-        return view
-
-    @property
-    def _owner(self):
-        return getattr(self._combate, "_ui_owner", None) or getattr(self._original, "_ui_owner", None)
 
 
 class _AvancarView(discord.ui.View):
@@ -134,18 +120,9 @@ class Luta(_LutaLegada):
 
     def _acao_embed(self, *, atacante, defensor, nome, emoji, turno, dano, mana, descricao, efeito="Nenhum"):
         return painel(
-            atacante=atacante.get("nome", "User"),
-            ataque=f"{emoji} {nome}",
-            vida=self._vida(atacante),
-            mana=mana,
-            dano=dano,
-            efeito=efeito or "Nenhum",
-            alvo=defensor.get("nome", "-"),
-            turno=turno,
-            oponente=defensor,
-            vida_oponente=self._vida(defensor),
-            extra=descricao,
-            cor=discord.Color.blurple(),
+            atacante=atacante.get("nome", "User"), ataque=f"{emoji} {nome}", vida=self._vida(atacante), mana=mana,
+            dano=dano, efeito=efeito or "Nenhum", alvo=defensor.get("nome", "-"), turno=turno,
+            oponente=defensor, vida_oponente=self._vida(defensor), extra=descricao, cor=discord.Color.blurple(),
         )
 
     async def _ui_editar(self, combate, embed, view=True):
@@ -167,50 +144,28 @@ class Luta(_LutaLegada):
 
     def _ui_context(self, ctx, combate):
         mensagem = combate.get("ui_message")
-        return _UIContext(ctx, mensagem, combate) if mensagem is not None else ctx
+        return _UIContext(ctx, mensagem, combate, self) if mensagem is not None else ctx
 
     def _embed_velocidade(self, combate):
-        ordem = "\n".join(
-            f"{i + 1}. {p.get('nome', 'Desconhecido')} — {int(float(p.get('Velocidade', p.get('velocidade', 0)) or 0))} Vel."
-            for i, p in enumerate(combate.get("participantes", []))
-        ) or "Nenhum participante."
-        atacante = self._obter_atacante(combate)
-        return painel(
-            atacante=atacante.get("nome", "User") if atacante else "User",
-            ataque="ordem de velocidade",
-            vida=self._vida(atacante),
-            mana=atacante.get("mana", 0) if atacante else 0,
-            dano="-", efeito="-", alvo="Todos", turno=combate.get("numero_turno", 1),
-            oponente="Todos", vida_oponente="-", extra=ordem, cor=discord.Color.blurple(),
-        )
+        ordem = "\n".join(f"{i + 1}. {p.get('nome', 'Desconhecido')} — {int(float(p.get('Velocidade', p.get('velocidade', 0)) or 0))} Vel." for i, p in enumerate(combate.get("participantes", []))) or "Nenhum participante."
+        atacante = self._obter_atacante(combate) or {}
+        return painel(atacante=atacante.get("nome", "User"), ataque="ordem de velocidade", vida=self._vida(atacante), mana=atacante.get("mana", 0), dano="-", efeito="-", alvo="Todos", turno=combate.get("numero_turno", 1), oponente="Todos", vida_oponente="-", extra=ordem, cor=discord.Color.blurple())
 
     def _embed_aguarde_jogador(self, combate):
         atacante = self._obter_atacante(combate) or {}
         defensor = self._obter_defensor(combate) or {}
-        return self._acao_embed(
-            atacante=atacante, defensor=defensor, nome="Sua vez", emoji="👤",
-            turno=combate.get("numero_turno", 1), dano=0, mana=atacante.get("mana", 0),
-            descricao=f"Use `!soco` ou `!chute` para atacar **{defensor.get('nome', '-')}**.",
-        )
+        return self._acao_embed(atacante=atacante, defensor=defensor, nome="Sua vez", emoji="👤", turno=combate.get("numero_turno", 1), dano=0, mana=atacante.get("mana", 0), descricao=f"Use `!soco` ou `!chute` para atacar **{defensor.get('nome', '-')}**.")
 
     def _embed_turno_monstro(self, combate):
         atacante = self._obter_atacante(combate) or {}
         defensor = self._obter_defensor(combate) or {}
-        return self._acao_embed(
-            atacante=atacante, defensor=defensor, nome="Vez do monstro", emoji="👹",
-            turno=combate.get("numero_turno", 1), dano=0, mana=0,
-            descricao=f"**{atacante.get('nome', 'Monstro')}** está pronto para atacar.",
-        )
+        return self._acao_embed(atacante=atacante, defensor=defensor, nome="Vez do monstro", emoji="👹", turno=combate.get("numero_turno", 1), dano=0, mana=0, descricao=f"**{atacante.get('nome', 'Monstro')}** está pronto para atacar.")
 
     def _embed_defesa(self, combate):
         ataque = combate.get("ataque_pendente") or {}
         defensor = self._obter_defensor(combate) or {}
         atacante = self._participante(combate, ataque.get("atacante_id")) or {}
-        return self._acao_embed(
-            atacante=atacante, defensor=defensor, nome="Defenda-se", emoji="🛡️",
-            turno=combate.get("numero_turno", 1), dano=ataque.get("dano_base", 0), mana=0,
-            descricao=f"**{defensor.get('nome', 'Jogador')}**, use `!defesa` ou `!esquiva`.",
-        )
+        return self._acao_embed(atacante=atacante, defensor=defensor, nome="Defenda-se", emoji="🛡️", turno=combate.get("numero_turno", 1), dano=ataque.get("dano_base", 0), mana=0, descricao=f"**{defensor.get('nome', 'Jogador')}**, use `!defesa` ou `!esquiva`.")
 
     async def _mostrar_ataque_ui(self, combate):
         ataque = combate.get("ataque_pendente") or {}
@@ -221,12 +176,7 @@ class Luta(_LutaLegada):
         efeito = ataque.get("efeito") or {}
         if isinstance(efeito, dict):
             efeito = efeito.get("nome", efeito.get("tipo", "Nenhum"))
-        embed = self._acao_embed(
-            atacante=atacante, defensor=defensor, nome=ataque.get("nome", "Ataque"),
-            emoji="👹" if atacante.get("tipo") == "monstro" else "⚔️",
-            turno=combate.get("numero_turno", 1), dano=ataque.get("dano_base", 0),
-            mana=ataque.get("mana_base", 0), descricao=f"**{atacante.get('nome')}** atacou **{defensor.get('nome')}**.", efeito=efeito,
-        )
+        embed = self._acao_embed(atacante=atacante, defensor=defensor, nome=ataque.get("nome", "Ataque"), emoji="👹" if atacante.get("tipo") == "monstro" else "⚔️", turno=combate.get("numero_turno", 1), dano=ataque.get("dano_base", 0), mana=ataque.get("mana_base", 0), descricao=f"**{atacante.get('nome')}** atacou **{defensor.get('nome')}**.", efeito=efeito)
         url = imagem_golpe(ataque.get("tipo")) or imagem_golpe(ataque.get("nome"))
         if url:
             embed.set_image(url=url)
@@ -238,41 +188,49 @@ class Luta(_LutaLegada):
             await self._mostrar_ataque_ui(combate)
             combate["ui_stage"] = "attack"
             return
-        if embed is None:
-            return
-        kwargs = {"embed": embed}
-        if arquivo is not None:
-            kwargs["file"] = arquivo
-        await ctx.send(**kwargs)
+        if embed is not None:
+            kwargs = {"embed": embed}
+            if arquivo is not None:
+                kwargs["file"] = arquivo
+            await ctx.send(**kwargs)
 
     async def executar_ataque_jogador(self, ctx, tipo_ataque, embed):
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
-            await self._ui_context(ctx, combate).send("❌ Não há combate ativo.") if combate and combate.get("ui_message") else await ctx.send("❌ Não há combate ativo.")
+            if combate and combate.get("ui_message"):
+                await self._ui_context(ctx, combate).send("❌ Não há combate ativo.")
+            else:
+                await ctx.send("❌ Não há combate ativo.")
             return
+        ui = self._ui_context(ctx, combate)
         if combate.get("aguardando_finalizacao"):
-            await self._ui_context(ctx, combate).send("❌ O combate aguarda a finalização PvP.")
+            await ui.send("❌ O combate aguarda a finalização PvP.")
             return
         if combate.get("fase") != "ataque":
-            await self._ui_context(ctx, combate).send("❌ O ataque anterior ainda não foi defendido.")
+            await ui.send("❌ O ataque anterior ainda não foi defendido.")
             return
         atacante = self._obter_atacante(combate)
         defensor = self._obter_defensor(combate)
         if not atacante or not defensor:
             return
         if atacante.get("tipo") != "jogador" or str(atacante.get("id")) != str(ctx.author.id):
-            await self._ui_context(ctx, combate).send(f"❌ É a vez de **{atacante.get('nome', 'outro jogador')}**.")
+            await ui.send(f"❌ É a vez de **{atacante.get('nome', 'outro jogador')}**.")
             return
         golpe = luta_db.GOLPES.get(tipo_ataque, {})
         self._criar_ataque(combate, tipo_ataque, atacante, defensor, nome=golpe.get("nome", tipo_ataque.title()), dano_base=float(golpe.get("dano_base", 0) or 0), com_arma=bool(golpe.get("com_arma")), efeito=golpe.get("efeito", {}))
-        await self._mostrar_ataque_ui(combate) if combate.get("ui_message") else self.mostrar_ataque(ctx, embed)
         if combate.get("ui_message"):
+            await self._mostrar_ataque_ui(combate)
             combate["ui_stage"] = "attack"
+        else:
+            await self.mostrar_ataque(ctx, embed)
 
     async def executar_defesa_jogador(self, ctx, acao, embed):
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo") or combate.get("fase") != "defesa":
-            await self._ui_context(ctx, combate).send("❌ Não há ataque pendente para defender.") if combate and combate.get("ui_message") else await ctx.send("❌ Não há ataque pendente para defender.")
+            if combate and combate.get("ui_message"):
+                await self._ui_context(ctx, combate).send("❌ Não há ataque pendente para defender.")
+            else:
+                await ctx.send("❌ Não há ataque pendente para defender.")
             return
         defensor = self._obter_defensor(combate)
         if not defensor or defensor.get("tipo") != "jogador" or str(defensor.get("id")) != str(ctx.author.id):
@@ -281,7 +239,10 @@ class Luta(_LutaLegada):
             return
         defensor["defesa_ativa"] = acao == "defesa"
         defensor["esquiva_ativa"] = acao == "esquiva"
-        await self._resolver_ataque(self._ui_context(ctx, combate)) if combate.get("ui_message") else await self._resolver_ataque(ctx)
+        if combate.get("ui_message"):
+            await self._resolver_ataque(self._ui_context(ctx, combate))
+        else:
+            await self._resolver_ataque(ctx)
 
     async def _anunciar_ataque(self, ctx):
         combate = self._obter_combate(ctx.channel.id)
@@ -298,7 +259,7 @@ class Luta(_LutaLegada):
             return
         embed = self._embeds_acao.pop(ctx.channel.id, None)
         embed = embed[0] if isinstance(embed, tuple) else embed
-        await self.mostrar_ataque(ctx, embed or self._acao_embed(atacante=atacante, defensor=defensor, nome=ataque.get("nome", "Ataque"), emoji="⚔️", turno=combate.get("numero_turno", 1), dano=ataque.get("dano_base", 0), mana=0, descricao="Oponente realizou uma ação."))
+        await self.mostrar_ataque(ctx, embed)
 
     async def _mostrar_inicio(self, ctx):
         combate = self._obter_combate(ctx.channel.id)
@@ -371,8 +332,10 @@ class Luta(_LutaLegada):
                 else:
                     combate["ui_stage"] = "player_action"
                     await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
-            elif stage in {"player_action", "defense_action"}:
-                await self._ui_editar(combate, self._embed_aguarde_jogador(combate) if stage == "player_action" else self._embed_defesa(combate))
+            elif stage == "player_action":
+                await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
+            elif stage == "defense_action":
+                await self._ui_editar(combate, self._embed_defesa(combate))
 
     async def _criar_ataque_monstro_ui(self, combate):
         atacante = self._obter_atacante(combate)
@@ -387,7 +350,7 @@ class Luta(_LutaLegada):
         await self._mostrar_ataque_ui(combate)
 
     def _dano_fisico(self, atacante, defensor, ataque):
-        """Defesa normal: Força + Defesa; cada 3 pontos defendem 1 ponto de dano."""
+        """Defesa normal: Força + Defesa; 3 pontos de defesa reduzem 1 de dano."""
         if defensor.get("esquiva_ativa"):
             defensor["esquiva_ativa"] = False
             velocidade = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
@@ -407,7 +370,7 @@ class Luta(_LutaLegada):
             defesa = float(defensor.get("defesa", 0) or 0)
             if defesa <= 0:
                 defesa = float(defensor.get("Força", 0) or 0) + float(defensor.get("Defesa", 0) or 0)
-            dano = max(0.0, dano - (defesa / 3.0))
+            dano = max(0.0, dano - defesa / 3.0)
         defensor["defesa_ativa"] = False
         return max(0, int(dano)), "atingiu"
 
@@ -422,8 +385,7 @@ class Luta(_LutaLegada):
             if resultado:
                 await self._finalizar(self._ui_context(ctx, combate), motivo="vida")
                 return
-            atual = int(combate.get("turno", 0))
-            proximo = self._proximo_indice(combate, atual)
+            proximo = self._proximo_indice(combate, int(combate.get("turno", 0)))
             if proximo is None:
                 await self._finalizar(self._ui_context(ctx, combate), motivo="vida")
                 return
@@ -441,17 +403,10 @@ class Luta(_LutaLegada):
                 await self._finalizar(ui_ctx, motivo="efeitos")
                 return
             if bloqueado:
-                # O participante atordoado perde este turno. A próxima tela já aponta para o próximo vivo.
+                # O stun consome o turno atual e NÃO permite que o monstro ataque.
                 combate["ui_stage"] = "result"
                 combate["ui_waiting_advance"] = True
-                await self._ui_editar(combate, painel(
-                    atacante=atacante.get("nome", "Participante"), ataque="STUN",
-                    vida=self._vida(atacante), mana=atacante.get("mana", 0), dano=0,
-                    efeito="Stun", alvo="-", turno=combate.get("numero_turno", 1),
-                    oponente="-", vida_oponente="-",
-                    extra=f"⛓️ **{atacante.get('nome', 'Participante')}** está atordoado e perde este turno.",
-                    cor=discord.Color.orange(),
-                ))
+                await self._ui_editar(combate, painel(atacante=atacante.get("nome", "Participante"), ataque="⛓️ STUN", vida=self._vida(atacante), mana=atacante.get("mana", 0), dano=0, efeito="Stun", alvo="-", turno=combate.get("numero_turno", 1), oponente="-", vida_oponente="-", extra=f"**{atacante.get('nome', 'Participante')}** está atordoado e perde este turno.", cor=discord.Color.orange()))
                 return
             combate["ui_stage"] = "turn"
             await self._ui_editar(combate, self._embed_turno_monstro(combate) if atacante.get("tipo") == "monstro" else self._embed_aguarde_jogador(combate))
