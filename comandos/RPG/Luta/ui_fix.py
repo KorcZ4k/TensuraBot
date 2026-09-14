@@ -162,24 +162,16 @@ async def _executar_defesa_ui(self, ctx, acao, embed=None):
 
 
 async def _criar_ataque_monstro_ui_seguro(self, combate):
-    """Usa o mesmo caminho de ataque do motor/balanceamento na UI.
-
-    O fluxo antigo recriava o golpe diretamente e, por isso, pulava
-    _ataque_monstro do balanceamento: bosses perdiam habilidades especiais.
-    """
+    """Usa o caminho real do motor para não pular habilidades de boss."""
     atacante = self._obter_atacante(combate)
     defensor = self._obter_defensor(combate)
     if not atacante or atacante.get("tipo") != "monstro" or not defensor:
         return
-    await self._ataque_monstro(self._ui_context(self._ui_context_original(combate), combate))
-
-
-def _ui_context_original(self, combate):
-    """Recupera um objeto adequado para o _UIContext sem depender de ctx global."""
     mensagem = combate.get("ui_message")
     if mensagem is None:
-        return self.bot
-    return mensagem
+        return
+    ui_ctx = _UIContext(mensagem, mensagem, combate, self)
+    await self._ataque_monstro(ui_ctx)
 
 
 # O balanceamento chama _regras_monstro a partir dos wrappers de dano.
