@@ -17,10 +17,12 @@ class Luta(_LutaLegada):
         return monstro_id
 
     def _id_monstro(self, defensor):
-        """Obtém diretamente o ID/nome do monstro para buscar sua imagem."""
+        """Obtém o ID canônico do monstro para buscar sua imagem."""
         defensor = defensor or {}
-        if defensor.get("tipo") == "monstro" or defensor.get("monstro_id"):
+        if defensor.get("tipo") == "monstro":
             return defensor.get("id") or defensor.get("monstro_id") or defensor.get("nome")
+        if defensor.get("monstro_id"):
+            return defensor.get("monstro_id")
         return None
 
     def _imagens_da_luta(self, ataque, defensor):
@@ -30,32 +32,31 @@ class Luta(_LutaLegada):
         monstro_id = self._id_monstro(defensor)
         return imagens_combate(nome_ataque, monstro_id)
 
+    def _defensor_monstro(self, combate):
+        return next(
+            (
+                participante
+                for participante in combate.get("participantes", [])
+                if participante.get("tipo") == "monstro" or participante.get("monstro_id")
+            ),
+            None,
+        )
+
     async def _mostrar_inicio(self, ctx):
-        """Mostra o início e, se o monstro tiver a maior velocidade, executa seu ataque."""
+        """Mostra o início e faz o monstro agir imediatamente quando ele começa."""
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
             return
 
         atacante = self._obter_atacante(combate)
         defensor = self._obter_defensor(combate)
-
         if not defensor:
-            defensor = next(
-                (
-                    participante
-                    for participante in combate.get("participantes", [])
-                    if participante.get("tipo") == "monstro" or participante.get("monstro_id")
-                ),
-                None,
-            )
-
+            defensor = self._defensor_monstro(combate)
         if not atacante or not defensor:
+            print("[LUTA][INICIO][ERRO] Atacante ou defensor não encontrado.")
             return
 
-        _, imagem_monstro = imagens_combate(
-            "início do combate",
-            self._id_monstro(defensor),
-        )
+        _, imagem_monstro = imagens_combate("início do combate", self._id_monstro(defensor))
         mensagem = painel(
             atacante=atacante.get("nome", "User"),
             ataque="início do combate",
@@ -73,8 +74,6 @@ class Luta(_LutaLegada):
         )
         await ctx.send(embed=mensagem)
 
-        # Se o monstro começa pela velocidade, ele precisa agir imediatamente.
-        # Antes disso o combate ficava parado porque o jogador não podia atacar.
         if atacante.get("tipo") == "monstro":
             await asyncio.sleep(0.25)
             await self._ataque_monstro(ctx)
