@@ -19,7 +19,9 @@ class Luta(_LutaLegada):
     def _id_monstro(self, defensor):
         """Obtém diretamente o ID/nome do monstro para buscar sua imagem."""
         defensor = defensor or {}
-        return defensor.get("id") or defensor.get("monstro_id") or defensor.get("nome")
+        if defensor.get("tipo") == "monstro" or defensor.get("monstro_id"):
+            return defensor.get("id") or defensor.get("monstro_id") or defensor.get("nome")
+        return None
 
     def _imagens_da_luta(self, ataque, defensor):
         """Retorna somente a imagem do monstro; ataque nunca possui imagem."""
@@ -29,7 +31,7 @@ class Luta(_LutaLegada):
         return imagens_combate(nome_ataque, monstro_id)
 
     async def _mostrar_inicio(self, ctx):
-        """Mostra o início do combate já com a imagem do monstro resolvida."""
+        """Mostra o início e, se o monstro tiver a maior velocidade, executa seu ataque."""
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
             return
@@ -42,11 +44,7 @@ class Luta(_LutaLegada):
                 (
                     participante
                     for participante in combate.get("participantes", [])
-                    if participante.get("id")
-                    and (
-                        participante.get("tipo") == "monstro"
-                        or participante.get("monstro_id")
-                    )
+                    if participante.get("tipo") == "monstro" or participante.get("monstro_id")
                 ),
                 None,
             )
@@ -69,11 +67,17 @@ class Luta(_LutaLegada):
             turno=combate.get("numero_turno", 1),
             oponente=defensor,
             vida_oponente=f"{max(0, int(float(defensor.get('vida', 0) or 0)))}/{max(1, int(float(defensor.get('vida_maxima', defensor.get('vida', 0)) or 1)))}",
-            extra="Combate PvE iniciado.",
+            extra="Combate PvP iniciado." if combate.get("pvp") else "Combate PvE iniciado.",
             imagem_ataque=None,
             imagem_oponente=imagem_monstro,
         )
         await ctx.send(embed=mensagem)
+
+        # Se o monstro começa pela velocidade, ele precisa agir imediatamente.
+        # Antes disso o combate ficava parado porque o jogador não podia atacar.
+        if atacante.get("tipo") == "monstro":
+            await asyncio.sleep(0.25)
+            await self._ataque_monstro(ctx)
 
     async def _anunciar_ataque(self, ctx):
         combate = self._obter_combate(ctx.channel.id)
