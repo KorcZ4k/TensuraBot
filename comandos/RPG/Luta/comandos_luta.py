@@ -85,9 +85,20 @@ def _dados_painel(ctx):
     combate = cog._obter_combate(ctx.channel.id) if cog else None
     if not combate:
         return {}
+
     atacante = cog._obter_atacante(combate)
     ataque = combate.get("ataque_pendente") or {}
     defensor = cog._participante(combate, ataque.get("defensor_id")) if ataque else cog._obter_defensor(combate)
+
+    # No início do PvE ainda não existe ataque_pendente. Nesse ponto o
+    # defensor também pode não ser retornado pelo método de alvo, então
+    # pegamos diretamente o participante marcado como monstro.
+    if not defensor:
+        defensor = next(
+            (p for p in combate.get("participantes", []) if p.get("tipo") == "monstro"),
+            None,
+        )
+
     return {
         "combate": combate,
         "atacante": atacante,
@@ -124,9 +135,17 @@ async def _send_interface_luta(self, content=None, *, embed=None, **kwargs):
     elif comando == "esquiva":
         ataque_nome = "Esquiva"
 
-    # A imagem é resolvida exclusivamente por Mensagens_luta.
-    # Para monstros, usamos o ID real do participante (ex.: slime, goblin, lobo).
-    monstro_id = defensor.get("id") if defensor.get("tipo") == "monstro" else None
+    # A imagem do monstro vem SEMPRE do ID do participante criado pelo PvE.
+    # Ex.: criar_monstro("slime") -> id="slime" -> slime-luta-url.
+    monstro_id = None
+    if defensor.get("tipo") == "monstro":
+        monstro_id = defensor.get("id")
+    if not monstro_id:
+        monstro_id = next(
+            (p.get("id") for p in dados.get("combate", {}).get("participantes", []) if p.get("tipo") == "monstro"),
+            None,
+        )
+
     imagem_ataque, imagem_monstro = imagens_combate(ataque_nome, monstro_id)
 
     dano_match = re.search(r"\*\*(\d+)\s+de dano", texto, re.IGNORECASE)
