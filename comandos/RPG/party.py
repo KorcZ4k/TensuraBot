@@ -1,10 +1,12 @@
+import asyncio
 import time
 
 import discord
 from discord.ext import commands
 
 from database.python.luta_async import pode_lutar, atualizar_situacao
-from database.python.luta import criar_monstro
+from database.python.mongodb import run_db
+from database.python import luta as luta_db
 from . import luta as luta_mod
 
 
@@ -134,7 +136,6 @@ class PartyCombate(commands.Cog):
             self.convites.pop(convite_id, None)
             await ctx.send("❌ Esta party não existe mais.")
             return
-        # Não consome o convite quando a party está temporariamente bloqueada.
         if self._party_em_combate(party_id):
             await ctx.send("❌ Esta party está em combate e não pode ser alterada agora. Tente novamente quando o combate terminar.")
             return
@@ -211,77 +212,82 @@ class PartyCombate(commands.Cog):
     @commands.command(name="luta_party", aliases=["party_luta", "partyfight"])
     @commands.guild_only()
     async def luta_party(self, ctx, monstro_tipo: str):
-        party_id, party = self._party_do_usuario(ctx.guild.id, ctx.author.id)
-        if not party:
-            await ctx.send("❌ Você precisa estar em uma party para iniciar uma luta em grupo.")
-            return
-        if party["lider_id"] != str(ctx.author.id):
-            await ctx.send("❌ Apenas o líder da party pode iniciar a luta.")
-            return
-        if self._party_em_combate(party_id):
-            await ctx.send("❌ Esta party já está em combate.")
-            return
         luta_cog = self.bot.get_cog("Luta")
         if not luta_cog:
             await ctx.send("❌ O sistema principal de luta não está carregado.")
             return
-        if luta_cog._combate_ativo(ctx.channel.id):
-            await ctx.send("❌ Já existe um combate ativo neste canal.")
-            return
-        monstro_id = luta_cog._encontrar_monstro(monstro_tipo)
-        if not monstro_id:
-            await ctx.send(f"❌ Monstro `{monstro_tipo}` não encontrado.")
-            return
-        guild_id = str(ctx.guild.id)
-        participantes = []
-        for membro_id in list(party["membros"]):
-            membro = ctx.guild.get_member(int(membro_id))
-            if membro is None or membro.bot:
-                await ctx.send(f"❌ O membro <@{membro_id}> não está disponível no servidor.")
+
+        async with luta_cog._lock(ctx.channel.id):
+            party_id, party = self._party_do_usuario(ctx.guild.id, ctx.author.id)
+            if not party:
+                await ctx.send("❌ Você precisa estar em uma party para iniciar uma luta em grupo.")
                 return
-            verificacao = await pode_lutar(str(membro_id), guild_id)
-            if not verificacao.get("pode", False):
-                await ctx.send(f"❌ <@{membro_id}> não pode participar: {verificacao.get('mensagem', 'indisponível')}")
+            if party["lider_id"] != str(ctx.author.id):
+                await ctx.send("❌ Apenas o líder da party pode iniciar a luta.")
                 return
-            jogador = await luta_mod._criar_participante(str(membro_id), guild_id)
-            if not jogador:
-                await ctx.send(f"❌ <@{membro_id}> não possui personagem registrado.")
+            if self._party_em_combate(party_id):
+                await ctx.send("❌ Esta party já está em combate.")
                 return
-            jogador["nome"] = jogador.get("nome") or membro.display_name
-            jogador["equipe"] = "jogadores"
-            jogador["vida"] = max(0, int(jogador.get("vida", 0) or 0))
-            if jogador["vida"] <= 0:
-                await ctx.send(f"❌ <@{membro_id}> está sem vida para participar do combate.")
+            if luta_cog._combate_ativo(ctx.channel.id):
+                await ctx.send("❌ Já existe um combate ativo neste canal.")
                 return
-            participantes.append(jogador)
-        monstro = criar_monstro(monstro_id, 1)
-        if not monstro:
-            await ctx.send("❌ Não foi possível criar esse monstro.")
-            return
-        monstro["equipe"] = "inimigos"
-        participantes.append(monstro)
-        participantes.sort(key=lambda p: p.get("Velocidade", p.get("velocidade", 0)), reverse=True)
-        luta_cog.combates[ctx.channel.id] = {
-            "participantes": participantes,
-            "turno": 0,
-            "numero_turno": 1,
-            "fase": "ataque",
-            "ativo": True,
-            "pvp": False,
-            "party": True,
-            "party_id": party_id,
-            "guild_id": guild_id,
-            "ataque_pendente": None,
-            "historico": [],
-            "aguardando_finalizacao": False,
-            "vencedor_id": None,
-            "perdedor_id": None,
-        }
-        for jogador in participantes:
-            if jogador.get("tipo") == "jogador":
-                await atualizar_situacao(jogador["id"], guild_id, "ativo_combate")
-        await ctx.send(f"⚔️ A party com **{len(party['membros'])} membro(s)** iniciou uma luta contra **{monstro.get('nome', monstro_id)}**!")
-        await luta_cog._mostrar_inicio(ctx)
+            monstro_id = luta_cog._encontrar_monstro(monstro_tipo)
+            if not monstro_id:
+                await ctx.send(f"❌ Monstro `{monstro_tipo}` não encontrado.")
+                return
+
+            guild_id = str(ctx.guild.id)
+            participantes = []
+            for membro_id in list(party["membros"]):
+                membro = ctx.guild.get_member(int(membro_id))
+                if membro is None or membro.bot:
+                    await ctx.send(f"❌ O membro <@{membro_id}> não está disponível no servidor.")
+                    return
+                verificacao = await pode_lutar(str(membro_id), guild_id)
+                if not verificacao.get("pode", False):
+                    await ctx.send(f"❌ <@{membro_id}> não pode participar: {verificacao.get('mensagem', 'indisponível')}")
+                    return
+                jogador = await luta_mod._criar_participante(str(membro_id), guild_id)
+                if not jogador:
+                    await ctx.send(f"❌ <@{membro_id}> não possui personagem registrado.")
+                    return
+                jogador["nome"] = jogador.get("nome") or membro.display_name
+                jogador["equipe"] = "jogadores"
+                jogador["vida"] = max(0, int(jogador.get("vida", 0) or 0))
+                if jogador["vida"] <= 0:
+                    await ctx.send(f"❌ <@{membro_id}> está sem vida para participar do combate.")
+                    return
+                participantes.append(jogador)
+
+            monstro = await run_db(luta_db.criar_monstro, str(monstro_id), 1)
+            if not monstro:
+                await ctx.send("❌ Não foi possível criar esse monstro.")
+                return
+            monstro["equipe"] = "inimigos"
+            participantes.append(monstro)
+            participantes.sort(key=lambda p: p.get("Velocidade", p.get("velocidade", 0)), reverse=True)
+
+            luta_cog.combates[ctx.channel.id] = {
+                "participantes": participantes,
+                "turno": 0,
+                "numero_turno": 1,
+                "fase": "ataque",
+                "ativo": True,
+                "pvp": False,
+                "party": True,
+                "party_id": party_id,
+                "guild_id": guild_id,
+                "ataque_pendente": None,
+                "historico": [],
+                "aguardando_finalizacao": False,
+                "vencedor_id": None,
+                "perdedor_id": None,
+            }
+            for jogador in participantes:
+                if jogador.get("tipo") == "jogador":
+                    await atualizar_situacao(jogador["id"], guild_id, "ativo_combate")
+            await ctx.send(f"⚔️ A party com **{len(party['membros'])} membro(s)** iniciou uma luta contra **{monstro.get('nome', monstro_id)}**!")
+            await luta_cog._mostrar_inicio(ctx)
 
 
 async def setup(bot):
