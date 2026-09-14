@@ -165,6 +165,15 @@ async def _executar_defesa_ui(self, ctx, acao, embed=None):
         return
 
 
+# O balanceamento dos monstros substitui _dano_fisico/_dano_magia e chama
+# _regras_monstro. O metodo é definido no módulo de balanceamento, mas precisa
+# estar exposto na classe Luta para esses wrappers funcionarem na UI.
+def _regras_monstro_compat(self, dano, resultado, atacante, defensor):
+    from ..monstros_balanceamento import _regras_monstro
+    return _regras_monstro(self, dano, resultado, atacante, defensor)
+
+
+Luta._regras_monstro = _regras_monstro_compat
 Luta._ataque_jogador = _ataque_jogador_ui
 Luta._defesa_jogador = _defesa_jogador_ui
 Luta.executar_defesa_jogador = _executar_defesa_ui
