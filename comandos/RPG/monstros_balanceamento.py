@@ -4,12 +4,10 @@ import random
 
 from database.python import luta as luta_db
 
-
 ATRIBUTOS = (
     "Força", "Defesa", "Vitalidade", "Velocidade",
     "Destreza", "Magia", "Sorte", "Inteligencia",
 )
-
 BOSS_IDS = {
     "slime-rei", "goblin-rei", "lobo-alpha", "orc-rei",
     "cavaleiro-esqueletico", "dragao-adulto", "arquidemonio",
@@ -78,8 +76,7 @@ def _patch_luta():
     original_efeito = Luta._aplicar_efeito
     original_proximo_turno = Luta._proximo_turno
     original_criar_ataque = Luta._criar_ataque
-    original_recompensar = Luta._recompensar
-
+    
     def criar_ataque_boss(self, combate, tipo, atacante, defensor, **dados):
         mid = str(atacante.get("boss_id", atacante.get("id", "")))
         if mid == "slime-rei":
@@ -107,10 +104,12 @@ def _patch_luta():
             estado["sopro_elemental"] = True
             estado["sopro_multiplicador"] = multiplicador
             dano_base = max(0, multiplicador * total_normal - _raw_normal_damage(atacante))
-            self._criar_ataque(combate, "ataque_monstro", atacante, defensor,
+            self._criar_ataque(
+                combate, "ataque_monstro", atacante, defensor,
                 nome="🔥 Sopro Elemental", dano_base=dano_base,
                 efeito={"nome": "queimadura", "valor": 10, "turnos": 3},
-                com_arma=False, area=True, multiplicador_area=multiplicador)
+                com_arma=False, area=True, area_targets=_alvos(combate, atacante),
+                multiplicador_area=multiplicador)
             await self._anunciar_ataque(ctx)
             return
 
@@ -127,23 +126,10 @@ def _patch_luta():
                     servo["expira_turno"] = int(combate.get("numero_turno", 1)) + 6
                     combate.setdefault("participantes", []).append(servo)
             await ctx.send("💀 **Exército dos Mortos:** o Cavaleiro Esquelético invocou **3 Esqueletos**!")
-
         await original_ataque(self, ctx)
 
     async def resolver_boss(self, ctx):
-        combate = self._obter_combate(ctx.channel.id)
-        ataque = combate.get("ataque_pendente") if combate else None
-        atacante = self._participante(combate, ataque.get("atacante_id")) if combate and ataque else None
-        defensor = self._participante(combate, ataque.get("defensor_id")) if combate and ataque else None
-        area_targets = [p for p in _alvos(combate, atacante) if p is not defensor] if ataque and ataque.get("area") and atacante else []
         await original_resolver(self, ctx)
-        if not combate or not atacante or not area_targets:
-            return
-        dano_base = float(ataque.get("dano_base", 0) or 0)
-        dano = max(1, int(float(atacante.get("Força", 0)) + float(atacante.get("Velocidade", 0)) + dano_base))
-        for alvo in area_targets:
-            if _vivo(alvo):
-                alvo["vida"] = max(0, float(alvo.get("vida", 0)) - dano)
 
     async def inicio_boss(self, ctx, participante):
         bloqueado = await original_inicio(self, ctx, participante)
@@ -218,6 +204,11 @@ def _patch_luta():
                 dano = int(dano * (1 - 0.10 * min(3, int(corrosao.get("acumulo", 1)))))
         if resultado == "atingiu" and _eh(defensor, "dragao-adulto"):
             dano = int(dano * 0.65)
+        if resultado == "atingiu" and ataque.get("area"):
+            for alvo in ataque.get("area_targets", []):
+                if alvo is not defensor and _vivo(alvo):
+                    dano_area = max(1, int(float(atacante.get("Força", 0)) + float(atacante.get("Velocidade", 0)) + float(ataque.get("dano_base", 0) or 0)))
+                    alvo["vida"] = max(0, float(alvo.get("vida", 0)) - dano_area)
         if resultado == "atingiu" and _eh(atacante, "dragao-adulto") and _estado(atacante).get("furia_draconica"):
             dano = int(dano * 1.30)
         return self._regras_monstro(dano, resultado, atacante, defensor)
@@ -259,23 +250,6 @@ def _patch_luta():
                     await ctx.send("🐉 **Fúria Dracônica:** +30% Dano, +20% Velocidade e o Sopro agora causa **4× Dano**!")
         await original_proximo_turno(self, ctx)
 
-    async def recompensar_sem_tp(self, combate):
-        resultado = self._condicao_vitoria(combate)
-        if resultado != "jogadores" or luta_db.db is None:
-            return 0, 0
-        xp = sum(int(float(p.get("xp_recompensa", 0) or 0)) for p in combate.get("participantes", []) if p.get("tipo") == "monstro")
-        hunos = sum(int(float(p.get("hunos_recompensa", 0) or 0)) for p in combate.get("participantes", []) if p.get("tipo") == "monstro")
-        vivos = [p for p in combate.get("participantes", []) if p.get("tipo") == "jogador" and _vivo(p)]
-        if not vivos:
-            return xp, hunos
-        for i, p in enumerate(vivos):
-            ganho_xp = xp // len(vivos) + (1 if i < xp % len(vivos) else 0)
-            ganho_hunos = hunos // len(vivos) + (1 if i < hunos % len(vivos) else 0)
-            filtro = {"ID": str(p.get("id")), "guild_id": str(combate.get("guild_id"))}
-            await luta_db.run_db(luta_db.db["Jogadores"].update_one, filtro, {"$inc": {"XP": ganho_xp}})
-            await luta_db.run_db(luta_db.db["Hunos"].update_one, filtro, {"$inc": {"carteira": ganho_hunos}}, upsert=True)
-        return xp, hunos
-
     Luta._criar_ataque = criar_ataque_boss
     Luta._ataque_monstro = ataque_monstro_boss
     Luta._resolver_ataque = resolver_boss
@@ -284,7 +258,6 @@ def _patch_luta():
     Luta._dano_magia = magia_boss
     Luta._aplicar_efeito = efeito_boss
     Luta._proximo_turno = proximo_turno_boss
-    Luta._recompensar = recompensar_sem_tp
 
 
 _patch_luta()
