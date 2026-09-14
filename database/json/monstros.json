@@ -21,10 +21,7 @@
       "hunos_recompensa": 20,
       "tp_recompensa": 10,
       "cooldown_horas": 6,
-      "golpes": [
-        "pancada",
-        "investida"
-      ]
+      "golpes": ["pancada", "investida"]
     },
     "slime-rei": {
       "rank": "boss",
@@ -48,10 +45,7 @@
       "hunos_recompensa": 175,
       "tp_recompensa": 150,
       "cooldown_horas": 6,
-      "golpes": [
-        "corte",
-        "estocada"
-      ]
+      "golpes": ["corte", "estocada"]
     },
 
     "goblin": {
@@ -75,13 +69,10 @@
       "hunos_recompensa": 60,
       "tp_recompensa": 35,
       "cooldown_horas": 6,
-      "golpes": [
-        "corte",
-        "estocada"
-      ]
+      "golpes": ["corte", "estocada"]
     },
     "goblin-rei": {
-      "rank": "boss"
+      "rank": "boss",
       "nome": "Goblin Rei",
       "emoji": "👑",
       "vida_base": 7800,
@@ -102,10 +93,7 @@
       "hunos_recompensa": 175,
       "tp_recompensa": 175,
       "cooldown_horas": 6,
-      "golpes": [
-        "corte",
-        "estocada"
-      ]
+      "golpes": ["corte", "estocada"]
     },
 
     "lobo": {
@@ -129,13 +117,10 @@
       "hunos_recompensa": 40,
       "tp_recompensa": 45,
       "cooldown_horas": 6,
-      "golpes": [
-        "mordida",
-        "arranhar"
-      ]
+      "golpes": ["mordida", "arranhar"]
     },
-    "goblin-rei": {
-      "rank": "boss"
+    "lobo-alpha": {
+      "rank": "boss",
       "nome": "Lobo Alpha",
       "emoji": "👑",
       "vida_base": 10000,
@@ -151,15 +136,12 @@
         "Sorte": 1000,
         "Inteligencia": 1000
       },
-      "dano_base": 1560,
-      "xp_recompensa": 290,
-      "hunos_recompensa": 175,
-      "tp_recompensa": 175,
+      "dano_base": 2000,
+      "xp_recompensa": 320,
+      "hunos_recompensa": 200,
+      "tp_recompensa": 200,
       "cooldown_horas": 6,
-      "golpes": [
-        "corte",
-        "estocada"
-      ]
+      "golpes": ["mordida", "arranhar"]
     },
 
     "orc": {
@@ -169,7 +151,7 @@
       "nivel_minimo": 1,
       "nivel_maximo": 25,
       "atributos_base": {
-        "Força": 3200,
+        "Força": 320,
         "Defesa": 320,
         "Vitalidade": 320,
         "Velocidade": 320,
@@ -183,10 +165,31 @@
       "hunos_recompensa": 75,
       "tp_recompensa": 80,
       "cooldown_horas": 6,
-      "golpes": [
-        "machadada",
-        "esmagamento"
-      ]
+      "golpes": ["machadada", "esmagamento"]
+    },
+    "orc-rei": {
+      "rank": "boss",
+      "nome": "Orc Rei",
+      "emoji": "👑",
+      "vida_base": 15000,
+      "nivel_minimo": 1,
+      "nivel_maximo": 1,
+      "atributos_base": {
+        "Força": 1500,
+        "Defesa": 1500,
+        "Vitalidade": 1500,
+        "Velocidade": 1500,
+        "Destreza": 1500,
+        "Magia": 1500,
+        "Sorte": 1500,
+        "Inteligencia": 1500
+      },
+      "dano_base": 3000,
+      "xp_recompensa": 400,
+      "hunos_recompensa": 250,
+      "tp_recompensa": 250,
+      "cooldown_horas": 6,
+      "golpes": ["machadada", "esmagamento"]
     },
 
     "esqueleto": {
@@ -210,10 +213,31 @@
       "hunos_recompensa": 90,
       "tp_recompensa": 100,
       "cooldown_horas": 6,
-      "golpes": [
-        "golpe_osseo",
-        "estocada"
-      ]
+      "golpes": ["golpe_osseo", "estocada"]
+    },
+    "cavaleiro-esqueletico": {
+      "rank": "boss",
+      "nome": "Cavaleiro Esquelético",
+      "emoji": "💀",
+      "vida_base": 20000,
+      "nivel_minimo": 1,
+      "nivel_maximo": 1,
+      "atributos_base": {
+        "Força": 2000,
+        "Defesa": 2000,
+        "Vitalidade": 2000,
+        "Velocidade": 2000,
+        "Destreza": 2000,
+        "Magia": 2000,
+        "Sorte": 2000,
+        "Inteligencia": 2000
+      },
+      "dano_base": 4000,
+      "xp_recompensa": 550,
+      "hunos_recompensa": 350,
+      "tp_recompensa": 350,
+      "cooldown_horas": 6,
+      "golpes": ["golpe_osseo", "estocada", "corte"]
     },
 
     "dragao": {
@@ -237,12 +261,31 @@
       "hunos_recompensa": 700,
       "tp_recompensa": 400,
       "cooldown_horas": 6,
-      "golpes": [
-        "garras",
-        "arranhar",
-        "mordida",
-        "sopro_de_fogo"
-      ]
+      "golpes": ["garras", "arranhar", "mordida", "sopro_de_fogo"]
+    },
+    "dragao-adulto": {
+      "rank": "boss",
+      "nome": "Dragão Adulto",
+      "emoji": "🐲",
+      "vida_base": 50000,
+      "nivel_minimo": 1,
+      "nivel_maximo": 1,
+      "atributos_base": {
+        "Força": 5000,
+        "Defesa": 5000,
+        "Vitalidade": 5000,
+        "Velocidade": 5000,
+        "Destreza": 5000,
+        "Magia": 5000,
+        "Sorte": 5000,
+        "Inteligencia": 5000
+      },
+      "dano_base": 10000,
+      "xp_recompensa": 3000,
+      "hunos_recompensa": 1500,
+      "tp_recompensa": 1000,
+      "cooldown_horas": 6,
+      "golpes": ["garras", "arranhar", "mordida", "sopro_de_fogo"]
     },
 
     "fenix": {
@@ -266,10 +309,7 @@
       "hunos_recompensa": 350,
       "tp_recompensa": 350,
       "cooldown_horas": 6,
-      "golpes": [
-        "bicada_flamejante",
-        "asas_flamejantes"
-      ]
+      "golpes": ["bicada_flamejante", "asas_flamejantes"]
     },
 
     "demonio": {
@@ -293,11 +333,31 @@
       "hunos_recompensa": 200,
       "tp_recompensa": 650,
       "cooldown_horas": 6,
-      "golpes": [
-        "garra_sombria",
-        "corte",
-        "chama_sombria"
-      ]
+      "golpes": ["garra_sombria", "corte", "chama_sombria"]
+    },
+    "arquidemonio": {
+      "rank": "boss",
+      "nome": "Arquidemonio",
+      "emoji": "👿",
+      "vida_base": 50000,
+      "nivel_minimo": 1,
+      "nivel_maximo": 1,
+      "atributos_base": {
+        "Força": 5000,
+        "Defesa": 5000,
+        "Vitalidade": 5000,
+        "Velocidade": 5000,
+        "Destreza": 5000,
+        "Magia": 5000,
+        "Sorte": 5000,
+        "Inteligencia": 5000
+      },
+      "dano_base": 10000,
+      "xp_recompensa": 3500,
+      "hunos_recompensa": 1800,
+      "tp_recompensa": 1200,
+      "cooldown_horas": 6,
+      "golpes": ["garra_sombria", "corte", "chama_sombria"]
     }
   }
 }
