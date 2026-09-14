@@ -1,10 +1,6 @@
 """Balanceamento centralizado dos atributos e recompensas dos monstros."""
 
-import discord
-from discord.ext import commands
-
 from database.python import luta as luta_db
-from . import luta_sync as base_luta
 
 
 ATRIBUTOS = (
@@ -30,7 +26,7 @@ def _tp_monstro(dados, nivel, nivel_minimo):
 
 
 def criar_monstro_balanceado(tipo: str, nivel: int = 1):
-    dados = luta_db.MONSTROS.get(tipo)
+    dados = luta_db.MONSTROS.get(str(tipo))
     if not dados:
         return None
 
@@ -86,49 +82,9 @@ def criar_monstro_balanceado(tipo: str, nivel: int = 1):
     }
 
 
-base_luta.criar_monstro = criar_monstro_balanceado
+# O balanceamento passa a ser a implementação usada por todas as entradas
+# que chamam database.python.luta.criar_monstro.
 luta_db.criar_monstro = criar_monstro_balanceado
-
-
-def _encontrar_monstro(nome):
-    nome = str(nome or "").strip().casefold()
-    for monstro_id, dados in luta_db.MONSTROS.items():
-        if str(monstro_id).strip().casefold() == nome:
-            return monstro_id
-        if str(dados.get("nome", "")).strip().casefold() == nome:
-            return monstro_id
-    return None
-
-
-def _preencher_atributos_jogador(jogador, dados):
-    """Garante que o participante de combate tenha todos os atributos da ficha."""
-    jogador["Força"] = float(dados.get("Força", 0) or 0)
-    jogador["Defesa"] = float(dados.get("Defesa", 0) or 0)
-    jogador["Vitalidade"] = float(dados.get("Vitalidade", 0) or 0)
-    jogador["Velocidade"] = float(dados.get("Velocidade", 0) or 0)
-    jogador["Destreza"] = float(dados.get("Destreza", 0) or 0)
-    jogador["Magia"] = float(dados.get("Magia", 0) or 0)
-    jogador["Sorte"] = float(dados.get("Sorte", 0) or 0)
-    jogador["Inteligencia"] = float(
-        dados.get("Inteligencia", dados.get("inteligencia", dados.get("Inteligência", 0))) or 0
-    )
-    jogador["defesa"] = jogador["Força"] + jogador["Defesa"]
-    jogador["velocidade"] = jogador["Velocidade"]
-    jogador["defesa_magica_ativa"] = False
-    jogador["defesa_magica_valor"] = 0
-    return jogador
-
-
-    comando = grupo.get_command("pve")
-    if comando is None:
-        print("[MONSTROS][ERRO] Comando PvE não encontrado no grupo luta.")
-        return False
-
-    async def pve_callback(self, ctx, *partes_monstro):
-        await _pve_corrigido(self, ctx, *partes_monstro)
-
-    comando.callback = pve_callback
-    return True
 
 
 async def setup(bot):
