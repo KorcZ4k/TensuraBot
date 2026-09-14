@@ -1,6 +1,7 @@
 """Motor de combate com interface de mensagem única e navegação por Avançar."""
 from __future__ import annotations
 
+import asyncio
 import random
 
 import discord
@@ -321,8 +322,6 @@ class Luta(_LutaLegada):
             return
         if not interaction.response.is_done():
             await interaction.response.defer()
-        # O callback do botão é serializado pelo próprio estado da UI; não seguramos
-        # o lock do combate enquanto editamos a mensagem ou resolvemos o turno.
         stage = combate.get("ui_stage", "attributes")
         if stage == "attributes":
             combate["ui_stage"] = "velocity"
@@ -359,6 +358,8 @@ class Luta(_LutaLegada):
             await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
         elif stage == "defense_action":
             await self._ui_editar(combate, self._embed_defesa(combate))
+        elif stage == "resolving":
+            await interaction.followup.send("❌ A defesa está sendo processada. Aguarde o resultado.", ephemeral=True)
 
     async def _criar_ataque_monstro_ui(self, combate):
         atacante = self._obter_atacante(combate)
