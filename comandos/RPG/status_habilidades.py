@@ -35,7 +35,7 @@ def carregar_nomes_habilidades():
 
 
 class StatusHabilidades:
-    """Adiciona as habilidades ao embed do comando !status sem alterar sua assinatura."""
+    """Adiciona as habilidades ao painel visual do comando !status."""
 
     def __init__(self, bot):
         self.bot = bot
@@ -50,9 +50,6 @@ class StatusHabilidades:
         nomes = self.nomes
 
         async def callback(*args, **kwargs):
-            # O callback original de um comando pode ser chamado pelo discord.py
-            # com cog + ctx ou, dependendo do contexto, já estar vinculado ao cog.
-            # Localizamos o ctx sem modificar os argumentos recebidos.
             ctx = kwargs.get("ctx")
             if ctx is None:
                 for argumento in args:
@@ -61,7 +58,6 @@ class StatusHabilidades:
                         break
 
             if ctx is None:
-                # Não altera a chamada original caso a estrutura seja inesperada.
                 return await callback_original(*args, **kwargs)
 
             membro = kwargs.get("membro")
@@ -77,7 +73,7 @@ class StatusHabilidades:
 
             async def enviar_modificado(*send_args, **send_kwargs):
                 embed = send_kwargs.get("embed")
-                if embed is not None and getattr(embed, "title", None) == "📊 Status do Personagem":
+                if embed is not None and getattr(embed, "title", None) == "🌙 MOON TENSURA • STATUS":
                     documento = db["Habilidades"].find_one({
                         "ID": str(membro_consultado.id),
                         "guild_id": str(ctx.guild.id),
@@ -88,20 +84,14 @@ class StatusHabilidades:
                         lista = [f"• **{nomes.get(str(h), str(h))}**" for h in habilidades]
                         texto = "\n".join(lista)
                     else:
-                        texto = "Nenhuma habilidade obtida."
+                        texto = "Nenhuma habilidade obtida ainda."
 
-                    campos = [(campo.name, campo.value, campo.inline) for campo in embed.fields]
-                    embed.clear_fields()
                     embed.add_field(name="🧠 Habilidades", value=texto[:1024], inline=False)
-                    for nome, valor, inline in campos:
-                        embed.add_field(name=nome, value=valor, inline=inline)
 
                 return await enviar_original(*send_args, **send_kwargs)
 
             ctx.send = enviar_modificado
             try:
-                # Preserva exatamente os argumentos originais para evitar
-                # erros como "missing required positional argument: ctx".
                 return await callback_original(*args, **kwargs)
             finally:
                 ctx.send = enviar_original
