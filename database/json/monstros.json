@@ -1,363 +1,79 @@
 {
   "monstros": {
     "slime": {
-      "nome": "Slime",
-      "emoji": "🟢",
-      "vida_base": 600,
-      "nivel_minimo": 1,
-      "nivel_maximo": 7,
-      "atributos_base": {
-        "Força": 50,
-        "Defesa": 50,
-        "Vitalidade": 50,
-        "Velocidade": 50,
-        "Destreza": 50,
-        "Magia": 50,
-        "Sorte": 50,
-        "Inteligencia": 50
-      },
-      "dano_base": 100,
-      "xp_recompensa": 20,
-      "hunos_recompensa": 20,
-      "tp_recompensa": 10,
-      "cooldown_horas": 6,
-      "golpes": ["pancada", "investida"]
+      "nome": "Slime", "emoji": "🟢", "vida_base": 600, "nivel_minimo": 1, "nivel_maximo": 7,
+      "atributos_base": {"Força": 50, "Defesa": 50, "Vitalidade": 50, "Velocidade": 50, "Destreza": 50, "Magia": 50, "Sorte": 50, "Inteligencia": 50},
+      "dano_base": 100, "xp_recompensa": 20, "hunos_recompensa": 20, "cooldown_horas": 12, "golpes": ["pancada", "investida"]
     },
     "slime-rei": {
-      "rank": "boss",
-      "nome": "Slime Supermassivo",
-      "emoji": "🔵",
-      "vida_base": 5000,
-      "nivel_minimo": 1,
-      "nivel_maximo": 1,
-      "atributos_base": {
-        "Força": 500,
-        "Defesa": 500,
-        "Vitalidade": 500,
-        "Velocidade": 500,
-        "Destreza": 500,
-        "Magia": 500,
-        "Sorte": 500,
-        "Inteligencia": 500
-      },
-      "dano_base": 1000,
-      "xp_recompensa": 250,
-      "hunos_recompensa": 175,
-      "tp_recompensa": 150,
-      "cooldown_horas": 6,
-      "golpes": ["corte", "estocada"]
+      "rank": "boss", "nome": "Slime Supermassivo", "emoji": "🔵", "vida_base": 5000, "nivel_minimo": 1, "nivel_maximo": 1,
+      "atributos_base": {"Força": 500, "Defesa": 500, "Vitalidade": 500, "Velocidade": 500, "Destreza": 500, "Magia": 500, "Sorte": 500, "Inteligencia": 500},
+      "dano_base": 1000, "xp_recompensa": 250, "hunos_recompensa": 175, "cooldown_horas": 12, "golpes": ["corte", "estocada"]
     },
-
     "goblin": {
-      "nome": "Goblin",
-      "emoji": "👺",
-      "vida_base": 2100,
-      "nivel_minimo": 1,
-      "nivel_maximo": 15,
-      "atributos_base": {
-        "Força": 210,
-        "Defesa": 210,
-        "Vitalidade": 210,
-        "Velocidade": 210,
-        "Destreza": 210,
-        "Magia": 210,
-        "Sorte": 210,
-        "Inteligencia": 210
-      },
-      "dano_base": 420,
-      "xp_recompensa": 75,
-      "hunos_recompensa": 60,
-      "tp_recompensa": 35,
-      "cooldown_horas": 6,
-      "golpes": ["corte", "estocada"]
+      "nome": "Goblin", "emoji": "👺", "vida_base": 2100, "nivel_minimo": 1, "nivel_maximo": 15,
+      "atributos_base": {"Força": 210, "Defesa": 210, "Vitalidade": 210, "Velocidade": 210, "Destreza": 210, "Magia": 210, "Sorte": 210, "Inteligencia": 210},
+      "dano_base": 420, "xp_recompensa": 75, "hunos_recompensa": 60, "cooldown_horas": 12, "golpes": ["corte", "estocada"]
     },
     "goblin-rei": {
-      "rank": "boss",
-      "nome": "Goblin Rei",
-      "emoji": "👑",
-      "vida_base": 7800,
-      "nivel_minimo": 1,
-      "nivel_maximo": 1,
-      "atributos_base": {
-        "Força": 780,
-        "Defesa": 780,
-        "Vitalidade": 780,
-        "Velocidade": 780,
-        "Destreza": 780,
-        "Magia": 780,
-        "Sorte": 780,
-        "Inteligencia": 780
-      },
-      "dano_base": 1560,
-      "xp_recompensa": 290,
-      "hunos_recompensa": 175,
-      "tp_recompensa": 175,
-      "cooldown_horas": 6,
-      "golpes": ["corte", "estocada"]
+      "rank": "boss", "nome": "Goblin Rei", "emoji": "👑", "vida_base": 7800, "nivel_minimo": 1, "nivel_maximo": 1,
+      "atributos_base": {"Força": 780, "Defesa": 780, "Vitalidade": 780, "Velocidade": 780, "Destreza": 780, "Magia": 780, "Sorte": 780, "Inteligencia": 780},
+      "dano_base": 1560, "xp_recompensa": 290, "hunos_recompensa": 175, "cooldown_horas": 12, "golpes": ["corte", "estocada"]
     },
-
     "lobo": {
-      "nome": "Lobo",
-      "emoji": "🐺",
-      "vida_base": 2800,
-      "nivel_minimo": 1,
-      "nivel_maximo": 20,
-      "atributos_base": {
-        "Força": 280,
-        "Defesa": 280,
-        "Vitalidade": 280,
-        "Velocidade": 280,
-        "Destreza": 280,
-        "Magia": 280,
-        "Sorte": 280,
-        "Inteligencia": 280
-      },
-      "dano_base": 560,
-      "xp_recompensa": 90,
-      "hunos_recompensa": 40,
-      "tp_recompensa": 45,
-      "cooldown_horas": 6,
-      "golpes": ["mordida", "arranhar"]
+      "nome": "Lobo", "emoji": "🐺", "vida_base": 2800, "nivel_minimo": 1, "nivel_maximo": 20,
+      "atributos_base": {"Força": 280, "Defesa": 280, "Vitalidade": 280, "Velocidade": 280, "Destreza": 280, "Magia": 280, "Sorte": 280, "Inteligencia": 280},
+      "dano_base": 560, "xp_recompensa": 90, "hunos_recompensa": 40, "cooldown_horas": 12, "golpes": ["mordida", "arranhar"]
     },
     "lobo-alpha": {
-      "rank": "boss",
-      "nome": "Lobo Alpha",
-      "emoji": "👑",
-      "vida_base": 10000,
-      "nivel_minimo": 1,
-      "nivel_maximo": 1,
-      "atributos_base": {
-        "Força": 1000,
-        "Defesa": 1000,
-        "Vitalidade": 1000,
-        "Velocidade": 1000,
-        "Destreza": 1000,
-        "Magia": 1000,
-        "Sorte": 1000,
-        "Inteligencia": 1000
-      },
-      "dano_base": 2000,
-      "xp_recompensa": 320,
-      "hunos_recompensa": 200,
-      "tp_recompensa": 200,
-      "cooldown_horas": 6,
-      "golpes": ["mordida", "arranhar"]
+      "rank": "boss", "nome": "Lobo Alpha", "emoji": "👑", "vida_base": 10000, "nivel_minimo": 1, "nivel_maximo": 1,
+      "atributos_base": {"Força": 1000, "Defesa": 1000, "Vitalidade": 1000, "Velocidade": 1000, "Destreza": 1000, "Magia": 1000, "Sorte": 1000, "Inteligencia": 1000},
+      "dano_base": 2000, "xp_recompensa": 320, "hunos_recompensa": 200, "cooldown_horas": 12, "golpes": ["mordida", "arranhar"]
     },
-
     "orc": {
-      "nome": "Orc",
-      "emoji": "👹",
-      "vida_base": 3200,
-      "nivel_minimo": 1,
-      "nivel_maximo": 25,
-      "atributos_base": {
-        "Força": 320,
-        "Defesa": 320,
-        "Vitalidade": 320,
-        "Velocidade": 320,
-        "Destreza": 320,
-        "Magia": 320,
-        "Sorte": 320,
-        "Inteligencia": 320
-      },
-      "dano_base": 640,
-      "xp_recompensa": 100,
-      "hunos_recompensa": 75,
-      "tp_recompensa": 80,
-      "cooldown_horas": 6,
-      "golpes": ["machadada", "esmagamento"]
+      "nome": "Orc", "emoji": "👹", "vida_base": 3200, "nivel_minimo": 1, "nivel_maximo": 25,
+      "atributos_base": {"Força": 320, "Defesa": 320, "Vitalidade": 320, "Velocidade": 320, "Destreza": 320, "Magia": 320, "Sorte": 320, "Inteligencia": 320},
+      "dano_base": 640, "xp_recompensa": 100, "hunos_recompensa": 75, "cooldown_horas": 12, "golpes": ["machadada", "esmagamento"]
     },
     "orc-rei": {
-      "rank": "boss",
-      "nome": "Orc Rei",
-      "emoji": "👑",
-      "vida_base": 15000,
-      "nivel_minimo": 1,
-      "nivel_maximo": 1,
-      "atributos_base": {
-        "Força": 1500,
-        "Defesa": 1500,
-        "Vitalidade": 1500,
-        "Velocidade": 1500,
-        "Destreza": 1500,
-        "Magia": 1500,
-        "Sorte": 1500,
-        "Inteligencia": 1500
-      },
-      "dano_base": 3000,
-      "xp_recompensa": 400,
-      "hunos_recompensa": 250,
-      "tp_recompensa": 250,
-      "cooldown_horas": 6,
-      "golpes": ["machadada", "esmagamento"]
+      "rank": "boss", "nome": "Orc Rei", "emoji": "👑", "vida_base": 15000, "nivel_minimo": 1, "nivel_maximo": 1,
+      "atributos_base": {"Força": 1500, "Defesa": 1500, "Vitalidade": 1500, "Velocidade": 1500, "Destreza": 1500, "Magia": 1500, "Sorte": 1500, "Inteligencia": 1500},
+      "dano_base": 3000, "xp_recompensa": 400, "hunos_recompensa": 250, "cooldown_horas": 12, "golpes": ["machadada", "esmagamento"]
     },
-
     "esqueleto": {
-      "nome": "Esqueleto",
-      "emoji": "💀",
-      "vida_base": 4000,
-      "nivel_minimo": 1,
-      "nivel_maximo": 30,
-      "atributos_base": {
-        "Força": 400,
-        "Defesa": 400,
-        "Vitalidade": 400,
-        "Velocidade": 400,
-        "Destreza": 400,
-        "Magia": 400,
-        "Sorte": 400,
-        "Inteligencia": 400
-      },
-      "dano_base": 800,
-      "xp_recompensa": 110,
-      "hunos_recompensa": 90,
-      "tp_recompensa": 100,
-      "cooldown_horas": 6,
-      "golpes": ["golpe_osseo", "estocada"]
+      "nome": "Esqueleto", "emoji": "💀", "vida_base": 4000, "nivel_minimo": 1, "nivel_maximo": 30,
+      "atributos_base": {"Força": 400, "Defesa": 400, "Vitalidade": 400, "Velocidade": 400, "Destreza": 400, "Magia": 400, "Sorte": 400, "Inteligencia": 400},
+      "dano_base": 800, "xp_recompensa": 110, "hunos_recompensa": 90, "cooldown_horas": 12, "golpes": ["golpe_osseo", "estocada"]
     },
     "cavaleiro-esqueletico": {
-      "rank": "boss",
-      "nome": "Cavaleiro Esquelético",
-      "emoji": "💀",
-      "vida_base": 20000,
-      "nivel_minimo": 1,
-      "nivel_maximo": 1,
-      "atributos_base": {
-        "Força": 2000,
-        "Defesa": 2000,
-        "Vitalidade": 2000,
-        "Velocidade": 2000,
-        "Destreza": 2000,
-        "Magia": 2000,
-        "Sorte": 2000,
-        "Inteligencia": 2000
-      },
-      "dano_base": 4000,
-      "xp_recompensa": 550,
-      "hunos_recompensa": 350,
-      "tp_recompensa": 350,
-      "cooldown_horas": 6,
-      "golpes": ["golpe_osseo", "estocada", "corte"]
+      "rank": "boss", "nome": "Cavaleiro Esquelético", "emoji": "💀", "vida_base": 20000, "nivel_minimo": 1, "nivel_maximo": 1,
+      "atributos_base": {"Força": 2000, "Defesa": 2000, "Vitalidade": 2000, "Velocidade": 2000, "Destreza": 2000, "Magia": 2000, "Sorte": 2000, "Inteligencia": 2000},
+      "dano_base": 4000, "xp_recompensa": 550, "hunos_recompensa": 350, "cooldown_horas": 12, "golpes": ["golpe_osseo", "estocada", "corte"]
     },
-
     "dragao": {
-      "nome": "Dragão",
-      "emoji": "🐉",
-      "vida_base": 15000,
-      "nivel_minimo": 1,
-      "nivel_maximo": 70,
-      "atributos_base": {
-        "Força": 1500,
-        "Defesa": 1500,
-        "Vitalidade": 1500,
-        "Velocidade": 1500,
-        "Destreza": 1500,
-        "Magia": 1500,
-        "Sorte": 1500,
-        "Inteligencia": 1500
-      },
-      "dano_base": 3000,
-      "xp_recompensa": 1500,
-      "hunos_recompensa": 700,
-      "tp_recompensa": 400,
-      "cooldown_horas": 6,
-      "golpes": ["garras", "arranhar", "mordida", "sopro_de_fogo"]
+      "nome": "Dragão", "emoji": "🐉", "vida_base": 15000, "nivel_minimo": 1, "nivel_maximo": 70,
+      "atributos_base": {"Força": 1500, "Defesa": 1500, "Vitalidade": 1500, "Velocidade": 1500, "Destreza": 1500, "Magia": 1500, "Sorte": 1500, "Inteligencia": 1500},
+      "dano_base": 3000, "xp_recompensa": 1500, "hunos_recompensa": 700, "cooldown_horas": 12, "golpes": ["garras", "arranhar", "mordida", "sopro_de_fogo"]
     },
     "dragao-adulto": {
-      "rank": "boss",
-      "nome": "Dragão Adulto",
-      "emoji": "🐲",
-      "vida_base": 50000,
-      "nivel_minimo": 1,
-      "nivel_maximo": 1,
-      "atributos_base": {
-        "Força": 5000,
-        "Defesa": 5000,
-        "Vitalidade": 5000,
-        "Velocidade": 5000,
-        "Destreza": 5000,
-        "Magia": 5000,
-        "Sorte": 5000,
-        "Inteligencia": 5000
-      },
-      "dano_base": 10000,
-      "xp_recompensa": 3000,
-      "hunos_recompensa": 1500,
-      "tp_recompensa": 1000,
-      "cooldown_horas": 6,
-      "golpes": ["garras", "arranhar", "mordida", "sopro_de_fogo"]
+      "rank": "boss", "nome": "Dragão Adulto", "emoji": "🐲", "vida_base": 50000, "nivel_minimo": 1, "nivel_maximo": 1,
+      "atributos_base": {"Força": 5000, "Defesa": 5000, "Vitalidade": 5000, "Velocidade": 5000, "Destreza": 5000, "Magia": 5000, "Sorte": 5000, "Inteligencia": 5000},
+      "dano_base": 10000, "xp_recompensa": 3000, "hunos_recompensa": 1500, "cooldown_horas": 12, "golpes": ["garras", "arranhar", "mordida", "sopro_de_fogo"]
     },
-
     "fenix": {
-      "nome": "Fênix",
-      "emoji": "🔥",
-      "vida_base": 10000,
-      "nivel_minimo": 1,
-      "nivel_maximo": 20,
-      "atributos_base": {
-        "Força": 1000,
-        "Defesa": 1000,
-        "Vitalidade": 1000,
-        "Velocidade": 1000,
-        "Destreza": 1000,
-        "Magia": 1000,
-        "Sorte": 1000,
-        "Inteligencia": 1000
-      },
-      "dano_base": 2000,
-      "xp_recompensa": 450,
-      "hunos_recompensa": 350,
-      "tp_recompensa": 350,
-      "cooldown_horas": 6,
-      "golpes": ["bicada_flamejante", "asas_flamejantes"]
+      "nome": "Fênix", "emoji": "🔥", "vida_base": 10000, "nivel_minimo": 1, "nivel_maximo": 20,
+      "atributos_base": {"Força": 1000, "Defesa": 1000, "Vitalidade": 1000, "Velocidade": 1000, "Destreza": 1000, "Magia": 1000, "Sorte": 1000, "Inteligencia": 1000},
+      "dano_base": 2000, "xp_recompensa": 450, "hunos_recompensa": 350, "cooldown_horas": 12, "golpes": ["bicada_flamejante", "asas_flamejantes"]
     },
-
     "demonio": {
-      "nome": "Demônio",
-      "emoji": "😈",
-      "vida_base": 12500,
-      "nivel_minimo": 1,
-      "nivel_maximo": 70,
-      "atributos_base": {
-        "Força": 1250,
-        "Defesa": 1250,
-        "Vitalidade": 1250,
-        "Velocidade": 1250,
-        "Destreza": 1250,
-        "Magia": 1250,
-        "Sorte": 1250,
-        "Inteligencia": 1250
-      },
-      "dano_base": 1250,
-      "xp_recompensa": 650,
-      "hunos_recompensa": 200,
-      "tp_recompensa": 650,
-      "cooldown_horas": 6,
-      "golpes": ["garra_sombria", "corte", "chama_sombria"]
+      "nome": "Demônio", "emoji": "😈", "vida_base": 12500, "nivel_minimo": 1, "nivel_maximo": 70,
+      "atributos_base": {"Força": 1250, "Defesa": 1250, "Vitalidade": 1250, "Velocidade": 1250, "Destreza": 1250, "Magia": 1250, "Sorte": 1250, "Inteligencia": 1250},
+      "dano_base": 1250, "xp_recompensa": 650, "hunos_recompensa": 200, "cooldown_horas": 12, "golpes": ["garra_sombria", "corte", "chama_sombria"]
     },
     "arquidemonio": {
-      "rank": "boss",
-      "nome": "Arquidemonio",
-      "emoji": "👿",
-      "vida_base": 50000,
-      "nivel_minimo": 1,
-      "nivel_maximo": 1,
-      "atributos_base": {
-        "Força": 5000,
-        "Defesa": 5000,
-        "Vitalidade": 5000,
-        "Velocidade": 5000,
-        "Destreza": 5000,
-        "Magia": 5000,
-        "Sorte": 5000,
-        "Inteligencia": 5000
-      },
-      "dano_base": 10000,
-      "xp_recompensa": 3500,
-      "hunos_recompensa": 1800,
-      "tp_recompensa": 1200,
-      "cooldown_horas": 6,
-      "golpes": ["garra_sombria", "corte", "chama_sombria"]
+      "rank": "boss", "nome": "Arquidemonio", "emoji": "👿", "vida_base": 50000, "nivel_minimo": 1, "nivel_maximo": 1,
+      "atributos_base": {"Força": 5000, "Defesa": 5000, "Vitalidade": 5000, "Velocidade": 5000, "Destreza": 5000, "Magia": 5000, "Sorte": 5000, "Inteligencia": 5000},
+      "dano_base": 10000, "xp_recompensa": 3500, "hunos_recompensa": 1800, "cooldown_horas": 12, "golpes": ["garra_sombria", "corte", "chama_sombria"]
     }
   }
 }
