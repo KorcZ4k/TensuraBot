@@ -36,24 +36,20 @@ async def _ui_editar_seguro(self, combate, embed, view=True):
 
 
 async def _ui_context_send_seguro(self, content=None, **kwargs):
-    """Mostra mensagens sem transformar erros em um resultado avancavel.
+    """Mostra mensagens na tela unica sem corromper a maquina de estados.
 
-    Uma acao invalida (por exemplo, usar !defesa enquanto o monstro ainda
-    precisa atacar) deve informar o erro, mas PRESERVAR a etapa real do motor.
-    Antes isso mudava ui_stage para ``result``; o proximo clique em Avancar
-    entao chamava _proximo_turno e pulava a vez do monstro.
+    Mensagens de erro recebem a marca interna ``_luta_error=True`` e preservam
+    exatamente a etapa em que o combate estava. Resultados reais, como o dano
+    depois de !defesa, continuam mudando para ``result`` e liberando Avancar.
     """
     combate = self._combate
     atacante = self._get_participante(combate, combate.get("vencedor_id")) or self._atacante(combate) or {}
     defensor = self._get_participante(combate, combate.get("perdedor_id")) or self._defensor(combate) or {}
     embed = kwargs.get("embed")
+    eh_erro = bool(kwargs.pop("_luta_error", False))
     extra = content or ""
     if embed is not None and embed.description:
         extra = embed.description if not extra else f"{extra}\n{embed.description}"
-
-    eh_erro = "❌" in extra
-    etapa_anterior = combate.get("ui_stage", "attributes")
-    aguardando_anterior = combate.get("ui_waiting_advance", False)
 
     padrao = painel(
         atacante=atacante.get("nome", "User"), ataque="resultado",
@@ -65,15 +61,17 @@ async def _ui_context_send_seguro(self, content=None, **kwargs):
         cor=discord.Color.red() if eh_erro else discord.Color.blurple(),
     )
 
-    # ERRO DE ACAO: nao altera a maquina de estados.
-    # Assim, se estava em "turn" (vez do monstro), Avancar continua executando
-    # o ataque do monstro; nao e possivel usar uma acao invalida para pular turno.
-    if not eh_erro:
-        combate["ui_stage"] = "result"
-        combate["ui_waiting_advance"] = True
-    else:
+    etapa_anterior = combate.get("ui_stage", "attributes")
+    aguardando_anterior = combate.get("ui_waiting_advance", False)
+    if eh_erro:
+        # ERRO DE ACAO: nunca cria um falso resultado avancavel.
+        # Ex.: !defesa durante a vez do monstro continua em "turn".
         combate["ui_stage"] = etapa_anterior
         combate["ui_waiting_advance"] = aguardando_anterior
+    else:
+        # Resultado real: mostra o dano e deixa Avancar passar ao proximo turno.
+        combate["ui_stage"] = "result"
+        combate["ui_waiting_advance"] = True
 
     view = self._owner._ui_views.get(self._message.id) if self._owner else None
     if view is None and self._owner:
