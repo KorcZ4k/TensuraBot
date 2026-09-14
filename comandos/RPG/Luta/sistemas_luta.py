@@ -36,7 +36,7 @@ class _UIContext:
         return getattr(self._original, name)
 
     async def send(self, content=None, **kwargs):
-        """Converte resultados e erros do motor para a interface padrão."""
+        """Atualiza a tela única sem perder o estado do combate."""
         combate = self._combate
         atacante = self._get_participante(combate, combate.get("vencedor_id")) or self._atacante(combate) or {}
         defensor = self._get_participante(combate, combate.get("perdedor_id")) or self._defensor(combate) or {}
@@ -97,7 +97,18 @@ class _AvancarView(discord.ui.View):
         self.add_item(botao)
 
     async def _callback(self, interaction: discord.Interaction):
-        await self.cog.avancar(interaction)
+        # O callback sempre responde ao Discord, mesmo se alguma etapa do motor falhar.
+        try:
+            await self.cog.avancar(interaction)
+        except Exception as erro:
+            print(f"[LUTA][UI][AVANCAR][ERRO] {type(erro).__name__}: {erro}")
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send("❌ Erro ao avançar o combate. O estado foi preservado.", ephemeral=True)
+                else:
+                    await interaction.response.send_message("❌ Erro ao avançar o combate. O estado foi preservado.", ephemeral=True)
+            except Exception:
+                pass
 
 
 class Luta(_LutaLegada):
@@ -240,6 +251,7 @@ class Luta(_LutaLegada):
         defensor["defesa_ativa"] = acao == "defesa"
         defensor["esquiva_ativa"] = acao == "esquiva"
         if combate.get("ui_message"):
+            combate["ui_waiting_advance"] = False
             await self._resolver_ataque(self._ui_context(ctx, combate))
         else:
             await self._resolver_ataque(ctx)
@@ -290,52 +302,63 @@ class Luta(_LutaLegada):
         combate = self._obter_combate(interaction.channel.id)
         mensagem = combate.get("ui_message") if combate else None
         if not combate or not combate.get("ativo") or mensagem is None:
-            await interaction.response.send_message("❌ Este combate não está mais ativo.", ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send("❌ Este combate não está mais ativo.", ephemeral=True)
+            else:
+                await interaction.response.send_message("❌ Este combate não está mais ativo.", ephemeral=True)
             return
         if interaction.message is None or interaction.message.id != mensagem.id:
-            await interaction.response.send_message("❌ Esta tela não pertence ao combate atual.", ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send("❌ Esta tela não pertence ao combate atual.", ephemeral=True)
+            else:
+                await interaction.response.send_message("❌ Esta tela não pertence ao combate atual.", ephemeral=True)
             return
         if combate.get("ui_owner_id") is not None and str(combate.get("ui_owner_id")) != str(interaction.user.id):
-            await interaction.response.send_message("❌ Apenas o jogador deste combate pode avançar a tela.", ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send("❌ Apenas o jogador deste combate pode avançar a tela.", ephemeral=True)
+            else:
+                await interaction.response.send_message("❌ Apenas o jogador deste combate pode avançar a tela.", ephemeral=True)
             return
-        await interaction.response.defer()
-        async with self._lock(interaction.channel.id):
-            stage = combate.get("ui_stage", "attributes")
-            if stage == "attributes":
-                combate["ui_stage"] = "velocity"
-                await self._ui_editar(combate, self._embed_velocidade(combate))
-            elif stage == "velocity":
-                atacante = self._obter_atacante(combate)
-                if atacante and atacante.get("tipo") == "monstro":
-                    await self._criar_ataque_monstro_ui(combate)
-                else:
-                    combate["ui_stage"] = "player_action"
-                    await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
-            elif stage == "attack":
-                defensor = self._obter_defensor(combate)
-                if defensor and defensor.get("tipo") == "monstro":
-                    escolha = random.choice(("defesa", "esquiva", "normal"))
-                    defensor["defesa_ativa"] = escolha == "defesa"
-                    defensor["esquiva_ativa"] = escolha == "esquiva"
-                    combate["ui_waiting_advance"] = False
-                    await self._resolver_ataque(self._ui_context(interaction, combate))
-                else:
-                    combate["ui_stage"] = "defense_action"
-                    await self._ui_editar(combate, self._embed_defesa(combate))
-            elif stage == "result":
-                combate["ui_waiting_advance"] = False
-                await self._proximo_turno(interaction)
-            elif stage == "turn":
-                atacante = self._obter_atacante(combate)
-                if atacante and atacante.get("tipo") == "monstro":
-                    await self._criar_ataque_monstro_ui(combate)
-                else:
-                    combate["ui_stage"] = "player_action"
-                    await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
-            elif stage == "player_action":
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+        # O callback do botão é serializado pelo próprio estado da UI; não seguramos
+        # o lock do combate enquanto editamos a mensagem ou resolvemos o turno.
+        stage = combate.get("ui_stage", "attributes")
+        if stage == "attributes":
+            combate["ui_stage"] = "velocity"
+            await self._ui_editar(combate, self._embed_velocidade(combate))
+        elif stage == "velocity":
+            atacante = self._obter_atacante(combate)
+            if atacante and atacante.get("tipo") == "monstro":
+                await self._criar_ataque_monstro_ui(combate)
+            else:
+                combate["ui_stage"] = "player_action"
                 await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
-            elif stage == "defense_action":
+        elif stage == "attack":
+            defensor = self._obter_defensor(combate)
+            if defensor and defensor.get("tipo") == "monstro":
+                escolha = random.choice(("defesa", "esquiva", "normal"))
+                defensor["defesa_ativa"] = escolha == "defesa"
+                defensor["esquiva_ativa"] = escolha == "esquiva"
+                combate["ui_waiting_advance"] = False
+                await self._resolver_ataque(self._ui_context(interaction, combate))
+            else:
+                combate["ui_stage"] = "defense_action"
                 await self._ui_editar(combate, self._embed_defesa(combate))
+        elif stage == "result":
+            combate["ui_waiting_advance"] = False
+            await self._proximo_turno(interaction)
+        elif stage == "turn":
+            atacante = self._obter_atacante(combate)
+            if atacante and atacante.get("tipo") == "monstro":
+                await self._criar_ataque_monstro_ui(combate)
+            else:
+                combate["ui_stage"] = "player_action"
+                await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
+        elif stage == "player_action":
+            await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
+        elif stage == "defense_action":
+            await self._ui_editar(combate, self._embed_defesa(combate))
 
     async def _criar_ataque_monstro_ui(self, combate):
         atacante = self._obter_atacante(combate)
@@ -404,7 +427,6 @@ class Luta(_LutaLegada):
                 await self._finalizar(ui_ctx, motivo="efeitos")
                 return
             if bloqueado:
-                # O stun consome o turno atual e NÃO permite que o monstro ataque.
                 combate["ui_stage"] = "result"
                 combate["ui_waiting_advance"] = True
                 await self._ui_editar(combate, painel(atacante=atacante.get("nome", "Participante"), ataque="stun", vida=self._vida(atacante), mana=atacante.get("mana", 0), dano=0, efeito="Stun", alvo="-", turno=combate.get("numero_turno", 1), oponente="-", vida_oponente="-", extra=f"**{atacante.get('nome', 'Participante')}** está atordoado e perde este turno.", cor=discord.Color.orange()))
