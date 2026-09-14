@@ -86,13 +86,38 @@ def _linha(texto):
     return f"**{texto}**"
 
 
+def _rotulo_acao(ataque):
+    texto = str(ataque or "").strip()
+    genericos = {
+        "resultado": "📋 | Resultado",
+        "ordem de velocidade": "📋 | Ordem de velocidade",
+        "aguardando ação": "⏳ | Aguardando ação",
+        "início do combate": "⚔️ | Início do combate",
+        "finalização": "🏁 | Finalização",
+        "resultado da defesa": "🛡️ | Resultado da defesa",
+        "stun": "⛓️ | Stun",
+        "⛓️ stun": "⛓️ | Stun",
+    }
+    normalizado = texto.casefold()
+    if normalizado in genericos:
+        return genericos[normalizado]
+    return None
+
+
 def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", efeito="Nenhum", alvo="-", turno="-", oponente="-", vida_oponente="-", extra="", cor=None, imagem_ataque=None, imagem_oponente=None):
     nome_oponente = _nome(oponente, str(oponente) if not isinstance(oponente, dict) else "-")
+    rotulo = _rotulo_acao(ataque)
+    if rotulo:
+        linha_acao = f"│ ⋮ → {rotulo}"
+    elif str(ataque).casefold().startswith("vez de"):
+        linha_acao = f"│ ⋮ → 👤 | {ataque}"
+    else:
+        linha_acao = f"│ ⋮ → 👤 | {atacante} atacou usando {ataque}"
     linhas = [
         "╭────────────────────────────────────────────╮",
         "│              🌙  MOON TENSURA              │",
         "├────────────────────────────────────────────┤",
-        f"│ ⋮ → 👤 | {atacante} atacou usando {ataque}",
+        linha_acao,
         f"│ ⋮ → ❤️ | Vida de {atacante}: {vida}",
         f"│ ⋮ → 🔷 | Mana de: {mana}",
         "├────────────────────────────────────────────┤",
@@ -118,7 +143,7 @@ def embed(titulo, descricao="", *, cor=None, imagem=None):
 
 
 def resultado(texto, *, status=None):
-    return painel(extra=f"Resultado: {texto}" + (f" | Status: {status}" if status else ""), cor=discord.Color.red())
+    return painel(ataque="resultado", extra=f"Resultado: {texto}" + (f" | Status: {status}" if status else ""), cor=discord.Color.red())
 
 
 def turno(numero, atacante, defensor):
