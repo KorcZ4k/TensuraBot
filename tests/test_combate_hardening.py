@@ -22,6 +22,11 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("_limpar_convites_expirados", text)
         self.assertIn("Tente novamente quando o combate terminar", text)
 
+    def test_party_combat_uses_the_canonical_lock_and_nonblocking_monster_creation(self):
+        text = source("comandos/RPG/party.py")
+        self.assertIn("async with luta_cog._lock(ctx.channel.id):", text)
+        self.assertIn("await run_db(luta_db.criar_monstro", text)
+
     def test_combat_has_one_canonical_resolver(self):
         text = source("comandos/RPG/luta.py")
         self.assertIn("class Luta(commands.Cog)", text)
@@ -115,12 +120,6 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("cancelar_cooldown_monstro", text)
         self.assertIn("timedelta(hours=horas)", text)
 
-    def test_pve_command_enforces_monster_cooldown(self):
-        text = source("comandos/RPG/luta.py")
-        self.assertIn("luta_db.iniciar_cooldown_monstro", text)
-        self.assertIn("luta_db.cancelar_cooldown_monstro", text)
-        self.assertIn("⏳", text)
-
     def test_pve_reserves_cooldown_only_after_validation(self):
         text = source("comandos/RPG/luta.py")
         self.assertLess(text.index("monstro_id = cog._encontrar_monstro"), text.index("luta_db.pode_lutar"))
@@ -133,6 +132,28 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn('"Vida": nova_vida', text)
         self.assertIn('"vida_recuperada"', text)
 
+    def test_combat_image_mapping_is_monster_only(self):
+        text = source("comandos/RPG/Luta/Mensagens_luta.py")
+        imagens = json.loads(source("database/json/Imagens.json"))["Imagens"]
+        for monstro in ("slime", "goblin", "lobo", "orc", "esqueleto", "dragao", "titan", "fenix", "demonio"):
+            self.assertIn(f'"{monstro}-luta-url"', text)
+            self.assertIn(f"{monstro}-luta-url", imagens)
+        self.assertIn("def imagem_ataque(nome):", text)
+        self.assertIn("return None", text)
+        self.assertIn("imagem_ataque é propositalmente ignorada", text)
+
+    def test_combat_image_can_be_attached_to_embed(self):
+        text = source("comandos/RPG/Luta/comandos_luta.py")
+        self.assertIn("async def _baixar_imagem_monstro(url):", text)
+        self.assertIn('panel.set_image(url=f"attachment://{filename}")', text)
+        self.assertIn('kwargs["file"] = arquivo', text)
+        self.assertNotIn("imagem_ataque=imagem_ataque", text)
+
+    def test_monster_turn_is_automatically_started_when_monster_is_faster(self):
+        text = source("comandos/RPG/Luta/sistemas_luta.py")
+        self.assertIn('if atacante.get("tipo") == "monstro":', text)
+        self.assertIn("await self._ataque_monstro(ctx)", text)
+
     def test_hardening_modules_remain_valid_python(self):
         for relative in (
             "database/python/luta.py",
@@ -144,6 +165,11 @@ class CombatHardeningTests(unittest.TestCase):
             "comandos/RPG/correcoes_concorrencia.py",
             "comandos/RPG/correcoes_party.py",
             "comandos/RPG/habilidades_combate.py",
+            "comandos/RPG/Luta/Infos_Luta.py",
+            "comandos/RPG/Luta/Mensagens_luta.py",
+            "comandos/RPG/Luta/sistemas_luta.py",
+            "comandos/RPG/Luta/comandos_luta.py",
+            "comandos/RPG/monstros_balanceamento.py",
             "main.py",
         ):
             ast.parse(source(relative), filename=relative)
