@@ -73,7 +73,7 @@ class StatusHabilidades:
 
             async def enviar_modificado(*send_args, **send_kwargs):
                 embed = send_kwargs.get("embed")
-                if embed is not None and getattr(embed, "title", None) == "🌙 MOON TENSURA • STATUS":
+                if embed is not None and getattr(embed, "title", None) == "🌙 MOON TENSURA":
                     documento = db["Habilidades"].find_one({
                         "ID": str(membro_consultado.id),
                         "guild_id": str(ctx.guild.id),
