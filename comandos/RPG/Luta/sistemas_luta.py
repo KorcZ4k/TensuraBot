@@ -3,22 +3,20 @@
 from __future__ import annotations
 
 import asyncio
-import random
 
 import discord
 
 from database.python import luta as luta_db
 from ..luta import Luta as _LutaLegada
 from .Infos_Luta import obter_monstro
-from .Mensagens_luta import painel
 
 
 class Luta(_LutaLegada):
     """Motor único de combate.
 
-    O comando cria o Embed da própria ação e entrega ao motor. O motor não
-    cria mensagens para soco/chute/defesa/esquiva; ele apenas executa a regra
-    e chama ``mostrar_ataque(ctx, embed)`` para publicar a ação recebida.
+    O comando cria o próprio ``discord.Embed`` e entrega ao motor. O motor
+    executa regras/estado e publica o Embed recebido, sem monkeypatch global
+    de ``Context.send``.
     """
 
     def __init__(self, bot):
@@ -29,24 +27,14 @@ class Luta(_LutaLegada):
         monstro_id, _ = obter_monstro(nome)
         return monstro_id
 
-    def _id_monstro(self, defensor):
-        defensor = defensor or {}
-        if defensor.get("tipo") == "monstro":
-            return defensor.get("id") or defensor.get("monstro_id") or defensor.get("nome")
-        return defensor.get("monstro_id")
-
     def _vida(self, participante):
         vida = max(0, int(float((participante or {}).get("vida", 0) or 0)))
         maxima = max(1, int(float((participante or {}).get("vida_maxima", vida) or 1)))
         return f"{vida}/{maxima}"
 
     def _acao_embed(self, *, atacante, defensor, nome, emoji, turno, dano, mana, descricao, efeito="Nenhum"):
-        """Fallback usado somente quando uma ação não veio de um comando."""
-        embed = discord.Embed(
-            title=f"{emoji} {nome}",
-            description=descricao,
-            color=discord.Color.blurple(),
-        )
+        """Fallback visual apenas para ações automáticas do motor."""
+        embed = discord.Embed(title=f"{emoji} {nome}", description=descricao, color=discord.Color.blurple())
         embed.add_field(name="👤 Atacante", value=atacante.get("nome", "User"), inline=True)
         embed.add_field(name="🎯 Alvo", value=defensor.get("nome", "-"), inline=True)
         embed.add_field(name="⚔️ Dano base", value=str(dano), inline=True)
@@ -153,7 +141,7 @@ class Luta(_LutaLegada):
         await self.mostrar_ataque(ctx, embed)
 
     async def _mostrar_inicio(self, ctx):
-        """Mostra o início usando o Embed preparado pelo comando PvE/PvP."""
+        """Mostra o Embed preparado pelo comando PvE/PvP."""
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
             return
@@ -172,8 +160,14 @@ class Luta(_LutaLegada):
             await asyncio.sleep(0.25)
             await self._ataque_monstro(ctx)
 
+    async def _finalizar_pvp(self, ctx, motivo):
+        """Publica primeiro o Embed criado por !matar/!desmaiar."""
+        embed = self._embeds_acao.pop(ctx.channel.id, None)
+        if embed is not None:
+            await ctx.send(embed=embed)
+        return await super()._finalizar_pvp(ctx, motivo)
+
     def preparar_embed(self, ctx, embed):
-        """Entrega um Embed pronto para o próximo ponto de publicação."""
         self._embeds_acao[ctx.channel.id] = embed
 
     async def resultado_ataque(self, ctx):
