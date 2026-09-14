@@ -32,22 +32,39 @@ def _normalizar_nome(valor):
 
 
 def imagem_ataque(nome):
-    # Imagens de ataque desativadas na interface de combate.
+    # Imagens de ataque continuam desativadas na interface de combate.
     return None
 
 
 def imagem_monstro(monstro):
-    # Imagens de monstro desativadas na interface de combate.
-    return None
+    """Retorna a imagem do monstro somente para a apresentação inicial do PvE."""
+    if isinstance(monstro, dict):
+        valor = monstro.get("id") or monstro.get("monstro_id") or monstro.get("nome")
+    else:
+        valor = monstro
+    mapa = {
+        "slime": "slime-luta-url",
+        "goblin": "goblin-luta-url",
+        "lobo": "lobo-luta-url",
+        "orc": "orc-luta-url",
+        "esqueleto": "esqueleto-luta-url",
+        "dragao": "dragao-luta-url",
+        "titan": "titan-luta-url",
+        "fenix": "fenix-luta-url",
+        "demonio": "demonio-luta-url",
+    }
+    url = IMAGENS.get(mapa.get(_normalizar_nome(valor)))
+    return url if isinstance(url, str) and "discord" in url.lower() else None
 
 
 def imagem_golpe(nome):
-    # Imagens de golpes desativadas na interface de combate.
+    # Imagens de golpes continuam desativadas na interface de combate.
     return None
 
 
 def imagens_combate(nome_ataque, monstro=None):
-    return None, None
+    # A imagem do monstro é usada apenas na apresentação inicial do PvE.
+    return None, imagem_monstro(monstro)
 
 
 def _imagem_monstro(oponente):
