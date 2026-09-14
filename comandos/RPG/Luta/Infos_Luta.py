@@ -1,9 +1,4 @@
-"""Informações e regras de referência do sistema de luta.
-
-Este módulo não registra comandos nem envia mensagens. Ele concentra as
-consultas que descrevem o que monstros e golpes podem fazer, deixando o
-motor livre para resolver o combate.
-"""
+"""Informações e regras de referência do sistema de luta."""
 
 from __future__ import annotations
 
@@ -13,8 +8,9 @@ from database.python import luta as luta_db
 
 
 def normalizar(texto: object) -> str:
-    """Normaliza nomes para buscas de monstros, golpes e efeitos."""
-    return unicodedata.normalize("NFKD", str(texto or "")).casefold().strip()
+    """Normaliza nomes para buscas sem diferença de acentos, caixa ou espaços."""
+    texto = unicodedata.normalize("NFKD", str(texto or "")).casefold().strip()
+    return "".join(c for c in texto if not unicodedata.combining(c))
 
 
 def listar_monstros() -> list[tuple[str, dict]]:
@@ -23,7 +19,7 @@ def listar_monstros() -> list[tuple[str, dict]]:
 
 
 def obter_monstro(nome: str):
-    """Localiza um monstro pelo ID ou nome exibido."""
+    """Localiza um monstro pelo ID ou nome exibido, com ou sem acento."""
     alvo = normalizar(nome)
     for monstro_id, dados in luta_db.MONSTROS.items():
         if normalizar(monstro_id) == alvo or normalizar(dados.get("nome")) == alvo:
@@ -33,7 +29,11 @@ def obter_monstro(nome: str):
 
 def obter_golpe(nome: str) -> dict:
     """Retorna os dados de um golpe cadastrado."""
-    return luta_db.GOLPES.get(nome, {})
+    alvo = normalizar(nome)
+    for golpe_id, dados in luta_db.GOLPES.items():
+        if normalizar(golpe_id) == alvo or normalizar(dados.get("nome")) == alvo:
+            return dados
+    return {}
 
 
 def golpes_do_monstro(monstro: dict) -> list[dict]:
