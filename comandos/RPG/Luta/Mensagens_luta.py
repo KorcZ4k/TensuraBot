@@ -1,4 +1,4 @@
-"""Interface visual unica das mensagens de combate."""
+"""Interface visual única das mensagens de combate."""
 
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ IMAGENS = _carregar_imagens()
 
 def imagem_ataque(nome):
     nome = str(nome or "").lower().strip()
-
     if nome == "soco":
         return IMAGENS.get("soco-luta-url")
     elif nome == "chute":
@@ -46,53 +45,42 @@ def imagem_ataque(nome):
         return IMAGENS.get("magia-luta-url")
     elif nome == "habilidade":
         return IMAGENS.get("habilidade-luta-url")
-    else:
-        return IMAGENS.get("ataque-luta-url")
+    return IMAGENS.get("ataque-luta-url")
 
 
 def imagem_monstro(monstro):
-    """Escolha direta: monstro -> URL correspondente no Imagens.json."""
+    """Mapeamento explícito: ID do monstro -> imagem exclusiva."""
     monstro = str(monstro or "").lower().strip()
 
     if monstro == "slime":
-        imagem = IMAGENS.get("slime-luta-url")
+        return IMAGENS.get("slime-luta-url")
     elif monstro == "goblin":
-        imagem = IMAGENS.get("goblin-luta-url")
+        return IMAGENS.get("goblin-luta-url")
     elif monstro == "lobo":
-        imagem = IMAGENS.get("lobo-luta-url")
+        return IMAGENS.get("lobo-luta-url")
     elif monstro == "orc":
-        imagem = IMAGENS.get("orc-luta-url")
+        return IMAGENS.get("orc-luta-url")
     elif monstro == "esqueleto":
-        imagem = IMAGENS.get("esqueleto-luta-url")
+        return IMAGENS.get("esqueleto-luta-url")
     elif monstro == "dragao":
-        imagem = IMAGENS.get("dragao-luta-url")
+        return IMAGENS.get("dragao-luta-url")
     elif monstro == "titan":
-        imagem = IMAGENS.get("titan-luta-url")
+        return IMAGENS.get("titan-luta-url")
     elif monstro == "fenix":
-        imagem = IMAGENS.get("fenix-luta-url")
+        return IMAGENS.get("fenix-luta-url")
     elif monstro == "demonio":
-        imagem = IMAGENS.get("demonio-luta-url")
-    else:
-        imagem = None
-
-    return imagem
+        return IMAGENS.get("demonio-luta-url")
+    return None
 
 
 def imagens_combate(nome_ataque, monstro=None):
-    imagem = imagem_monstro(monstro)
-    return imagem_ataque(nome_ataque), imagem
-
-
-def _imagem_ataque(nome):
-    return imagem_ataque(nome)
+    return imagem_ataque(nome_ataque), imagem_monstro(monstro)
 
 
 def _imagem_monstro(oponente):
     if isinstance(oponente, dict):
-        monstro = oponente.get("id") or oponente.get("monstro_id") or oponente.get("nome")
-    else:
-        monstro = oponente
-    return imagem_monstro(monstro)
+        return imagem_monstro(oponente.get("id") or oponente.get("monstro_id") or oponente.get("nome"))
+    return imagem_monstro(oponente)
 
 
 def _vida(p):
@@ -115,7 +103,6 @@ def _nome(p, padrao="-"):
 
 def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", efeito="Nenhum", alvo="-", turno="-", oponente="-", vida_oponente="-", extra="", cor=None, imagem_ataque=None, imagem_oponente=None):
     nome_oponente = _nome(oponente, str(oponente) if not isinstance(oponente, dict) else "-")
-
     texto = (
         "╭────────────────────────────────────────────╮\n"
         "│              🌙  MOON TENSURA              │\n"
@@ -136,20 +123,17 @@ def painel(*, atacante="User", ataque="Ataque", vida="-", mana="-", dano="-", ef
         texto += f"│ │ → ℹ️ | {extra}\n"
     texto += "╰────────────────────────────────────────────╯"
 
-    mensagem = discord.Embed(
-        title="🌙 MOON TENSURA",
-        description=texto,
-        color=cor or discord.Color.blurple(),
-        timestamp=discord.utils.utcnow(),
-    )
+    mensagem = discord.Embed(title="🌙 MOON TENSURA", description=texto, color=cor or discord.Color.blurple(), timestamp=discord.utils.utcnow())
 
-    url_ataque = imagem_ataque if imagem_ataque is not None else _imagem_ataque(ataque)
-    url_monstro = imagem_oponente if imagem_oponente is not None else _imagem_monstro(oponente)
+    # Monstro sempre tem prioridade. Nunca usar imagem genérica de ataque no lugar dele.
+    url_monstro = imagem_oponente
+    if url_monstro is None and isinstance(oponente, dict) and oponente.get("tipo") == "monstro":
+        url_monstro = _imagem_monstro(oponente)
 
     if url_monstro:
         mensagem.set_image(url=url_monstro)
-    elif url_ataque:
-        mensagem.set_image(url=url_ataque)
+    elif imagem_ataque:
+        mensagem.set_image(url=imagem_ataque)
 
     mensagem.set_footer(text=FOOTER)
     return mensagem
@@ -188,17 +172,4 @@ def ordem_velocidade(participantes):
 
 
 def acao(*, atacante, defensor, nome_ataque, dano=0, efeito="Nenhum", turno="-", extra="", cor=None):
-    return painel(
-        atacante=_nome(atacante, "User"),
-        ataque=nome_ataque,
-        vida=_vida(atacante),
-        mana=_mana(atacante),
-        dano=dano,
-        efeito=efeito or "Nenhum",
-        alvo=_nome(defensor),
-        turno=turno,
-        oponente=defensor or "-",
-        vida_oponente=_vida(defensor),
-        extra=extra,
-        cor=cor,
-    )
+    return painel(atacante=_nome(atacante, "User"), ataque=nome_ataque, vida=_vida(atacante), mana=_mana(atacante), dano=dano, efeito=efeito or "Nenhum", alvo=_nome(defensor), turno=turno, oponente=defensor or "-", vida_oponente=_vida(defensor), extra=extra, cor=cor)
