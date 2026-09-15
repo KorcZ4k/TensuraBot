@@ -174,16 +174,6 @@ async def _criar_ataque_monstro_ui_seguro(self, combate):
     await self._ataque_monstro(ui_ctx)
 
 
-# O balanceamento chama _regras_monstro a partir dos wrappers de dano.
-# O metodo real pertence ao modulo de balanceamento; a ponte evita importar
-# o simbolo com `from ... import`, que quebra quando o balanceamento o mantem
-# como funcao interna de _patch_luta.
-def _regras_monstro_compat(self, dano, resultado, atacante, defensor):
-    from .. import monstros_balanceamento
-    return monstros_balanceamento._regras_monstro(self, dano, resultado, atacante, defensor)
-
-
-Luta._regras_monstro = _regras_monstro_compat
 Luta._ataque_jogador = _ataque_jogador_ui
 Luta._defesa_jogador = _defesa_jogador_ui
 Luta.executar_defesa_jogador = _executar_defesa_ui
