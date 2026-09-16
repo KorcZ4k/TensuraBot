@@ -165,13 +165,94 @@ async def _criar_ataque_monstro_ui_seguro(self, combate):
     """Usa o caminho real do motor para não pular habilidades de boss."""
     atacante = self._obter_atacante(combate)
     defensor = self._obter_defensor(combate)
-    if not atacante or atacante.get("tipo") != "monstro" or not defensor:
-        return
+    if not atacante:
+        raise RuntimeError("não foi possível identificar o atacante do turno")
+    if atacante.get("tipo") != "monstro":
+        raise RuntimeError("tentativa de criar ataque de monstro para atacante que não é monstro")
+    if not defensor:
+        raise RuntimeError("não foi possível identificar o defensor do turno")
     mensagem = combate.get("ui_message")
     if mensagem is None:
-        return
+        raise RuntimeError("combate sem mensagem de interface")
     ui_ctx = _UIContext(mensagem, mensagem, combate, self)
     await self._ataque_monstro(ui_ctx)
+    if combate.get("ativo") and (combate.get("fase") != "defesa" or not combate.get("ataque_pendente")):
+        raise RuntimeError("o ataque do monstro não criou um ataque pendente")
+
+
+_original_avancar = Luta.avancar
+
+
+def _ui_stage_seguro(combate):
+    """Escolhe uma etapa que ainda permite continuar depois de uma falha transitória."""
+    ataque = combate.get("ataque_pendente") or {}
+    if combate.get("fase") == "defesa" and ataque:
+        defensor = next((p for p in combate.get("participantes", []) if str(p.get("id")) == str(ataque.get("defensor_id"))), None)
+        return "defense_action" if defensor and defensor.get("tipo") == "jogador" else "attack"
+    if combate.get("fase") == "ataque":
+        return "turn"
+    return combate.get("ui_stage", "turn")
+
+
+async def _avancar_resiliente(self, interaction):
+    """Serializa cliques e recupera a tela se uma etapa do motor falhar."""
+    combate = self._obter_combate(interaction.channel.id)
+    mensagem = combate.get("ui_message") if combate else None
+    if mensagem is None:
+        return await _original_avancar(self, interaction)
+
+    locks = getattr(self, "_ui_avancar_locks", None)
+    if locks is None:
+        locks = self._ui_avancar_locks = {}
+    lock = locks.setdefault(mensagem.id, asyncio.Lock())
+
+    if lock.locked():
+        if not interaction.response.is_done():
+            await interaction.response.send_message("⏳ Estou processando o avanço anterior. Tente novamente em um instante.", ephemeral=True)
+        else:
+            await interaction.followup.send("⏳ Estou processando o avanço anterior. Tente novamente em um instante.", ephemeral=True)
+        return
+
+    async with lock:
+        try:
+            await _original_avancar(self, interaction)
+            if not combate.get("ativo"):
+                return
+            stage = combate.get("ui_stage")
+            fase = combate.get("fase")
+            ataque = combate.get("ataque_pendente")
+            if stage in {"velocity", "turn"} and fase == "ataque":
+                atacante = self._obter_atacante(combate)
+                if atacante and atacante.get("tipo") == "monstro" and not ataque:
+                    raise RuntimeError("o turno do monstro terminou sem gerar ataque")
+            if stage == "attack" and fase == "defesa" and not ataque:
+                raise RuntimeError("a tela de ataque ficou sem ataque pendente")
+        except Exception as erro:
+            print(f"[LUTA][UI][AVANCAR][ERRO] {type(erro).__name__}: {erro}")
+            traceback.print_exc()
+            if combate.get("ativo") and combate.get("ui_message"):
+                combate["ui_stage"] = _ui_stage_seguro(combate)
+                combate["ui_waiting_advance"] = False
+                atacante = self._obter_atacante(combate) or {}
+                defensor = self._obter_defensor(combate) or {}
+                try:
+                    ui_ctx = self._ui_context(interaction, combate)
+                    erro_embed = painel(
+                        atacante=atacante.get("nome", "User"), ataque="erro recuperável",
+                        vida=ui_ctx._vida(atacante), mana=atacante.get("mana", 0),
+                        dano="-", efeito="Erro", alvo=defensor.get("nome", "-"),
+                        turno=combate.get("numero_turno", 1), oponente=defensor,
+                        vida_oponente=ui_ctx._vida(defensor),
+                        extra=f"❌ Ocorreu um erro nesta etapa: `{type(erro).__name__}: {erro}`\n\nO estado do combate foi preservado. Clique em **Avançar** novamente.",
+                        cor=discord.Color.red(),
+                    )
+                    await self._ui_editar(combate, erro_embed)
+                except Exception as erro_tela:
+                    print(f"[LUTA][UI][RECUPERACAO][ERRO] {type(erro_tela).__name__}: {erro_tela}")
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ Houve uma falha nesta etapa, mas o combate foi preservado. Clique em Avançar novamente.", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ Houve uma falha nesta etapa, mas o combate foi preservado. Clique em Avançar novamente.", ephemeral=True)
 
 
 Luta._ataque_jogador = _ataque_jogador_ui
@@ -179,4 +260,5 @@ Luta._defesa_jogador = _defesa_jogador_ui
 Luta.executar_defesa_jogador = _executar_defesa_ui
 Luta._ui_editar = _ui_editar_seguro
 Luta._criar_ataque_monstro_ui = _criar_ataque_monstro_ui_seguro
+Luta.avancar = _avancar_resiliente
 _UIContext.send = _ui_context_send_seguro
