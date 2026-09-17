@@ -180,9 +180,6 @@ async def _criar_ataque_monstro_ui_seguro(self, combate):
     if not defensor:
         raise RuntimeError("não foi possível identificar o defensor do turno")
 
-    # Primeiro tenta o caminho especial/resiliente já instalado. Se ele não
-    # produzir um ataque, o reparo abaixo cria exatamente um ataque normal com
-    # o mesmo contrato do motor, em vez de deixar fase=ataque sem pendência.
     mensagem = combate.get("ui_message")
     if mensagem is None:
         raise RuntimeError("combate sem mensagem de interface")
@@ -200,8 +197,6 @@ async def _criar_ataque_monstro_ui_seguro(self, combate):
         combate["ui_stage"] = "attack"
         return
 
-    # Último recurso: nunca falha silenciosamente. O _criar_ataque pode ser
-    # especializado por boss via monstros_balanceamento, preservando essas regras.
     ids = atacante.get("golpes", [])
     disponiveis = [luta_db.GOLPES[i] for i in ids if i in luta_db.GOLPES]
     golpe = random.choice(disponiveis) if disponiveis else {
@@ -272,7 +267,10 @@ async def _avancar_resiliente(self, interaction):
             if stage in {"velocity", "turn"} and fase == "ataque":
                 atacante = self._obter_atacante(combate)
                 if atacante and atacante.get("tipo") == "monstro" and not ataque:
-                    await self._criar_ataque_monstro_ui_seguro(self, combate) if False else self._criar_ataque_monstro_ui
+                    await self._criar_ataque_monstro_ui(combate)
+            stage = combate.get("ui_stage")
+            fase = combate.get("fase")
+            ataque = combate.get("ataque_pendente")
             if stage == "attack" and fase == "defesa" and not ataque:
                 raise RuntimeError("a tela de ataque ficou sem ataque pendente")
         except Exception as erro:
