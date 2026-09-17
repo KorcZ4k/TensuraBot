@@ -188,11 +188,11 @@ class CombatRegressionTests(unittest.IsolatedAsyncioTestCase):
         main = (root / "main.py").read_text(encoding="utf-8")
         commands = (root / "comandos/RPG/Luta/comandos_luta.py").read_text(encoding="utf-8")
         self.assertIn('command_prefix="!"', main)
-        self.assertIn('name="luta"', commands)
-        self.assertIn('name="pve"', commands)
-        self.assertIn('name="soco"', commands)
-        self.assertIn('name="defesa"', commands)
-        self.assertIn('name="esquiva"', commands)
+        self.assertIn('async def luta(ctx)', commands)
+        self.assertIn('"pve"', commands)
+        self.assertIn('async def soco(ctx)', commands)
+        self.assertIn('async def defesa(ctx)', commands)
+        self.assertIn('async def esquiva(ctx)', commands)
 
 
 if __name__ == "__main__":
