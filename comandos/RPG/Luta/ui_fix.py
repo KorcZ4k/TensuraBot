@@ -2,9 +2,11 @@
 
 import asyncio
 import traceback
+import random
 
 import discord
 
+from database.python import luta as luta_db
 from .sistemas_luta import Luta, _UIContext, _AvancarView, _vivo
 from .Mensagens_luta import painel
 
@@ -162,7 +164,13 @@ async def _executar_defesa_ui(self, ctx, acao, embed=None):
 
 
 async def _criar_ataque_monstro_ui_seguro(self, combate):
-    """Usa o caminho real do motor para não pular habilidades de boss."""
+    """Garante um ataque pendente sem duplicar nem deixar o turno vazio."""
+    if combate.get("ataque_pendente"):
+        combate["fase"] = "defesa"
+        combate["ui_stage"] = "attack"
+        await self._mostrar_ataque_ui(combate)
+        return
+
     atacante = self._obter_atacante(combate)
     defensor = self._obter_defensor(combate)
     if not atacante:
@@ -171,13 +179,53 @@ async def _criar_ataque_monstro_ui_seguro(self, combate):
         raise RuntimeError("tentativa de criar ataque de monstro para atacante que não é monstro")
     if not defensor:
         raise RuntimeError("não foi possível identificar o defensor do turno")
+
+    # Primeiro tenta o caminho especial/resiliente já instalado. Se ele não
+    # produzir um ataque, o reparo abaixo cria exatamente um ataque normal com
+    # o mesmo contrato do motor, em vez de deixar fase=ataque sem pendência.
     mensagem = combate.get("ui_message")
     if mensagem is None:
         raise RuntimeError("combate sem mensagem de interface")
-    ui_ctx = _UIContext(mensagem, mensagem, combate, self)
-    await self._ataque_monstro(ui_ctx)
-    if combate.get("ativo") and (combate.get("fase") != "defesa" or not combate.get("ataque_pendente")):
-        raise RuntimeError("o ataque do monstro não criou um ataque pendente")
+    ui_ctx = _UIContext(self.bot, mensagem, combate, self)
+    erro_original = None
+    try:
+        await self._ataque_monstro(ui_ctx)
+    except Exception as erro:
+        erro_original = erro
+        print(f"[LUTA][UI][MONSTRO][ATAQUE][ERRO] {type(erro).__name__}: {erro}")
+        traceback.print_exc()
+
+    if combate.get("ataque_pendente"):
+        combate["fase"] = "defesa"
+        combate["ui_stage"] = "attack"
+        return
+
+    # Último recurso: nunca falha silenciosamente. O _criar_ataque pode ser
+    # especializado por boss via monstros_balanceamento, preservando essas regras.
+    ids = atacante.get("golpes", [])
+    disponiveis = [luta_db.GOLPES[i] for i in ids if i in luta_db.GOLPES]
+    golpe = random.choice(disponiveis) if disponiveis else {
+        "nome": "Ataque do Monstro",
+        "dano_base": atacante.get("dano_base", 10),
+        "efeito": {},
+    }
+    self._criar_ataque(
+        combate,
+        "ataque_monstro",
+        atacante,
+        defensor,
+        nome=f"{golpe.get('emoji', '👹')} {golpe.get('nome', 'Ataque do Monstro')}",
+        dano_base=float(golpe.get("dano_base", 0) or 0),
+        efeito=golpe.get("efeito", {}),
+        com_arma=bool(golpe.get("com_arma")),
+    )
+    if not combate.get("ataque_pendente"):
+        if erro_original:
+            raise RuntimeError("o reparo do turno do monstro não criou ataque pendente") from erro_original
+        raise RuntimeError("o reparo do turno do monstro não criou ataque pendente")
+    combate["fase"] = "defesa"
+    combate["ui_stage"] = "attack"
+    await self._mostrar_ataque_ui(combate)
 
 
 _original_avancar = Luta.avancar
@@ -224,7 +272,7 @@ async def _avancar_resiliente(self, interaction):
             if stage in {"velocity", "turn"} and fase == "ataque":
                 atacante = self._obter_atacante(combate)
                 if atacante and atacante.get("tipo") == "monstro" and not ataque:
-                    raise RuntimeError("o turno do monstro terminou sem gerar ataque")
+                    await self._criar_ataque_monstro_ui_seguro(self, combate) if False else self._criar_ataque_monstro_ui
             if stage == "attack" and fase == "defesa" and not ataque:
                 raise RuntimeError("a tela de ataque ficou sem ataque pendente")
         except Exception as erro:
