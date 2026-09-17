@@ -36,37 +36,37 @@ class CombatHardeningTests(unittest.TestCase):
 
     def test_luta_is_the_only_public_fight_command_owner(self):
         main = source("main.py")
-        luta = source("comandos/RPG/luta.py")
+        comandos = source("comandos/RPG/Luta/comandos_luta.py")
         self.assertIn('"comandos.RPG.Luta.comandos_luta"', main)
         self.assertNotIn('"comandos.RPG.luta"', main)
         self.assertNotIn('"comandos.RPG.correcoes_luta"', main)
         self.assertNotIn('"comandos.RPG.correcoes_monstros"', main)
         self.assertNotIn('"comandos.RPG.correcoes_luta_segura"', main)
-        self.assertIn("async def _pve", luta)
-        self.assertIn("async def _monstros", luta)
-        self.assertIn("luta_db.iniciar_cooldown_monstro", luta)
-        self.assertIn("luta_db.cancelar_cooldown_monstro", luta)
-        self.assertIn("⏳", luta)
+        self.assertIn("async def luta(ctx)", comandos)
+        self.assertIn("async def monstros(ctx)", comandos)
+        self.assertIn("async def pve(ctx", comandos)
+        self.assertIn("luta_db.iniciar_cooldown_monstro", comandos)
+        self.assertIn("luta_db.cancelar_cooldown_monstro", comandos)
 
     def test_no_duplicate_combat_cogs_remain(self):
         self.assertFalse((ROOT / "comandos/RPG/correcoes_monstros.py").exists())
         self.assertFalse((ROOT / "comandos/RPG/correcoes_luta_segura.py").exists())
-        self.assertIn("class Luta(commands.Cog)", source("comandos/RPG/luta.py"))
+        self.assertIn("class Luta(commands.Cog)", source("comandos/RPG/Luta/sistemas_luta.py"))
 
     def test_public_commands_are_module_callbacks_without_self_binding(self):
-        text = source("comandos/RPG/luta.py")
+        text = source("comandos/RPG/Luta/comandos_luta.py")
         for signature in (
-            "async def _luta(ctx)",
-            "async def _monstros(ctx)",
-            "async def _pve(ctx, *, monstro_tipo: str = \"\")",
-            "async def _pvp(ctx, membro: Optional[discord.Member] = None)",
-            "async def _soco(ctx)",
-            "async def _chute(ctx)",
-            "async def _defesa(ctx)",
-            "async def _esquiva(ctx)",
-            "async def _fugir(ctx)",
-            "async def _matar(ctx)",
-            "async def _desmaiar(ctx)",
+            "async def luta(ctx)",
+            "async def monstros(ctx)",
+            "async def pve(ctx, *, monstro_tipo: str = \"\")",
+            "async def pvp(ctx, membro: Optional[discord.Member] = None)",
+            "async def soco(ctx)",
+            "async def chute(ctx)",
+            "async def defesa(ctx)",
+            "async def esquiva(ctx)",
+            "async def fugir(ctx)",
+            "async def matar(ctx)",
+            "async def desmaiar(ctx)",
         ):
             self.assertIn(signature, text)
 
@@ -121,10 +121,12 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("timedelta(hours=horas)", text)
 
     def test_pve_reserves_cooldown_only_after_validation(self):
-        text = source("comandos/RPG/luta.py")
+        text = source("comandos/RPG/Luta/comandos_luta.py")
         self.assertLess(text.index("monstro_id = cog._encontrar_monstro"), text.index("luta_db.pode_lutar"))
         self.assertLess(text.index("luta_db.pode_lutar"), text.index("luta_db.iniciar_cooldown_monstro"))
         self.assertLess(text.index("luta_db.iniciar_cooldown_monstro"), text.index("criar_monstro"))
+        self.assertIn("cancelar_cooldown_monstro", text)
+        self.assertIn("cog.combates.pop(ctx.channel.id, None)", text)
 
     def test_rest_and_meditation_always_restore_life(self):
         text = source("database/python/status_async.py")
@@ -233,7 +235,7 @@ class TurnOrderTests(unittest.TestCase):
         self.assertEqual(ordem, ["A", "C", "D"])
 
     def test_pending_defender_is_the_one_who_must_defend(self):
-        text = source("comandos/RPG/luta.py")
+        text = source("comandos/RPG/Luta/sistemas_luta.py")
         self.assertIn('"defensor_id": defensor.get("id")', text)
         self.assertIn('str(defensor.get("id")) != str(ctx.author.id)', text)
 
