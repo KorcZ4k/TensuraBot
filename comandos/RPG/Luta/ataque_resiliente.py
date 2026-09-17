@@ -16,6 +16,13 @@ async def _ataque_monstro_resiliente(self, ctx):
     if not combate or not combate.get("ativo") or combate.get("fase") != "ataque":
         return
 
+    # Um ataque pendente é a fonte de verdade, independentemente da fase/UI.
+    # Nunca crie um segundo ataque para o mesmo turno.
+    if combate.get("ataque_pendente"):
+        if combate.get("fase") != "defesa":
+            combate["fase"] = "defesa"
+        return
+
     erro_original = None
     try:
         await _original_ataque_monstro(self, ctx)
@@ -28,8 +35,13 @@ async def _ataque_monstro_resiliente(self, ctx):
     # Nesse caso NÃO criamos outro ataque, evitando dano/resolução duplicados.
     if not combate.get("ativo"):
         return
-    ataque_pendente = combate.get("ataque_pendente")
-    if combate.get("fase") == "defesa" and ataque_pendente:
+    if combate.get("ataque_pendente"):
+        if combate.get("fase") != "defesa":
+            combate["fase"] = "defesa"
+        try:
+            await self._anunciar_ataque(ctx)
+        except Exception as erro_ui:
+            print(f"[LUTA][MONSTRO][ANUNCIO][ERRO] {type(erro_ui).__name__}: {erro_ui}")
         return
 
     atacante = self._obter_atacante(combate)
@@ -59,11 +71,13 @@ async def _ataque_monstro_resiliente(self, ctx):
         efeito=golpe.get("efeito", {}),
         com_arma=bool(golpe.get("com_arma")),
     )
-    if not ataque or combate.get("ataque_pendente") is not ataque:
-        raise RuntimeError("fallback do monstro não criou ataque pendente")
+    if not ataque or not combate.get("ataque_pendente"):
+        raise RuntimeError("fallback do monstro não criou ataque pendente") from erro_original
 
+    if combate.get("fase") != "defesa":
+        combate["fase"] = "defesa"
     await self._anunciar_ataque(ctx)
-    if combate.get("ativo") and combate.get("fase") == "ataque" and not combate.get("ataque_pendente"):
+    if combate.get("ativo") and not combate.get("ataque_pendente"):
         raise RuntimeError("o anúncio do ataque do monstro não deixou ataque pendente")
 
 
