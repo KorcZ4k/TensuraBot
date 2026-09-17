@@ -1,4 +1,3 @@
-import asyncio
 import unittest
 from types import SimpleNamespace
 
@@ -41,9 +40,8 @@ class CombatRegressionTests(unittest.IsolatedAsyncioTestCase):
             def _obter_combate(self, _):
                 return combate
 
-            def _criar_ataque(self, *args, **kwargs):
-                chamadas.append("criar")
-                raise AssertionError("ataque duplicado")
+            async def _anunciar_ataque(self, _):
+                chamadas.append("anunciar")
 
         class FakeCtx:
             channel = SimpleNamespace(id=1)
@@ -62,17 +60,10 @@ class CombatRegressionTests(unittest.IsolatedAsyncioTestCase):
     async def test_monster_attack_fallback_creates_pending_attack(self):
         import comandos.RPG.Luta.ataque_resiliente as resiliente
 
-        combate = {
-            "ativo": True,
-            "fase": "ataque",
-            "ataque_pendente": None,
-        }
+        combate = {"ativo": True, "fase": "ataque", "ataque_pendente": None}
         atacante = {
-            "id": "monstro",
-            "tipo": "monstro",
-            "vida": 100,
-            "golpes": ["golpe_inexistente"],
-            "dano_base": 10,
+            "id": "monstro", "tipo": "monstro", "vida": 100,
+            "golpes": ["golpe_inexistente"], "dano_base": 10,
         }
         defensor = {"id": "jogador", "tipo": "jogador", "vida": 100}
         anuncios = []
@@ -89,8 +80,7 @@ class CombatRegressionTests(unittest.IsolatedAsyncioTestCase):
 
             def _criar_ataque(self, combate, *_args, **kwargs):
                 ataque = {
-                    "atacante_id": "monstro",
-                    "defensor_id": "jogador",
+                    "atacante_id": "monstro", "defensor_id": "jogador",
                     "dano_base": kwargs["dano_base"],
                 }
                 combate["ataque_pendente"] = ataque
@@ -124,11 +114,8 @@ class CombatRegressionTests(unittest.IsolatedAsyncioTestCase):
         defensor = {"id": "jogador", "tipo": "jogador", "vida": 100}
         ataque = {"atacante_id": "monstro", "defensor_id": "jogador"}
         combate = {
-            "ativo": True,
-            "fase": "defesa",
-            "ataque_pendente": ataque,
-            "ui_stage": "defense_action",
-            "ui_waiting_advance": False,
+            "ativo": True, "fase": "defesa", "ataque_pendente": ataque,
+            "ui_stage": "defense_action", "ui_waiting_advance": False,
             "participantes": [atacante, defensor],
         }
         mensagens = []
@@ -172,6 +159,27 @@ class CombatRegressionTests(unittest.IsolatedAsyncioTestCase):
         resultado = _normalizar_recompensa(monstro)
         self.assertEqual(resultado["tp_recompensa"], 75)
         self.assertEqual(resultado["hunos_recompensa"], 60)
+
+    def test_pve_reserves_cooldown_after_all_preconditions(self):
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        text = (root / "comandos/RPG/Luta/comandos_luta.py").read_text(encoding="utf-8")
+        self.assertLess(text.index("monstro_id = cog._encontrar_monstro"), text.index("luta_db.pode_lutar"))
+        self.assertLess(text.index("luta_db.pode_lutar"), text.index("luta_db.iniciar_cooldown_monstro"))
+        self.assertLess(text.index("luta_db.iniciar_cooldown_monstro"), text.index("criar_monstro"))
+        self.assertIn("cancelar_cooldown_monstro", text)
+        self.assertIn("cog.combates.pop(ctx.channel.id, None)", text)
+
+    def test_reward_contract_is_present_in_generated_monster_paths(self):
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        contract = (root / "comandos/RPG/Luta/contrato_monstro.py").read_text(encoding="utf-8")
+        event = (root / "comandos/RPG/evento_monstros.py").read_text(encoding="utf-8")
+        self.assertIn("tp_recompensa", contract)
+        self.assertIn("criar_monstro_balanceado", contract)
+        self.assertIn("monstro['tp_recompensa']", event)
 
     def test_prefix_and_public_commands_remain_exclamation_based(self):
         from pathlib import Path
