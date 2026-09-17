@@ -5,14 +5,36 @@ import traceback
 from . import ui_fix
 from .sistemas_luta import Luta
 
-# Garante que as regras especiais dos monstros estejam aplicadas antes dos wrappers.
+# O balanceamento precisa ser carregado antes dos wrappers, pois instala as
+# regras especiais dos monstros diretamente na classe Luta.
 from .. import monstros_balanceamento  # noqa: F401,E402
 
+# Auditoria de compatibilidade: todos estes métodos são usados pelo fluxo de
+# ataque/defesa dos monstros. Se um patch futuro remover algum deles, o erro
+# fica explícito no carregamento em vez de aparecer no meio de uma luta.
+_METODOS_MONSTRO_OBRIGATORIOS = (
+    "_regras_monstro",
+    "_criar_ataque",
+    "_ataque_monstro",
+    "_resolver_ataque",
+    "_aplicar_efeitos_inicio",
+    "_dano_fisico",
+    "_dano_magia",
+    "_aplicar_efeito",
+    "_proximo_turno",
+    "_recompensar",
+    "_aplicar_corrosao",
+    "_matar_invocados_por_boss",
+    "_obter_combate_por_participantes",
+)
 
-# ``_aplicar_corrosao`` é definido dentro de ``_patch_luta`` no módulo de
-# balanceamento. Ele precisa ser instalado na classe junto das demais regras;
-# sem esta ponte, qualquer ataque físico/mágico de jogador contra um alvo que
-# use o balanceamento quebra com AttributeError antes de concluir a defesa.
+# Fenix já possui comportamento especial no balanceamento (cura e queimadura),
+# então precisa ser reconhecida como boss pelo criador balanceado também.
+monstros_balanceamento.BOSS_IDS.add("fenix")
+
+# ``_aplicar_corrosao`` é uma rotina definida dentro de ``_patch_luta`` no
+# módulo de balanceamento. Mantemos a implementação diretamente na classe para
+# que o método exista mesmo se a ordem de imports mudar no futuro.
 def _aplicar_corrosao_robusto(self, dano, defensor):
     corrosao = next(
         (
@@ -24,11 +46,19 @@ def _aplicar_corrosao_robusto(self, dano, defensor):
     )
     if not corrosao:
         return dano
-    stacks = min(3, max(1, int(corrosao.get("acumulo", 1))))
+    try:
+        stacks = min(3, max(1, int(corrosao.get("acumulo", 1))))
+    except (TypeError, ValueError):
+        stacks = 1
     return int(dano * (1 - 0.10 * stacks))
 
 
 Luta._aplicar_corrosao = _aplicar_corrosao_robusto
+
+# Verificação final após todos os patches do balanceamento.
+_faltantes = [nome for nome in _METODOS_MONSTRO_OBRIGATORIOS if not callable(getattr(Luta, nome, None))]
+if _faltantes:
+    raise RuntimeError("[LUTA] Métodos obrigatórios de monstros ausentes: " + ", ".join(_faltantes))
 
 
 _original_resolver_defesa_ui = ui_fix._resolver_defesa_ui
