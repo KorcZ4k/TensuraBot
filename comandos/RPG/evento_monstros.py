@@ -9,7 +9,7 @@ from discord.ext import commands
 
 from database.python import luta as luta_db
 from database.python.mongodb import run_db
-from .monstros_balanceamento import criar_monstro_balanceado
+from .Luta.contrato_monstro import criar_monstro_balanceado_contrato as criar_monstro_balanceado
 
 
 GUILD_ID = 1543039757146136586
