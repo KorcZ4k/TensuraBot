@@ -43,7 +43,7 @@ class PerformanceSafetyTests(unittest.TestCase):
             self.assertEqual(load_json(str(path))["version"], 2)
 
     def test_optimized_wrappers_keep_extension_setup(self):
-        for relative in ("comandos/RPG/luta.py", "comandos/RPG/magias.py", "comandos/RPG/status.py"):
+        for relative in ("comandos/RPG/Luta/comandos_luta.py", "comandos/RPG/magias.py", "comandos/RPG/status.py"):
             source = (ROOT / relative).read_text(encoding="utf-8")
             tree = ast.parse(source, filename=relative)
             functions = {node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
