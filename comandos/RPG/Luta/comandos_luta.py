@@ -15,7 +15,7 @@ from database.python.mongodb import run_db
 from database.python import luta as luta_db
 from ..luta import _criar_participante
 from .Mensagens_luta import imagem_monstro, painel
-from .sistemas_luta import Luta
+from .hardening_final import Luta
 
 FOOTER = "Tensura Moon - Korczak Technologies!"
 
