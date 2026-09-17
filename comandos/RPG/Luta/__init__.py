@@ -15,5 +15,7 @@ from . import robustez  # noqa: F401,E402
 from . import ataque_resiliente  # noqa: F401,E402
 # Invariantes: um ataque pendente nunca troca de atacante/alvo silenciosamente.
 from . import integridade_estado  # noqa: F401,E402
+# Contrato de dados: normaliza as recompensas antes dos eventos importarem o gerador.
+from . import contrato_monstro  # noqa: F401,E402
 
 __all__ = ["Infos_Luta", "Mensagens_luta", "sistemas_luta", "comandos_luta"]
