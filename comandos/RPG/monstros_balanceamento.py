@@ -354,6 +354,9 @@ def _patch_luta():
             await luta_db.run_db(luta_db.db["Hunos"].update_one, filtro, {"$inc": {"carteira": ganho_hunos}}, upsert=True)
         return xp, hunos
 
+    # Instala também os dois helpers chamados por outros métodos do próprio
+    # patch. Sem estas atribuições, o fluxo quebrava somente quando uma luta
+    # chegava a morte do Cavaleiro Esquelético.
     Luta._regras_monstro = _regras_monstro
     Luta._criar_ataque = criar_ataque_boss
     Luta._ataque_monstro = ataque_monstro_boss
@@ -364,6 +367,8 @@ def _patch_luta():
     Luta._aplicar_efeito = efeito_boss
     Luta._proximo_turno = proximo_turno_boss
     Luta._recompensar = recompensar_sem_tp
+    Luta._matar_invocados_por_boss = _matar_invocados_por_boss
+    Luta._obter_combate_por_participantes = _obter_combate_por_participantes
 
 
 _patch_luta()
