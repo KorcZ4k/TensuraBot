@@ -9,6 +9,28 @@ from .sistemas_luta import Luta
 from .. import monstros_balanceamento  # noqa: F401,E402
 
 
+# ``_aplicar_corrosao`` é definido dentro de ``_patch_luta`` no módulo de
+# balanceamento. Ele precisa ser instalado na classe junto das demais regras;
+# sem esta ponte, qualquer ataque físico/mágico de jogador contra um alvo que
+# use o balanceamento quebra com AttributeError antes de concluir a defesa.
+def _aplicar_corrosao_robusto(self, dano, defensor):
+    corrosao = next(
+        (
+            efeito
+            for efeito in defensor.get("efeitos", [])
+            if str(efeito.get("nome", "")).casefold() == "corrosao"
+        ),
+        None,
+    )
+    if not corrosao:
+        return dano
+    stacks = min(3, max(1, int(corrosao.get("acumulo", 1))))
+    return int(dano * (1 - 0.10 * stacks))
+
+
+Luta._aplicar_corrosao = _aplicar_corrosao_robusto
+
+
 _original_resolver_defesa_ui = ui_fix._resolver_defesa_ui
 
 
