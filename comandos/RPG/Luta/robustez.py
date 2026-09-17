@@ -1,12 +1,58 @@
 """Camada de robustez para falhas transitórias do fluxo de combate."""
 
+import random
 import traceback
 
 from . import ui_fix
 from .sistemas_luta import Luta
+from database.python import luta as luta_db
 
-# O balanceamento precisa ser carregado antes dos wrappers, pois instala as
-# regras especiais dos monstros diretamente na classe Luta.
+
+# Compatibilidade de carregamento: o balanceamento de monstros envolve
+# ``_ataque_monstro`` antes de instalar o próprio wrapper. O motor atual usa
+# ``_criar_ataque_monstro_ui`` na interface, mas o contrato legado também é
+# usado pelos patches e pelos eventos automáticos. Mantemos um único fallback
+# pequeno aqui em vez de duplicar o motor de resolução.
+if not callable(getattr(Luta, "_ataque_monstro", None)):
+    async def _ataque_monstro_base(self, ctx):
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo") or combate.get("fase") != "ataque":
+            return
+        if combate.get("ataque_pendente"):
+            combate["fase"] = "defesa"
+            return
+        atacante = self._obter_atacante(combate)
+        defensor = self._obter_defensor(combate)
+        if not atacante or atacante.get("tipo") != "monstro":
+            raise RuntimeError("turno de monstro sem atacante válido")
+        if not defensor:
+            raise RuntimeError("turno de monstro sem defensor válido")
+        ids = atacante.get("golpes", [])
+        disponiveis = [luta_db.GOLPES[i] for i in ids if i in luta_db.GOLPES]
+        golpe = random.choice(disponiveis) if disponiveis else {
+            "nome": "Ataque do Monstro",
+            "dano_base": atacante.get("dano_base", 10),
+            "efeito": {},
+        }
+        self._criar_ataque(
+            combate,
+            "ataque_monstro",
+            atacante,
+            defensor,
+            nome=f"{golpe.get('emoji', '👹')} {golpe.get('nome', 'Ataque do Monstro')}",
+            dano_base=float(golpe.get("dano_base", 0) or 0),
+            efeito=golpe.get("efeito", {}),
+            com_arma=bool(golpe.get("com_arma")),
+        )
+        if not combate.get("ataque_pendente"):
+            raise RuntimeError("ataque de monstro não criou ataque pendente")
+        await self._anunciar_ataque(ctx)
+
+    Luta._ataque_monstro = _ataque_monstro_base
+
+
+# O balanceamento instala as regras especiais dos monstros diretamente na
+# classe Luta. Ele precisa ser carregado antes dos wrappers abaixo.
 from .. import monstros_balanceamento  # noqa: F401,E402
 
 # Auditoria de compatibilidade: todos estes métodos são usados pelo fluxo de
@@ -72,8 +118,6 @@ async def _resolver_defesa_ui_robusto(self, ctx, combate, ataque, defensor, atac
         return await _original_resolver_defesa_ui(self, ctx, combate, ataque, defensor, atacante)
     except Exception:
         traceback.print_exc()
-        # A resolução já pode ter sido aplicada antes de falhar ao salvar/editar
-        # a mensagem. Nesse caso, repetir a defesa causaria dano/efeito duplicado.
         aplicado = (
             combate.get("fase") == "ataque"
             and combate.get("ataque_pendente") is None
