@@ -73,11 +73,13 @@ async def _executar_defesa_unificado(self, ctx, acao, embed=None):
     combate["ui_waiting_advance"] = False
 
     try:
-        # Não marcamos _resolvendo aqui: o resolver canonico é o dono desse lock.
-        # Assim cura, assentamento e finalização PvP seguem exatamente as mesmas regras.
+        # O resolver canônico permanece como dono da resolução para preservar
+        # cura, efeitos, assentamento, PvP e finalização.
         await self._resolver_ataque(ui)
     except Exception as erro:
         print(f"[LUTA][DEFESA][ERRO] {type(erro).__name__}: {erro}")
+        # Uma exceção nunca pode deixar o lock lógico da defesa preso.
+        ataque.pop("_resolvendo", None)
         if combate.get("ativo") and combate.get("ataque_pendente") is ataque:
             combate["ui_stage"] = "defense_action"
             combate["ui_waiting_advance"] = False
