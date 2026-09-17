@@ -1,17 +1,25 @@
-"""Normaliza o contrato dos monstros sem alterar o balanceamento existente."""
+"""Contrato único de atributos e recompensas dos monstros."""
 
 from database.python import luta as luta_db
 
 
 def _normalizar_recompensa(monstro):
-    """Garante que todo monstro tenha XP, TP e Hunos coerentes."""
     if not monstro:
         return monstro
     xp = int(float(monstro.get("xp_recompensa", 0) or 0))
     monstro.setdefault("tp_recompensa", xp)
     monstro.setdefault("hunos_recompensa", 0)
+    monstro.setdefault("vida", monstro.get("vida_base", 1))
+    monstro.setdefault("vida_maxima", monstro.get("vida", 1))
+    monstro.setdefault("dano_base", 0)
+    monstro.setdefault("golpes", [])
     return monstro
 
+
+# A própria tabela também precisa respeitar o contrato; eventos que consultam
+# MONSTROS diretamente não podem encontrar um dicionário sem tp_recompensa.
+for _dados in luta_db.MONSTROS.values():
+    _normalizar_recompensa(_dados)
 
 _original_criar_monstro = luta_db.criar_monstro
 
