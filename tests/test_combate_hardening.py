@@ -51,7 +51,7 @@ class CombatHardeningTests(unittest.TestCase):
     def test_no_duplicate_combat_cogs_remain(self):
         self.assertFalse((ROOT / "comandos/RPG/correcoes_monstros.py").exists())
         self.assertFalse((ROOT / "comandos/RPG/correcoes_luta_segura.py").exists())
-        self.assertIn("class Luta(commands.Cog)", source("comandos/RPG/Luta/sistemas_luta.py"))
+        self.assertIn("class Luta(_LutaLegada)", source("comandos/RPG/Luta/sistemas_luta.py"))
 
     def test_public_commands_are_module_callbacks_without_self_binding(self):
         text = source("comandos/RPG/Luta/comandos_luta.py")
@@ -235,7 +235,7 @@ class TurnOrderTests(unittest.TestCase):
         self.assertEqual(ordem, ["A", "C", "D"])
 
     def test_pending_defender_is_the_one_who_must_defend(self):
-        text = source("comandos/RPG/Luta/sistemas_luta.py")
+        text = source("comandos/RPG/luta.py")
         self.assertIn('"defensor_id": defensor.get("id")', text)
         self.assertIn('str(defensor.get("id")) != str(ctx.author.id)', text)
 
