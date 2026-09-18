@@ -272,9 +272,12 @@ class LutaInvariantTests(unittest.TestCase):
     def test_ataque_pendente_e_fonte_de_verdade_mesmo_com_fase_incorreta(self):
         cog, c = _cog(), _combat()
         a, d = c["participantes"]
-        primeiro = cog._criar_ataque(c, "soco", a, d, dano_base=10)
+        a["tipo"], a["equipe"] = "monstro", "inimigos"
+        d["tipo"], d["equipe"] = "jogador", "jogadores"
+        primeiro = cog._criar_ataque(c, "ataque_monstro", a, d, dano_base=10)
         c["fase"] = "ataque"
-        resultado = asyncio.run(cog._ataque_monstro(type("Ctx", (), {"channel": type("Ch", (), {"id": 1})()})())) if a.get("tipo") == "monstro" else primeiro
+        cog.combates[1] = c
+        resultado = asyncio.run(cog._ataque_monstro(type("Ctx", (), {"channel": type("Ch", (), {"id": 1})()})()))
         self.assertIs(c["ataque_pendente"], primeiro)
         self.assertIs(resultado, primeiro)
         self.assertEqual(c["fase"], "defesa")
