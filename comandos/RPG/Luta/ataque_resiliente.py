@@ -7,6 +7,8 @@ tempo de importação; a função abaixo pode ser usada por integrações antiga
 import random
 from database.python import luta as luta_db
 
+_original_ataque_monstro = None
+
 
 async def _ataque_monstro_resiliente(self, ctx):
     combate = self._obter_combate(ctx.channel.id)
@@ -17,7 +19,8 @@ async def _ataque_monstro_resiliente(self, ctx):
         combate["ui_stage"] = "attack"
         return combate["ataque_pendente"]
     try:
-        ataque = await self._ataque_monstro(ctx)
+        callback = _original_ataque_monstro or self._ataque_monstro
+        ataque = await callback(self, ctx) if _original_ataque_monstro else await callback(ctx)
         if ataque is not None:
             return ataque
     except Exception as erro_original:
