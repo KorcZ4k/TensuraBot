@@ -298,6 +298,9 @@ async def chute(ctx):
 
 
 async def defesa(ctx):
+    cog = await _cog(ctx)
+    if cog is None:
+        return
     async with cog._lock(ctx.channel.id):
         combate = cog._obter_combate(ctx.channel.id)
         atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
@@ -309,6 +312,9 @@ async def defesa(ctx):
 
 
 async def esquiva(ctx):
+    cog = await _cog(ctx)
+    if cog is None:
+        return
     async with cog._lock(ctx.channel.id):
         combate = cog._obter_combate(ctx.channel.id)
         atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
@@ -355,24 +361,18 @@ async def matar(ctx):
     cog = await _cog(ctx)
     if cog is None:
         return
-    combate = cog._obter_combate(ctx.channel.id)
-    vencedor = cog._participante(combate, combate.get("vencedor_id")) if combate else None
-    embed = painel(atacante=ctx.author.display_name, ataque="resultado", vida=_vida(vencedor), mana=_mana(vencedor), dano="-", efeito="Finalização", alvo="-", turno="fim", oponente="Combate encerrado", vida_oponente="-", extra=f"**☠️ {vencedor.get('nome')} escolheu finalizar o PvP com morte.**" if vencedor else "**☠️ Finalização por morte.**", cor=discord.Color.dark_red())
     async with cog._lock(ctx.channel.id):
-        cog.preparar_embed(ctx, embed)
         await cog._finalizar_pvp(ctx, "morte")
+
 
 
 async def desmaiar(ctx):
     cog = await _cog(ctx)
     if cog is None:
         return
-    combate = cog._obter_combate(ctx.channel.id)
-    vencedor = cog._participante(combate, combate.get("vencedor_id")) if combate else None
-    embed = painel(atacante=ctx.author.display_name, ataque="resultado", vida=_vida(vencedor), mana=_mana(vencedor), dano="-", efeito="Finalização", alvo="-", turno="fim", oponente="Combate encerrado", vida_oponente="-", extra=f"**💤 {vencedor.get('nome')} escolheu finalizar o PvP por desmaio.**" if vencedor else "**💤 Finalização por desmaio.**", cor=discord.Color.orange())
     async with cog._lock(ctx.channel.id):
-        cog.preparar_embed(ctx, embed)
         await cog._finalizar_pvp(ctx, "desmaio")
+
 
 
 def _comando(callback, nome, **kwargs):
