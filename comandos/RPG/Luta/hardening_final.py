@@ -366,7 +366,7 @@ class Luta(_BaseLuta):
                     await self._salvar(combate)
                 except Exception as save_erro:
                     print(f"[LUTA][ROLLBACK][ERRO] {type(save_erro).__name__}: {save_erro}")
-            raise erro
+            raise
         finally:
             if combate is not None:
                 await self._limpar_recursos_combate(ctx.channel.id, combate)
