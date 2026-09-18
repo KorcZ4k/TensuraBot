@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import discord
+from database.python import luta as luta_db
 
 from .sistemas_luta import Luta as _BaseLuta, _UIContext, _AvancarView, _vivo
 
@@ -133,13 +134,13 @@ class Luta(_BaseLuta):
             return None
         if combate.get("ataque_pendente"):
             combate["fase"] = "defesa"
+            combate["ui_stage"] = "attack"
             return combate["ataque_pendente"]
         atacante = self._obter_atacante(combate)
         defensor = self._obter_defensor(combate)
         if not atacante or not defensor or atacante.get("tipo") != "monstro":
             raise RuntimeError("turno do monstro sem atacante/defensor válido")
         import random
-        from database.python import luta as luta_db
         golpes = [luta_db.GOLPES[i] for i in (atacante.get("golpes") or []) if i in luta_db.GOLPES]
         if not golpes:
             raise RuntimeError("monstro sem golpe válido")
@@ -219,6 +220,13 @@ class Luta(_BaseLuta):
                 await self._ui_context(ctx, combate).send(f"❌ Erro ao resolver a defesa: `{type(erro).__name__}: {erro}`.", _luta_error=True)
             return
 
+    async def _limpar_recursos_combate(self, channel_id, combate):
+        self._embeds_acao.pop(channel_id, None)
+        mensagem = combate.get("ui_message")
+        if mensagem is not None:
+            self._ui_views.pop(mensagem.id, None)
+            getattr(self, "_ui_avancar_locks", {}).pop(mensagem.id, None)
+
     async def _recompensar(self, combate):
         """Único cálculo de recompensa: XP, TP e Hunos dos monstros derrotados."""
         if self._condicao_vitoria(combate) != "jogadores" or luta_db.db is None:
@@ -269,6 +277,17 @@ class Luta(_BaseLuta):
         await self._finalizar(ctx, motivo=motivo, vencedor=vencedor, perdedor=perdedor)
 
     async def avancar(self, interaction: discord.Interaction):
+        channel_id = interaction.channel.id
+        lock = self._lock(channel_id)
+        if lock.locked():
+            msg = "⏳ Aguarde a ação de combate anterior terminar."
+            if not interaction.response.is_done(): await interaction.response.send_message(msg, ephemeral=True)
+            else: await interaction.followup.send(msg, ephemeral=True)
+            return
+        async with lock:
+            return await self._avancar_locked(interaction)
+
+    async def _avancar_locked(self, interaction: discord.Interaction):
         combate = self._obter_combate(interaction.channel.id)
         if not combate or not combate.get("ativo"):
             return await super().avancar(interaction)
@@ -285,20 +304,10 @@ class Luta(_BaseLuta):
             else:
                 await interaction.followup.send("❌ Apenas o jogador deste combate pode avançar a tela.", ephemeral=True)
             return
-        locks = getattr(self, "_ui_avancar_locks", {})
-        self._ui_avancar_locks = locks
-        lock = locks.setdefault(mensagem.id, asyncio.Lock())
-        if lock.locked():
-            if not interaction.response.is_done():
-                await interaction.response.send_message("⏳ Aguarde o avanço anterior terminar.", ephemeral=True)
-            else:
-                await interaction.followup.send("⏳ Aguarde o avanço anterior terminar.", ephemeral=True)
-            return
         if not interaction.response.is_done():
             await interaction.response.defer()
-        async with lock:
-            self._normalizar_estado(combate)
-            try:
+        self._normalizar_estado(combate)
+        try:
                 stage = combate.get("ui_stage", "attributes")
                 if combate.get("ataque_pendente"):
                     await self._mostrar_ataque_ui(combate)
@@ -337,8 +346,8 @@ class Luta(_BaseLuta):
                     await self._ui_editar(combate, self._embed_defesa(combate))
                 elif stage == "resolving":
                     await interaction.followup.send("❌ A defesa está sendo processada. Aguarde o resultado.", ephemeral=True)
-            except Exception as erro:
-                combate["ui_waiting_advance"] = False
+        except Exception as erro:
+            combate["ui_waiting_advance"] = False
                 if combate.get("ataque_pendente"):
                     combate["fase"] = "defesa"
                     combate["ui_stage"] = "attack"
