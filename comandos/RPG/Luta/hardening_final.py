@@ -531,5 +531,3 @@ class Luta(_BaseLuta):
             return
         return await super()._proximo_turno(ctx)
 
-
-_AvancarView._callback = _callback_avancar_seguro
