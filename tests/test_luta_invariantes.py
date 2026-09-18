@@ -12,6 +12,7 @@ def _cog():
     cog._embeds_acao = {}
     cog._ui_views = {}
     cog._ui_avancar_locks = {}
+    cog._locks = {}
     return cog
 
 
