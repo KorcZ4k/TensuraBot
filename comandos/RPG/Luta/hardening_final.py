@@ -354,10 +354,22 @@ class Luta(_BaseLuta):
 
     async def _finalizar(self, ctx, motivo="vida", vencedor=None, perdedor=None):
         combate = self._obter_combate(ctx.channel.id)
-        resultado = await super()._finalizar(ctx, motivo=motivo, vencedor=vencedor, perdedor=perdedor)
-        if combate is not None:
-            await self._limpar_recursos_combate(ctx.channel.id, combate)
-        return resultado
+        try:
+            return await super()._finalizar(ctx, motivo=motivo, vencedor=vencedor, perdedor=perdedor)
+        except Exception as erro:
+            if combate is not None and combate.get("ativo") is False and not combate.get("recompensa_aplicada"):
+                combate["ativo"] = True
+                combate["fase"] = "defesa" if combate.get("ataque_pendente") else "ataque"
+                combate["ui_stage"] = "attack" if combate.get("ataque_pendente") else "turn"
+                combate["ui_waiting_advance"] = False
+                try:
+                    await self._salvar(combate)
+                except Exception as save_erro:
+                    print(f"[LUTA][ROLLBACK][ERRO] {type(save_erro).__name__}: {save_erro}")
+            raise erro
+        finally:
+            if combate is not None:
+                await self._limpar_recursos_combate(ctx.channel.id, combate)
 
     async def _finalizar_pvp(self, ctx, motivo):
         """Finaliza PvP somente quando existe uma vitória pendente válida."""
