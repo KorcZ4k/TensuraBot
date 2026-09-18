@@ -276,7 +276,7 @@ class Luta(_BaseLuta):
         vivos = [p for p in combate.get("participantes", [])
                  if p.get("tipo") == "jogador" and _vivo(p)]
         if not vivos:
-            return xp_total, hunos_total
+            return xp_total, hunos_total, tp_total
         guild_id = str(combate.get("guild_id"))
         for i, jogador in enumerate(vivos):
             xp = xp_total // len(vivos) + (i < xp_total % len(vivos))
@@ -286,6 +286,13 @@ class Luta(_BaseLuta):
             await luta_db.run_db(luta_db.db["Jogadores"].update_one, filtro, {"$inc": {"XP": int(xp), "TP": int(tp)}})
             await luta_db.run_db(luta_db.db["Hunos"].update_one, filtro, {"$inc": {"carteira": int(hunos)}}, upsert=True)
         return xp_total, hunos_total
+
+    async def _finalizar(self, ctx, motivo="vida", vencedor=None, perdedor=None):
+        combate = self._obter_combate(ctx.channel.id)
+        resultado = await super()._finalizar(ctx, motivo=motivo, vencedor=vencedor, perdedor=perdedor)
+        if combate is not None:
+            await self._limpar_recursos_combate(ctx.channel.id, combate)
+        return resultado
 
     async def _finalizar_pvp(self, ctx, motivo):
         """Finaliza PvP somente quando existe uma vitória pendente válida."""
