@@ -112,7 +112,7 @@ def adicionar_efeito(defensor,efeito):
 def efeito_especial(defensor,efeito):
     if not isinstance(efeito,dict): return None
     nome=str(efeito.get("nome",efeito.get("tipo",""))).casefold()
-    if eh(defensor,"dragao-adulto") and nome in {"stun","paralisia","sono","sleep","prisao","prisão"} and random.random()<.75: return None
+    if eh(defensor,"dragao-adulto") and nome in {"stun","paralisia","sono","sleep","prisao","prisão"} and random.random()<.75: return False
     if nome in {"corrosao","sangramento_profundo"}: return adicionar_efeito(defensor,efeito)
     return None
 
