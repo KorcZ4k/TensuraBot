@@ -297,29 +297,25 @@ async def chute(ctx):
 
 
 async def defesa(ctx):
-    cog = await _cog(ctx)
-    if cog is None:
-        return
-    combate = cog._obter_combate(ctx.channel.id)
-    atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
-    defensor = cog._obter_defensor(combate) if combate else atacante
-    golpe = luta_db.GOLPES.get("defesa", {})
-    embed = _embed_acao("🛡️ Defesa", defensor, atacante, combate.get("numero_turno", 1) if combate else 1, mana=_valor_int(golpe.get("custo_mana")), efeito="Redução de dano", extra=golpe.get("descricao", "Reduz o dano do próximo ataque."))
     async with cog._lock(ctx.channel.id):
+        combate = cog._obter_combate(ctx.channel.id)
+        atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
+        defensor = cog._obter_defensor(combate) if combate else atacante
+        golpe = luta_db.GOLPES.get("defesa", {})
+        embed = _embed_acao("🛡️ Defesa", defensor, atacante, combate.get("numero_turno", 1) if combate else 1, mana=_valor_int(golpe.get("custo_mana")), efeito="Redução de dano", extra=golpe.get("descricao", "Reduz o dano do próximo ataque."))
         await cog.executar_defesa_jogador(ctx, "defesa", embed=embed)
 
 
+
 async def esquiva(ctx):
-    cog = await _cog(ctx)
-    if cog is None:
-        return
-    combate = cog._obter_combate(ctx.channel.id)
-    atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
-    defensor = cog._obter_defensor(combate) if combate else atacante
-    golpe = luta_db.GOLPES.get("esquiva", {})
-    embed = _embed_acao("💨 Esquiva", defensor, atacante, combate.get("numero_turno", 1) if combate else 1, mana=_valor_int(golpe.get("custo_mana")), efeito="Tentativa de esquiva", extra=golpe.get("descricao", "Tenta desviar do próximo ataque."))
     async with cog._lock(ctx.channel.id):
+        combate = cog._obter_combate(ctx.channel.id)
+        atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
+        defensor = cog._obter_defensor(combate) if combate else atacante
+        golpe = luta_db.GOLPES.get("esquiva", {})
+        embed = _embed_acao("💨 Esquiva", defensor, atacante, combate.get("numero_turno", 1) if combate else 1, mana=_valor_int(golpe.get("custo_mana")), efeito="Tentativa de esquiva", extra=golpe.get("descricao", "Tenta desviar do próximo ataque."))
         await cog.executar_defesa_jogador(ctx, "esquiva", embed=embed)
+
 
 
 async def fugir(ctx):
