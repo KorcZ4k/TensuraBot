@@ -39,6 +39,19 @@ def _combat():
 
 
 class LutaInvariantTests(unittest.TestCase):
+    def test_motor_e_unico_e_sistemas_e_apenas_compatibilidade(self):
+        from comandos.RPG.Luta import sistemas_luta
+        from comandos.RPG.Luta.hardening_final import Luta as LutaFinal
+        from comandos.RPG.luta import Luta as LutaCanonica
+        self.assertIs(sistemas_luta.Luta, LutaCanonica)
+        self.assertTrue(issubclass(LutaFinal, LutaCanonica))
+
+    def test_camadas_de_dados_nao_expoem_calculo_de_dano(self):
+        import database.python.luta as luta_db
+        self.assertFalse(hasattr(luta_db, "calcular_dano"))
+        self.assertFalse(hasattr(luta_db, "aplicar_dano"))
+        self.assertFalse(hasattr(luta_db, "esta_vivo"))
+
     def test_turno_preserva_identidade_mesmo_com_lista_reordenada(self):
         cog, c = _cog(), _combat()
         cog._normalizar_estado(c)
