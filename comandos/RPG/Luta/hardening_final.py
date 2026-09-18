@@ -447,8 +447,7 @@ class Luta(_BaseLuta):
             elif stage == "attack":
                 defensor = self._obter_defensor(combate)
                 if defensor and defensor.get("tipo") == "monstro":
-                    defensor["defesa_ativa"] = False
-                    defensor["esquiva_ativa"] = False
+                    self._limpar_defesas(combate)
                     await self._resolver_ataque(self._ui_context(interaction, combate))
                 else:
                     combate["ui_stage"] = "defense_action"
@@ -517,11 +516,7 @@ class Luta(_BaseLuta):
             combate["ataque_pendente"] = None
             combate["ui_stage"] = "turn"
             combate["ui_waiting_advance"] = False
-            for participante in combate.get("participantes", []):
-                participante["defesa_ativa"] = False
-                participante["esquiva_ativa"] = False
-                participante["defesa_magica_ativa"] = False
-                participante["defesa_magica_valor"] = 0
+            self._limpar_defesas(combate)
             atacante = self._obter_atacante(combate)
             if not atacante:
                 await self._finalizar(self._ui_context(ctx, combate), motivo="vida")
