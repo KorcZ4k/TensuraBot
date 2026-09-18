@@ -459,7 +459,18 @@ class Luta(_BaseLuta):
                 await self._finalizar(self._ui_context(ctx, combate), motivo="vida")
                 return
             boss_rules.preparar_proximo_turno(combate)
-            proximo = self._proximo_indice(combate, int(combate.get("turno", 0)))
+            atual_id = combate.get("_turno_participante_id")
+            expirados = {str(x) for x in combate.pop("_participantes_expirados", set())}
+            if expirados:
+                combate["participantes"] = [p for p in combate.get("participantes", []) if str(p.get("id")) not in expirados]
+            if not combate.get("participantes"):
+                await self._finalizar(self._ui_context(ctx, combate), motivo="vida")
+                return
+            if atual_id is not None:
+                atual_index = next((i for i,p in enumerate(combate["participantes"]) if str(p.get("id")) == str(atual_id)), -1)
+            else:
+                atual_index = int(combate.get("turno", 0)) % len(combate["participantes"])
+            proximo = self._proximo_indice(combate, atual_index if atual_index >= 0 else -1)
             if proximo is None:
                 await self._finalizar(self._ui_context(ctx, combate), motivo="vida")
                 return
