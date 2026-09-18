@@ -156,6 +156,7 @@ class LutaInvariantTests(unittest.TestCase):
         a, d = c["participantes"]
         cog._criar_ataque(c, "soco", a, d, dano_base=10)
         original_vida = d["vida"]
+        cog.combates[1] = c
 
         async def falhar_ui(*_args, **_kwargs):
             raise RuntimeError("message.edit falhou")
@@ -182,6 +183,7 @@ class LutaInvariantTests(unittest.TestCase):
         a, d = c["participantes"]
         cog._criar_ataque(c, "soco", a, d, dano_base=10)
         a["vida"] = 0
+        cog.combates[1] = c
         calls = []
 
         async def salvar(*_args, **_kwargs):
@@ -202,6 +204,7 @@ class LutaInvariantTests(unittest.TestCase):
         a, d = c["participantes"]
         cog._criar_ataque(c, "soco", a, d, dano_base=10)
         d["vida"] = 0
+        cog.combates[1] = c
         calls = []
 
         async def salvar(*_args, **_kwargs):
