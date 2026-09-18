@@ -220,6 +220,29 @@ class LutaInvariantTests(unittest.TestCase):
         self.assertEqual(calls, [True])
         self.assertIs(cog._por_id(c, "slime"), d)
 
+    def test_ataque_de_area_atinge_todos_os_alvos_vivos(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        extra = _p("extra", "jogador", equipe="jogadores", vida=100)
+        c["participantes"].append(extra)
+        a["tipo"] = "monstro"
+        a["equipe"] = "inimigos"
+        a["boss_id"] = "dragao-adulto"
+        a["Força"] = 10
+        a["Velocidade"] = 10
+        cog.combates[1] = c
+        cog._criar_ataque(c, "fisico", a, d, dano_base=10, area=True, area_targets=[d, extra])
+        async def salvar(*_args, **_kwargs):
+            return None
+        async def ui(*_args, **_kwargs):
+            return None
+        cog._salvar = salvar
+        cog._ui_editar = ui
+        asyncio.run(cog._resolver_ataque(type("Ctx", (), {"channel": type("Ch", (), {"id": 1})()})()))
+        self.assertLess(d["vida"], 100)
+        self.assertLess(extra["vida"], 100)
+
+
     def test_todos_os_golpes_dos_monstros_tem_tipo_aceitavel_ou_sao_defensivos(self):
         defensivos = {"defesa", "esquiva"}
         for monstro_id, dados in bosses.luta_db.MONSTROS.items():
