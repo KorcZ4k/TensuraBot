@@ -286,6 +286,32 @@ class Luta(_BaseLuta):
                     if combate.get("assentamento_duelo") and defensor.get("vida", 0) <= 0:
                         defensor["vida"] = 1
                         duelo_pendente = True
+            if ataque.get("area"):
+                alvos_area = []
+                vistos = {str(defensor.get("id"))}
+                for alvo in ataque.get("area_targets", []) or []:
+                    alvo_id = str((alvo or {}).get("id"))
+                    if alvo_id in vistos:
+                        continue
+                    alvo_real = self._por_id(combate, alvo_id)
+                    if alvo_real and _vivo(alvo_real):
+                        vistos.add(alvo_id)
+                        alvos_area.append(alvo_real)
+                for alvo in alvos_area:
+                    dano_area, resultado_area = (
+                        self._dano_magia(atacante, alvo, ataque)
+                        if ataque.get("tipo") == "magia"
+                        else self._dano_fisico(atacante, alvo, ataque)
+                    )
+                    if resultado_area == "esquivou":
+                        mensagem += f"\n💨 **{alvo.get('nome')}** esquivou da área do ataque."
+                        continue
+                    vida_area = int(float(alvo.get("vida", 0) or 0))
+                    alvo["vida"] = max(0, vida_area - max(0, int(dano_area)))
+                    efeito_area = self._aplicar_efeito(alvo, ataque.get("efeito"))
+                    mensagem += f"\n🔥 **{alvo.get('nome')}** sofreu **{max(0, int(dano_area))} de dano**."
+                    if efeito_area:
+                        mensagem += f" Efeito: **{str(efeito_area).title()}**."
             combate["historico"].append(mensagem)
             self._limpar_defesas(combate)
             combate["ataque_pendente"] = None
