@@ -233,24 +233,24 @@ class Luta(commands.Cog):
         ))
 
     async def _recompensar(self, combate):
+        """Compatibilidade legada: mantém o mesmo contrato XP/TP/Hunos do motor final."""
         resultado = self._condicao_vitoria(combate)
         if resultado != "jogadores" or db is None:
-            return 0, 0
-        xp = sum(int(_num(p.get("xp_recompensa"))) for p in combate["participantes"] if p.get("tipo") == "monstro")
-        hunos = sum(int(_num(p.get("hunos_recompensa"))) for p in combate["participantes"] if p.get("tipo") == "monstro")
+            return 0, 0, 0
+        xp = sum(int(_num(p.get("xp_recompensa"))) for p in combate["participantes"] if p.get("tipo") == "monstro" and not p.get("invocado"))
+        tp = sum(int(_num(p.get("tp_recompensa", p.get("xp_recompensa", 0)))) for p in combate["participantes"] if p.get("tipo") == "monstro" and not p.get("invocado"))
+        hunos = sum(int(_num(p.get("hunos_recompensa"))) for p in combate["participantes"] if p.get("tipo") == "monstro" and not p.get("invocado"))
         vivos = [p for p in combate["participantes"] if p.get("tipo") == "jogador" and _vivo(p)]
         if not vivos:
-            return xp, hunos
+            return xp, hunos, tp
         for i, p in enumerate(vivos):
-            parte_xp, resto_xp = divmod(xp, len(vivos))
-            parte_hunos, resto_hunos = divmod(hunos, len(vivos))
-            ganho_xp = parte_xp + (1 if i < resto_xp else 0)
-            ganho_hunos = parte_hunos + (1 if i < resto_hunos else 0)
+            ganho_xp = xp // len(vivos) + (1 if i < xp % len(vivos) else 0)
+            ganho_tp = tp // len(vivos) + (1 if i < tp % len(vivos) else 0)
+            ganho_hunos = hunos // len(vivos) + (1 if i < hunos % len(vivos) else 0)
             filtro = {"ID": str(p.get("id")), "guild_id": str(combate.get("guild_id"))}
-            ganho_tp = max(1, min(2000, ganho_xp)) if ganho_xp > 0 else 0
             await run_db(db["Jogadores"].update_one, filtro, {"$inc": {"XP": ganho_xp, "TP": ganho_tp}})
             await run_db(db["Hunos"].update_one, filtro, {"$inc": {"carteira": ganho_hunos}}, upsert=True)
-        return xp, hunos
+        return xp, hunos, tp
 
     async def _finalizar_duelo_assentamento(self, ctx, vencedor, perdedor):
         combate = self._obter_combate(ctx.channel.id)
