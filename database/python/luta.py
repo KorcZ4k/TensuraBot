@@ -244,7 +244,7 @@ def finalizar_combate(combate):
     """
     guild_id = combate.get("guild_id")
     resultado = obter_vencedores(combate)
-    if not guild_id:
+    if not guild_id or db is None:
         return resultado
     for participante in combate.get("participantes", []):
         if participante.get("tipo") != "jogador":
