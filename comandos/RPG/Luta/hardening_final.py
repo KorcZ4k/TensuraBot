@@ -14,6 +14,10 @@ from .sistemas_luta import Luta as _BaseLuta, _UIContext, _AvancarView, _vivo
 
 
 class Luta(_BaseLuta):
+    async def _mostrar_aguarde_player(self, combate):
+        combate["ui_stage"] = "player_action"
+        await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
+    
     def _por_id(self, combate, participante_id):
         if participante_id is None:
             return None
