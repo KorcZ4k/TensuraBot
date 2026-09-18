@@ -268,8 +268,16 @@ async def pvp(ctx, membro: Optional[discord.Member] = None):
             await ctx.send(embed=_embed_erro("PvP", "Não foi possível montar os participantes do combate."))
             return
         embed = _embed_acao("⚔️ PvP", atacante, defensor, combate.get("numero_turno", 1), extra="**Duelo PvP iniciado.**", cor=discord.Color.red())
-        cog.preparar_embed(ctx, embed)
-        await cog._mostrar_inicio(ctx)
+        try:
+            cog.preparar_embed(ctx, embed)
+            await cog._mostrar_inicio(ctx)
+        except Exception as erro:
+            await cog._marcar_combate(jogadores, guild_id, "ativo")
+            await cog._limpar_recursos_combate(ctx.channel.id, combate)
+            cog.combates.pop(ctx.channel.id, None)
+            print(f"[LUTA][PVP][ROLLBACK] {type(erro).__name__}: {erro}")
+            await ctx.send(embed=_embed_erro("PvP", "Não foi possível abrir a tela do combate. O duelo foi desfeito."))
+            return
 
 
 async def _ataque(ctx, chave, titulo):
