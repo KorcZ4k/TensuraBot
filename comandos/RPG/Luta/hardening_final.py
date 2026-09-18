@@ -383,35 +383,8 @@ class Luta(_BaseLuta):
                 ataque.pop("_resolvendo", None)
 
     async def executar_defesa_jogador(self, ctx, acao, embed=None):
-        combate = self._obter_combate(ctx.channel.id)
-        if not combate or not combate.get("ativo"):
-            await ctx.send("❌ Não há combate ativo.")
-            return
-        ataque = combate.get("ataque_pendente")
-        if combate.get("fase") != "defesa" or not ataque:
-            await self._ui_context(ctx, combate).send("❌ Não há ataque pendente para defender.", _luta_error=True)
-            return
-        defensor = self._obter_defensor(combate)
-        if not defensor or str(defensor.get("id")) != str(ctx.author.id):
-            nome = defensor.get("nome", "outro jogador") if defensor else "outro jogador"
-            await self._ui_context(ctx, combate).send(f"❌ É **{nome}** quem deve defender este ataque.", _luta_error=True)
-            return
-        self._limpar_defesas(combate)
-        defensor["defesa_ativa"] = acao == "defesa"
-        defensor["esquiva_ativa"] = acao == "esquiva"
-        combate["ui_stage"] = "resolving"
-        combate["ui_waiting_advance"] = False
-        try:
-            await self._resolver_ataque(self._ui_context(ctx, combate))
-        except Exception as erro:
-            for participante in combate.get("participantes", []):
-                participante["defesa_ativa"] = False
-                participante["esquiva_ativa"] = False
-            if combate.get("ataque_pendente") is ataque and combate.get("ativo"):
-                combate["fase"] = "defesa"
-                combate["ui_stage"] = "defense_action"
-                await self._ui_context(ctx, combate).send(f"❌ Erro ao resolver a defesa: `{type(erro).__name__}: {erro}`.", _luta_error=True)
-            return
+        """Entrada compatível; a resolução de defesa vive no motor canônico."""
+        return await super()._defesa_jogador(ctx, acao)
 
     async def _limpar_recursos_combate(self, channel_id, combate):
         """Libera recursos locais e invalida a View no Discord sem mascarar falhas."""
