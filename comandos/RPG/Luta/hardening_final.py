@@ -116,7 +116,10 @@ class Luta(_BaseLuta):
         except (TypeError, ValueError) as erro:
             raise ValueError("dano_base/mana_base inválidos") from erro
         efeito = dados.get("efeito")
-        if efeito is not None and not isinstance(efeito, (dict, str)):
+        if isinstance(efeito, str):
+            efeito = {"nome": efeito}
+            dados["efeito"] = efeito
+        if efeito is not None and not isinstance(efeito, dict):
             raise ValueError("efeito de ataque inválido")
         ataque = {"tipo": tipo, "nome": dados.pop("nome", "⚔️ Ataque"),
                   "atacante_id": atacante.get("id"), "defensor_id": defensor.get("id"), **dados}
