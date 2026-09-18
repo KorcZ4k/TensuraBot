@@ -10,34 +10,20 @@ ATRIBUTOS = ("Força","Defesa","Vitalidade","Velocidade","Destreza","Magia","Sor
 BOSS_IDS = {"slime-rei","goblin-rei","lobo-alpha","orc-rei","cavaleiro-esqueletico","dragao-adulto","arquidemonio","fenix"}
 
 def criar_monstro_balanceado(tipo: str, nivel: int = 1):
-    dados = luta_db.MONSTROS.get(str(tipo))
-    if not dados:
+    """Único criador de atributos; adiciona apenas metadados de boss."""
+    monstro = luta_db.criar_monstro(tipo, nivel)
+    if monstro is None:
         return None
-    minimo = int(dados.get("nivel_minimo", 1) or 1)
-    maximo = int(dados.get("nivel_maximo", 99) or 99)
-    nivel = max(minimo, min(int(nivel), maximo))
-    fator = 1 + max(0, nivel - minimo) * 0.75
-    base = dados.get("atributos_base", {}) or {}
-    atributos = {n:int(float(base.get(n,0) or 0)*fator) for n in ATRIBUTOS}
-    vitalidade, magia = atributos["Vitalidade"], atributos["Magia"]
-    return {
-        "id":str(tipo),"monstro_id":str(tipo),"nome":dados.get("nome",tipo),
-        "emoji":dados.get("emoji","👹"),"tipo":"monstro","nivel":nivel,
-        "nivel_minimo":minimo,"nivel_maximo":maximo,
-        "vida":vitalidade*10,"vida_maxima":vitalidade*10,
-        "mana":magia,"mana_maxima":magia,**atributos,
-        "defesa":atributos["Força"]+atributos["Defesa"],
-        "velocidade":atributos["Velocidade"],
-        "dano_base":int(float(dados.get("dano_base",atributos["Força"]) or atributos["Força"])*fator),
-        "xp_recompensa":int(float(dados.get("xp_recompensa",0) or 0)*fator),
-        "tp_recompensa":int(float(dados.get("tp_recompensa",0) or 0)*fator),
-        "hunos_recompensa":int(float(dados.get("hunos_recompensa",10) or 10)*fator),
-        "golpes":list(dados.get("golpes",[])),
-        "boss":str(tipo) in BOSS_IDS,"boss_id":str(tipo) if str(tipo) in BOSS_IDS else None,
-        "boss_estado":{},"efeitos":[],
-        "defesa_ativa":False,"esquiva_ativa":False,
-        "defesa_magica_ativa":False,"defesa_magica_valor":0,
-    }
+    monstro = dict(monstro)
+    mid = str(tipo)
+    monstro.update({
+        "monstro_id": mid,
+        "boss": mid in BOSS_IDS,
+        "boss_id": mid if mid in BOSS_IDS else None,
+        "boss_estado": dict(monstro.get("boss_estado") or {}),
+        "efeitos": list(monstro.get("efeitos") or []),
+    })
+    return monstro
 
 def estado(monstro):
     return monstro.setdefault("boss_estado", {})
