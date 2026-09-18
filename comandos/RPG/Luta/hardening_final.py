@@ -187,8 +187,7 @@ class Luta(_BaseLuta):
         import random
         especial = boss_rules.ataque_especial(combate, atacante, defensor)
         if especial is not None:
-            dados = especial
-            tipo = "fisico"
+            dados, tipo = especial, "fisico"
         else:
             golpes = [luta_db.GOLPES[i] for i in (atacante.get("golpes") or []) if i in luta_db.GOLPES]
             if not golpes:
@@ -197,7 +196,8 @@ class Luta(_BaseLuta):
             dados = {"nome": golpe.get("nome", "Ataque"), "dano_base": float(golpe.get("dano_base", atacante.get("dano_base", 0)) or 0),
                      "mana_base": float(golpe.get("custo_mana", 0) or 0), "com_arma": bool(golpe.get("com_arma", False)),
                      "efeito": golpe.get("efeito", {}) or {}}
-            tipo = golpe.get("tipo", "fisico")
+            tipo_original = str(golpe.get("tipo", "monstro")).casefold()
+            tipo = "magia" if tipo_original in {"magia", "magico", "mágico"} else "ataque_monstro"
         ataque = self._criar_ataque(combate, tipo, atacante, defensor, **dados)
         if combate.get("ui_message"):
             await self._mostrar_ataque_ui(combate)
@@ -354,8 +354,7 @@ class Luta(_BaseLuta):
             defensor["esquiva_ativa"] = False
             velocidade = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
             destreza = float(defensor.get("Destreza", defensor.get("destreza", 0)) or 0)
-            chance = min(0.75, 0.10 + (velocidade + destreza) / 500)
-            if __import__("random").random() < chance:
+            if __import__("random").random() < min(0.75, 0.10 + (velocidade + destreza) / 500):
                 return 0, "esquivou"
         dano = float(atacante.get("Força", atacante.get("forca", 0)) or 0) + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
         dano += float(ataque.get("dano_base", 0) or 0)
@@ -369,14 +368,16 @@ class Luta(_BaseLuta):
             defesa_total = float(defensor.get("Força", defensor.get("forca", 0)) or 0) + float(defensor.get("Defesa", defensor.get("defesa", 0)) or 0)
             dano *= 1.0 - min(1.0, max(0.0, defesa_total) / 300.0)
         defensor["defesa_ativa"] = False
-        return max(0, int(dano)), "atingiu"
+        dano = max(0, int(dano))
+        combate = self._obter_combate_por_participantes(defensor)
+        dano = boss_rules.corrosao(dano, defensor)
+        return boss_rules.regras_dano(dano, "atingiu", atacante, defensor, ataque, combate)
 
     def _dano_magia(self, atacante, defensor, ataque):
         if defensor.get("esquiva_ativa"):
             defensor["esquiva_ativa"] = False
             velocidade = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
-            chance = min(0.75, 0.10 + velocidade / 500)
-            if __import__("random").random() < chance:
+            if __import__("random").random() < min(0.75, 0.10 + velocidade / 500):
                 return 0, "esquivou"
         dano = float(atacante.get("Magia", atacante.get("magia", 0)) or 0) + float(atacante.get("Inteligencia", atacante.get("Inteligência", 0)) or 0)
         dano += float(ataque.get("dano_base", 0) or 0)
@@ -387,11 +388,17 @@ class Luta(_BaseLuta):
         elif defensor.get("defesa_ativa"):
             dano -= float(defensor.get("Defesa", defensor.get("defesa", 0)) or 0) * 0.5
         defensor["defesa_ativa"] = False
-        return max(0, int(dano)), "atingiu"
+        dano = max(0, int(dano))
+        combate = self._obter_combate_por_participantes(defensor)
+        dano = boss_rules.corrosao(dano, defensor)
+        return boss_rules.regras_dano(dano, "atingiu", atacante, defensor, ataque, combate)
 
     def _aplicar_efeito(self, defensor, efeito):
         if not isinstance(efeito, dict):
             return None
+        especial = boss_rules.efeito_especial(defensor, efeito)
+        if especial is not None:
+            return especial
         nome = str(efeito.get("nome", efeito.get("tipo", ""))).strip().lower()
         if not nome:
             return None
@@ -402,6 +409,8 @@ class Luta(_BaseLuta):
         return nome
 
     async def _aplicar_efeitos_inicio(self, ctx, participante):
+        combate = self._obter_combate(ctx.channel.id)
+        boss_rules.inicio_especial(combate or {}, participante)
         dano_total = 0
         bloqueado = False
         novos = []
@@ -419,9 +428,7 @@ class Luta(_BaseLuta):
                 bloqueado = True
             turnos = int(float(efeito.get("turnos", 1) or 1)) - 1
             if turnos > 0:
-                copia = dict(efeito)
-                copia["turnos"] = turnos
-                novos.append(copia)
+                copia = dict(efeito); copia["turnos"] = turnos; novos.append(copia)
         participante["efeitos"] = novos
         if dano_total:
             participante["vida"] = max(0, int(float(participante.get("vida", 0) or 0)) - dano_total)
