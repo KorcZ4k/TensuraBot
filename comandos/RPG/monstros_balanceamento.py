@@ -146,6 +146,10 @@ def inicio_especial(combate, participante):
 
 def preparar_proximo_turno(combate):
     turno=int(combate.get("numero_turno",1))
+    lista=combate.get("participantes", [])
+    if lista:
+        idx=int(combate.get("turno",0)) % len(lista)
+        combate["_turno_participante_id"]=lista[idx].get("id")
     combate["participantes"]=[p for p in combate.get("participantes",[]) if not (p.get("invocado") and turno>=int(p.get("expira_turno",10**9)))]
     atual=next((p for p in combate.get("participantes",[]) if p.get("id")==combate.get("_turno_participante_id")),None)
     for p in combate.get("participantes",[]):
