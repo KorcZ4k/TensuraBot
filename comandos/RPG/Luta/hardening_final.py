@@ -717,6 +717,11 @@ class Luta(_BaseLuta):
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
             return
+        if combate.get("ataque_pendente"):
+            combate["fase"] = "defesa"
+            combate["ui_stage"] = "attack"
+            return
+        self._normalizar_estado(combate)
         if combate.get("ui_message"):
             if combate.get("ui_waiting_advance"):
                 return
