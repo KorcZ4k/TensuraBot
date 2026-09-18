@@ -207,6 +207,11 @@ async def pve(ctx, *, monstro_tipo: str = ""):
             cog.preparar_embed(ctx, panel, arquivo=arquivo)
             await cog._mostrar_inicio(ctx)
         except Exception:
+            try:
+                if "combate" in locals():
+                    await cog._marcar_combate([jogador], guild_id, "ativo")
+            except Exception as erro_estado:
+                print("[LUTA][PVE][ROLLBACK][ERRO]", type(erro_estado).__name__, erro_estado)
             if fim_cooldown is not None:
                 try:
                     await run_db(luta_db.cancelar_cooldown_monstro, user_id, guild_id, str(monstro_id), fim_cooldown)
@@ -248,7 +253,12 @@ async def pvp(ctx, membro: Optional[discord.Member] = None):
             jogadores.append(jogador)
         combate = cog._novo_combate(jogadores, guild_id, pvp=True)
         cog.combates[ctx.channel.id] = combate
-        await cog._marcar_combate(jogadores, guild_id, "ativo_combate")
+        try:
+            await cog._marcar_combate(jogadores, guild_id, "ativo_combate")
+        except Exception:
+            cog.combates.pop(ctx.channel.id, None)
+            await cog._marcar_combate(jogadores, guild_id, "ativo")
+            raise
         atacante = cog._obter_atacante(combate)
         defensor = cog._obter_defensor(combate)
         if not atacante or not defensor:
