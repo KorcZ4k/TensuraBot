@@ -412,22 +412,6 @@ class Luta(_BaseLuta):
                 await interaction.followup.send(msg, ephemeral=True)
             else:
                 await interaction.response.send_message(msg, ephemeral=True)
-
-
-async def _callback_avancar_seguro(self, interaction: discord.Interaction):
-    try:
-        await self.cog.avancar(interaction)
-    except Exception as erro:
-        print(f"[LUTA][UI][AVANCAR][ERRO] {type(erro).__name__}: {erro}")
-        try:
-            if interaction.response.is_done():
-                await interaction.followup.send("❌ Erro ao avançar o combate. O estado foi preservado.", ephemeral=True)
-            else:
-                await interaction.response.send_message("❌ Erro ao avançar o combate. O estado foi preservado.", ephemeral=True)
-        except Exception as resposta_erro:
-            print(f"[LUTA][UI][AVANCAR][RESPOSTA][ERRO] {type(resposta_erro).__name__}: {resposta_erro}")
-
-
     async def _proximo_turno(self, ctx):
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
