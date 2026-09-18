@@ -228,21 +228,81 @@ class Luta(_BaseLuta):
         defensor = self._por_id(combate, ataque.get("defensor_id"))
         ataque["_resolvendo"] = True
         try:
-            # Alvo pendente nunca é redirecionado. Se atacante ou defensor já
-            # morreu/desapareceu, o ataque é descartado e o turno avança.
-            if not atacante or not defensor or not _vivo(atacante) or not _vivo(defensor):
-                combate["historico"].append("Ataque pendente descartado: participante inválido ou derrotado.")
+            if not atacante or not defensor:
+                combate["historico"].append("Ataque pendente descartado: participante ausente.")
                 combate["ataque_pendente"] = None
                 combate["fase"] = "ataque"
                 combate["ui_stage"] = "turn"
-                combate["ui_waiting_advance"] = False
                 self._limpar_defesas(combate)
                 await self._salvar(combate)
                 await self._proximo_turno(ctx)
                 return
-            await super()._resolver_ataque(ctx)
+            if not _vivo(atacante) or not _vivo(defensor):
+                combate["historico"].append("Ataque pendente descartado: participante derrotado.")
+                combate["ataque_pendente"] = None
+                combate["fase"] = "ataque"
+                combate["ui_stage"] = "turn"
+                self._limpar_defesas(combate)
+                await self._salvar(combate)
+                await self._proximo_turno(ctx)
+                return
+            if ataque.get("tipo") == "magia" and float(ataque.get("cura_base", 0) or 0) > 0:
+                cura = int(float(atacante.get("Magia", atacante.get("magia", 0)) or 0) + float(atacante.get("Inteligencia", atacante.get("Inteligência", 0)) or 0) + float(ataque.get("cura_base", 0) or 0))
+                atacante["vida"] = min(int(float(atacante.get("vida_maxima", atacante.get("vida", 0)) or 0)), int(float(atacante.get("vida", 0) or 0)) + cura)
+                mensagem = f"✨ **{atacante.get('nome')}** recuperou **{cura} de vida**."
+            else:
+                if ataque.get("tipo") == "magia":
+                    dano, resultado = self._dano_magia(atacante, defensor, ataque)
+                    tipo_texto = "mágico"
+                else:
+                    dano, resultado = self._dano_fisico(atacante, defensor, ataque)
+                    tipo_texto = ""
+                if resultado == "esquivou":
+                    mensagem = f"💨 **{defensor.get('nome')}** esquivou do ataque!"
+                else:
+                    vida_antes = int(float(defensor.get("vida", 0) or 0))
+                    duelo_pendente = False
+                    if combate.get("assentamento_duelo") and dano >= vida_antes:
+                        dano = max(0, vida_antes - 1)
+                        duelo_pendente = True
+                    defensor["vida"] = max(0, vida_antes - dano)
+                    mensagem = (f"✨ **{atacante.get('nome')}** causou **{dano} de dano mágico** em **{defensor.get('nome')}**."
+                                if tipo_texto else f"⚔️ **{atacante.get('nome')}** causou **{dano} de dano** em **{defensor.get('nome')}**.")
+                    efeito = self._aplicar_efeito(defensor, ataque.get("efeito"))
+                    if efeito:
+                        mensagem += f"\n⚠️ Efeito: **{efeito.title()}**."
+                    if combate.get("assentamento_duelo") and defensor.get("vida", 0) <= 0:
+                        defensor["vida"] = 1
+                        duelo_pendente = True
+            combate["historico"].append(mensagem)
+            self._limpar_defesas(combate)
+            combate["ataque_pendente"] = None
+            combate["fase"] = "ataque"
+            combate["ui_stage"] = "result"
+            combate["ui_waiting_advance"] = True
+            embed = discord.Embed(title="💥 Resultado", description=mensagem, color=discord.Color.red())
+            embed.add_field(name="📋 Status", value=self._texto_status(combate["participantes"]), inline=False)
+            await self._ui_editar(combate, embed)
+            if combate.get("assentamento_duelo") and 'duelo_pendente' in locals() and duelo_pendente:
+                await self._finalizar_duelo_assentamento(ctx, atacante, defensor)
+                return
+            if combate.get("pvp") and not _vivo(defensor):
+                combate["aguardando_finalizacao"] = True
+                combate["vencedor_id"] = str(atacante.get("id"))
+                combate["perdedor_id"] = str(defensor.get("id"))
+                combate["fase"] = "finalizacao"
+                combate["ui_stage"] = "result"
+                combate["ui_waiting_advance"] = True
+                await self._salvar(combate)
+                return
+            resultado = self._condicao_vitoria(combate)
+            if resultado:
+                combate["ui_waiting_advance"] = False
+                await self._finalizar(self._ui_context(ctx, combate), motivo="vida", vencedor=atacante, perdedor=defensor)
+                return
+            await self._salvar(combate)
         except Exception:
-            if combate.get("ataque_pendente") is ataque and combate.get("ativo"):
+            if combate.get("ativo") and combate.get("ataque_pendente") is ataque:
                 combate["fase"] = "defesa"
                 combate["ui_stage"] = "defense_action"
                 combate["ui_waiting_advance"] = False
@@ -290,25 +350,83 @@ class Luta(_BaseLuta):
             getattr(self, "_ui_avancar_locks", {}).pop(mensagem.id, None)
 
     def _dano_fisico(self, atacante, defensor, ataque):
-        dano, resultado = super()._dano_fisico(atacante, defensor, ataque)
-        combate = self._obter_combate_por_participantes(defensor)
-        return boss_rules.regras_dano(dano, resultado, atacante, defensor, ataque, combate)
+        if defensor.get("esquiva_ativa"):
+            defensor["esquiva_ativa"] = False
+            velocidade = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
+            destreza = float(defensor.get("Destreza", defensor.get("destreza", 0)) or 0)
+            chance = min(0.75, 0.10 + (velocidade + destreza) / 500)
+            if __import__("random").random() < chance:
+                return 0, "esquivou"
+        dano = float(atacante.get("Força", atacante.get("forca", 0)) or 0) + float(atacante.get("Velocidade", atacante.get("velocidade", 0)) or 0)
+        dano += float(ataque.get("dano_base", 0) or 0)
+        if ataque.get("com_arma"):
+            dano += float(atacante.get("dano_arma", 0) or 0)
+        if defensor.get("defesa_magica_ativa"):
+            dano -= float(defensor.get("defesa_magica_valor", 0) or 0)
+            defensor["defesa_magica_ativa"] = False
+            defensor["defesa_magica_valor"] = 0
+        elif defensor.get("defesa_ativa"):
+            defesa_total = float(defensor.get("Força", defensor.get("forca", 0)) or 0) + float(defensor.get("Defesa", defensor.get("defesa", 0)) or 0)
+            dano *= 1.0 - min(1.0, max(0.0, defesa_total) / 300.0)
+        defensor["defesa_ativa"] = False
+        return max(0, int(dano)), "atingiu"
 
     def _dano_magia(self, atacante, defensor, ataque):
-        dano, resultado = super()._dano_magia(atacante, defensor, ataque)
-        combate = self._obter_combate_por_participantes(defensor)
-        return boss_rules.regras_dano(dano, resultado, atacante, defensor, ataque, combate)
+        if defensor.get("esquiva_ativa"):
+            defensor["esquiva_ativa"] = False
+            velocidade = float(defensor.get("Velocidade", defensor.get("velocidade", 0)) or 0)
+            chance = min(0.75, 0.10 + velocidade / 500)
+            if __import__("random").random() < chance:
+                return 0, "esquivou"
+        dano = float(atacante.get("Magia", atacante.get("magia", 0)) or 0) + float(atacante.get("Inteligencia", atacante.get("Inteligência", 0)) or 0)
+        dano += float(ataque.get("dano_base", 0) or 0)
+        if defensor.get("defesa_magica_ativa"):
+            dano -= float(defensor.get("defesa_magica_valor", 0) or 0)
+            defensor["defesa_magica_ativa"] = False
+            defensor["defesa_magica_valor"] = 0
+        elif defensor.get("defesa_ativa"):
+            dano -= float(defensor.get("Defesa", defensor.get("defesa", 0)) or 0) * 0.5
+        defensor["defesa_ativa"] = False
+        return max(0, int(dano)), "atingiu"
 
     def _aplicar_efeito(self, defensor, efeito):
-        especial = boss_rules.efeito_especial(defensor, efeito)
-        if especial is not None:
-            return especial
-        return super()._aplicar_efeito(defensor, efeito)
+        if not isinstance(efeito, dict):
+            return None
+        nome = str(efeito.get("nome", efeito.get("tipo", ""))).strip().lower()
+        if not nome:
+            return None
+        turnos = max(1, int(float(efeito.get("turnos", efeito.get("duracao", 1)) or 1)))
+        valor = int(float(efeito.get("valor", 5) or 5))
+        entrada = {"nome": nome, "turnos": turnos, "valor": valor}
+        defensor.setdefault("efeitos", []).append(entrada)
+        return nome
 
     async def _aplicar_efeitos_inicio(self, ctx, participante):
-        combate = self._obter_combate(ctx.channel.id)
-        boss_rules.inicio_especial(combate or {}, participante)
-        return await super()._aplicar_efeitos_inicio(ctx, participante)
+        dano_total = 0
+        bloqueado = False
+        novos = []
+        for efeito in list(participante.get("efeitos", []) or []):
+            if not isinstance(efeito, dict):
+                continue
+            nome = str(efeito.get("nome", efeito.get("tipo", ""))).strip().lower()
+            valor = max(0, int(float(efeito.get("valor", 5) or 5)))
+            if nome in {"veneno", "queimadura", "sangramento"}:
+                dano_total += valor
+            elif nome == "sangramento_profundo":
+                defesa = float(participante.get("Defesa", participante.get("defesa", 0)) or 0) + float(participante.get("Força", participante.get("forca", 0)) or 0)
+                dano_total += max(1, int(valor - defesa * 0.5))
+            if nome in {"paralisia", "stun", "prisao", "prisão"}:
+                bloqueado = True
+            turnos = int(float(efeito.get("turnos", 1) or 1)) - 1
+            if turnos > 0:
+                copia = dict(efeito)
+                copia["turnos"] = turnos
+                novos.append(copia)
+        participante["efeitos"] = novos
+        if dano_total:
+            participante["vida"] = max(0, int(float(participante.get("vida", 0) or 0)) - dano_total)
+            await ctx.send(f"⚠️ **{participante.get('nome')}** sofreu **{dano_total}** de efeitos.")
+        return bloqueado
 
     def _obter_combate_por_participantes(self, participante):
         """Busca por identidade do objeto, evitando colisões de IDs entre combates."""
@@ -357,22 +475,51 @@ class Luta(_BaseLuta):
 
     async def _finalizar(self, ctx, motivo="vida", vencedor=None, perdedor=None):
         combate = self._obter_combate(ctx.channel.id)
+        if not combate:
+            return
+        estado_anterior = {
+            "ativo": combate.get("ativo", True), "fase": combate.get("fase", "ataque"),
+            "ui_stage": combate.get("ui_stage", "turn"), "ui_waiting_advance": combate.get("ui_waiting_advance", False),
+            "ataque_pendente": combate.get("ataque_pendente"),
+        }
+        resultado = self._condicao_vitoria(combate)
+        if resultado is None and motivo in {"vida", "efeitos"}:
+            combate["ativo"] = True
+            combate["fase"] = "ataque"
+            combate["ataque_pendente"] = None
+            combate["ui_waiting_advance"] = False
+            await self._proximo_turno(ctx)
+            return
+        combate["ativo"] = False
+        combate["fase"] = "finalizado"
         try:
-            return await super()._finalizar(ctx, motivo=motivo, vencedor=vencedor, perdedor=perdedor)
-        except Exception as erro:
-            if combate is not None and combate.get("ativo") is False and not combate.get("recompensa_aplicada"):
-                combate["ativo"] = True
-                combate["fase"] = "defesa" if combate.get("ataque_pendente") else "ataque"
-                combate["ui_stage"] = "attack" if combate.get("ataque_pendente") else "turn"
-                combate["ui_waiting_advance"] = False
-                try:
-                    await self._salvar(combate)
-                except Exception as save_erro:
-                    print(f"[LUTA][ROLLBACK][ERRO] {type(save_erro).__name__}: {save_erro}")
+            await self._salvar(combate)
+            xp = hunos = tp = 0
+            if not combate.get("pvp") and resultado == "jogadores":
+                xp, hunos, tp = await self._recompensar(combate)
+            descricao = (
+                f"💀 **{vencedor.get('nome')}** finalizou **{perdedor.get('nome')}** ({motivo})."
+                if combate.get("pvp") and vencedor and perdedor else
+                "🏆 Os jogadores venceram o combate!" if resultado == "jogadores" else
+                "💀 Os jogadores foram derrotados." if resultado == "inimigos" else
+                "⚖️ O combate terminou em empate."
+            )
+            embed = discord.Embed(title="⚔️ Combate Finalizado", description=descricao, color=discord.Color.green() if resultado == "jogadores" else discord.Color.red())
+            embed.add_field(name="🎁 Recompensas", value=f"✨ XP: **{xp}**\n🔷 TP: **{tp}**\n💰 Hunos: **{hunos}**", inline=False)
+            embed.add_field(name="📋 Status", value=self._texto_status(combate["participantes"]), inline=False)
+            await ctx.send(embed=embed)
+            await self._limpar_recursos_combate(ctx.channel.id, combate)
+            self.combates.pop(ctx.channel.id, None)
+        except Exception:
+            combate.update(estado_anterior)
+            if combate.get("ativo"):
+                combate["fase"] = "defesa" if combate.get("ataque_pendente") else estado_anterior["fase"]
+                combate["ui_stage"] = "attack" if combate.get("ataque_pendente") else estado_anterior["ui_stage"]
+            try:
+                await self._salvar(combate)
+            except Exception as save_erro:
+                print(f"[LUTA][ROLLBACK][ERRO] {type(save_erro).__name__}: {save_erro}")
             raise
-        finally:
-            if combate is not None:
-                await self._limpar_recursos_combate(ctx.channel.id, combate)
 
     async def _finalizar_pvp(self, ctx, motivo):
         """Finaliza PvP somente quando existe uma vitória pendente válida."""
