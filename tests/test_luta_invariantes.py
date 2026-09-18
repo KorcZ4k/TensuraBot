@@ -115,8 +115,9 @@ def test_pendente_com_atacante_morto_mantem_atacante_original():
 
 
 def test_criador_balanceado_usa_o_mesmo_criador_de_dados():
-    base = bosses.luta_db.criar_monstro("slime-rei", 1)
-    balanceado = bosses.criar_monstro_balanceado("slime-rei", 1)
+    tipo = next(iter(bosses.luta_db.MONSTROS))
+    base = bosses.luta_db.criar_monstro(tipo, 1)
+    balanceado = bosses.criar_monstro_balanceado(tipo, 1)
     assert base is not None and balanceado is not None
     assert balanceado["vida"] == base["vida"]
     assert balanceado["dano_base"] == base["dano_base"]
@@ -125,7 +126,8 @@ def test_criador_balanceado_usa_o_mesmo_criador_de_dados():
 
 
 def test_contrato_recompensa_tem_tp():
-    monstro = bosses.luta_db.criar_monstro("slime", 1)
+    tipo = next(iter(bosses.luta_db.MONSTROS))
+    monstro = bosses.luta_db.criar_monstro(tipo, 1)
     if monstro is not None:
         assert "xp_recompensa" in monstro
         assert "tp_recompensa" in monstro
