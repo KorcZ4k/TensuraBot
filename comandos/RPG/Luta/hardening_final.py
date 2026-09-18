@@ -306,7 +306,9 @@ class Luta(_BaseLuta):
             participante["defesa_magica_valor"] = 0
 
     async def _recompensar(self, combate):
-        """Único cálculo de recompensa: XP, TP e Hunos dos monstros derrotados."""
+        """Único cálculo de recompensa; protegido contra aplicação duplicada."""
+        if combate.get("recompensa_aplicada"):
+            return (int(combate.get("recompensa_xp", 0)), int(combate.get("recompensa_hunos", 0)), int(combate.get("recompensa_tp", 0)))
         if self._condicao_vitoria(combate) != "jogadores" or luta_db.db is None:
             return 0, 0, 0
         monstros = [p for p in combate.get("participantes", [])
@@ -326,6 +328,10 @@ class Luta(_BaseLuta):
             filtro = {"ID": str(jogador.get("id")), "guild_id": guild_id}
             await luta_db.run_db(luta_db.db["Jogadores"].update_one, filtro, {"$inc": {"XP": int(xp), "TP": int(tp)}})
             await luta_db.run_db(luta_db.db["Hunos"].update_one, filtro, {"$inc": {"carteira": int(hunos)}}, upsert=True)
+        combate["recompensa_aplicada"] = True
+        combate["recompensa_xp"] = xp_total
+        combate["recompensa_hunos"] = hunos_total
+        combate["recompensa_tp"] = tp_total
         return xp_total, hunos_total, tp_total
 
     async def _finalizar(self, ctx, motivo="vida", vencedor=None, perdedor=None):
