@@ -10,7 +10,7 @@ import discord
 from database.python import luta as luta_db
 from .. import monstros_balanceamento as boss_rules
 
-from .sistemas_luta import Luta as _BaseLuta, _UIContext, _AvancarView, _vivo
+from .sistemas_luta import Luta as _BaseLuta, _UIContext, _vivo
 
 
 class Luta(_BaseLuta):
