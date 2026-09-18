@@ -16,6 +16,7 @@ from discord.ext import commands
 
 from database.python.mongodb import db, run_db
 from database.python import luta as luta_db
+from .Luta import monstros_balanceamento as boss_rules
 
 
 def _num(valor, padrao=0.0):
@@ -339,13 +340,21 @@ class Luta(commands.Cog):
             await ctx.send(f"⚠️ **{participante.get('nome')}** sofreu **{dano_total}** de efeitos.")
         return bloqueado
 
+    def _obter_combate_por_participantes(self, participante):
+        """Retorna o combate que contém a mesma instância do participante."""
+        if participante is None:
+            return {}
+        for combate in self.combates.values():
+            if any(p is participante for p in combate.get("participantes", [])):
+                return combate
+        return {}
+
     def _dano_fisico(self, atacante, defensor, ataque):
         if defensor.get("esquiva_ativa"):
             defensor["esquiva_ativa"] = False
             velocidade = _velocidade(defensor)
             destreza = _attr(defensor, "Destreza", "destreza")
-            chance = min(0.75, 0.10 + (velocidade + destreza) / 500)
-            if random.random() < chance:
+            if random.random() < min(0.75, 0.10 + (velocidade + destreza) / 500):
                 return 0, "esquivou"
         dano = _attr(atacante, "Força", "forca") + _velocidade(atacante)
         dano += _num(ataque.get("dano_base"))
@@ -356,15 +365,18 @@ class Luta(commands.Cog):
             defensor["defesa_magica_ativa"] = False
             defensor["defesa_magica_valor"] = 0
         elif defensor.get("defesa_ativa"):
-            dano -= _attr(defensor, "defesa", padrao=_attr(defensor, "Força") + _attr(defensor, "Defesa"))
+            defesa_total = _attr(defensor, "Força", "forca") + _attr(defensor, "Defesa", "defesa")
+            dano *= 1.0 - min(1.0, max(0.0, defesa_total) / 300.0)
         defensor["defesa_ativa"] = False
-        return max(0, int(dano)), "atingiu"
+        dano = max(0, int(dano))
+        combate = self._obter_combate_por_participantes(defensor)
+        dano = boss_rules.corrosao(dano, defensor)
+        return boss_rules.regras_dano(dano, "atingiu", atacante, defensor, ataque, combate)
 
     def _dano_magia(self, atacante, defensor, ataque):
         if defensor.get("esquiva_ativa"):
             defensor["esquiva_ativa"] = False
-            chance = min(0.75, 0.10 + _velocidade(defensor) / 500)
-            if random.random() < chance:
+            if random.random() < min(0.75, 0.10 + _velocidade(defensor) / 500):
                 return 0, "esquivou"
         dano = _attr(atacante, "Magia", "magia") + _attr(atacante, "Inteligencia", "Inteligência")
         dano += _num(ataque.get("dano_base"))
@@ -375,11 +387,17 @@ class Luta(commands.Cog):
         elif defensor.get("defesa_ativa"):
             dano -= _attr(defensor, "Defesa", "defesa") * 0.5
         defensor["defesa_ativa"] = False
-        return max(1, int(dano)), "atingiu"
+        dano = max(0, int(dano))
+        combate = self._obter_combate_por_participantes(defensor)
+        dano = boss_rules.corrosao(dano, defensor)
+        return boss_rules.regras_dano(dano, "atingiu", atacante, defensor, ataque, combate)
 
     def _aplicar_efeito(self, defensor, efeito):
         if not isinstance(efeito, dict):
             return None
+        especial = boss_rules.efeito_especial(defensor, efeito)
+        if especial is not None:
+            return especial
         nome = str(efeito.get("nome", efeito.get("tipo", ""))).strip().lower()
         if not nome:
             return None
@@ -387,6 +405,35 @@ class Luta(commands.Cog):
         valor = int(_num(efeito.get("valor"), 5))
         defensor.setdefault("efeitos", []).append({"nome": nome, "turnos": turnos, "valor": valor})
         return nome
+
+    async def _aplicar_efeitos_inicio(self, ctx, participante):
+        combate = self._obter_combate(ctx.channel.id)
+        boss_rules.inicio_especial(combate or {}, participante)
+        dano_total = 0
+        bloqueado = False
+        novos = []
+        for efeito in list(participante.get("efeitos", []) or []):
+            if not isinstance(efeito, dict):
+                continue
+            nome = _normalizar(efeito.get("nome", efeito.get("tipo", "")))
+            valor = max(0, int(_num(efeito.get("valor"), 5)))
+            if nome in {"veneno", "queimadura", "sangramento"}:
+                dano_total += valor
+            elif nome == "sangramento_profundo":
+                defesa = _attr(participante, "Defesa", "defesa") + _attr(participante, "Força", "forca")
+                dano_total += max(1, int(valor - defesa * 0.5))
+            if nome in {"paralisia", "stun", "prisao", "prisão"}:
+                bloqueado = True
+            turnos = int(_num(efeito.get("turnos"), 1)) - 1
+            if turnos > 0:
+                copia = dict(efeito)
+                copia["turnos"] = turnos
+                novos.append(copia)
+        participante["efeitos"] = novos
+        if dano_total:
+            participante["vida"] = max(0, int(_num(participante.get("vida")) - dano_total))
+            await ctx.send(f"⚠️ **{participante.get('nome')}** sofreu **{dano_total}** de efeitos.")
+        return bloqueado
 
     async def _resolver_ataque(self, ctx):
         combate = self._obter_combate(ctx.channel.id)
@@ -496,6 +543,8 @@ class Luta(commands.Cog):
         if not combate or not combate.get("ativo") or combate.get("fase") != "defesa":
             await ctx.send("❌ Não há ataque pendente para defender.")
             return
+        if acao not in {"defesa", "esquiva", "normal"}:
+            raise ValueError(f"ação de defesa inválida: {acao}")
         defensor = self._obter_defensor(combate)
         if not defensor or defensor.get("tipo") != "jogador" or str(defensor.get("id")) != str(ctx.author.id):
             nome = defensor.get("nome", "outro jogador") if defensor else "outro jogador"
