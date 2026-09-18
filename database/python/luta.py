@@ -179,31 +179,6 @@ def limpar_defesa(participante):
     participante["esquiva_ativa"] = False
 
 
-def calcular_dano(atacante, defensor=None):
-    if defensor and defensor.get("esquiva_ativa", False):
-        defensor["esquiva_ativa"] = False
-        if random.random() < 0.40:
-            return 0, "esquivou"
-    reducao = 0.50 if defensor and defensor.get("defesa_ativa", False) else 0
-    if atacante.get("tipo") == "jogador":
-        dano = int((atacante.get("Força", 10) + atacante.get("Destreza", 10)) / 2) + random.randint(1, 10)
-    else:
-        dano = atacante.get("dano_base", 10) + random.randint(1, 15)
-    if defensor:
-        dano = max(1, dano - int(float(defensor.get("defesa", 0) or 0) * 0.1))
-    if reducao:
-        dano = int(dano * (1 - reducao))
-    return max(1, dano), "normal"
-
-
-def aplicar_dano(defensor, dano):
-    defensor["vida"] = max(0, defensor.get("vida", 0) - dano)
-    return defensor["vida"]
-
-
-def esta_vivo(participante):
-    return participante.get("vida", 0) > 0
-
 
 def pode_lutar(user_id: str, guild_id: str):
     jogador = obter_jogador(user_id, guild_id)
