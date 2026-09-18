@@ -310,7 +310,7 @@ class Luta(_LutaLegada):
         combate["ui_stage"] = "attributes"
         combate["ui_waiting_advance"] = True
         self._ui_views[mensagem.id] = _AvancarView(self)
-        await mensagem.edit(view=self._ui_views[mensagem.id])
+        await self._ui_editar(combate, embed, view=True)
 
     async def avancar(self, interaction: discord.Interaction):
         combate = self._obter_combate(interaction.channel.id)
