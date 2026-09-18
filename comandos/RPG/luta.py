@@ -323,6 +323,8 @@ class Luta(commands.Cog):
             valor = max(0, int(_num(efeito.get("valor"), 5)))
             if nome in {"veneno", "queimadura", "sangramento"}:
                 dano_total += valor
+            elif nome == "sangramento_profundo":
+                dano_total += max(1, int(valor - _attr(participante, "defesa", padrao=_attr(participante, "Força") + _attr(participante, "Defesa")) * 0.50))
             if nome in {"paralisia", "stun", "prisao", "prisão"}:
                 bloqueado = True
             turnos = int(_num(efeito.get("turnos"), 1)) - 1
