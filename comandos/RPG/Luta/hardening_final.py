@@ -191,6 +191,32 @@ class Luta(_BaseLuta):
                 await self._ui_context(ctx, combate).send(f"❌ Erro ao resolver a defesa: `{type(erro).__name__}: {erro}`.", _luta_error=True)
             return
 
+    async def _finalizar_pvp(self, ctx, motivo):
+        """Finaliza PvP somente quando existe uma vitória pendente válida."""
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo"):
+            await ctx.send("❌ Não há combate PvP ativo.")
+            return
+        if not combate.get("pvp") or not combate.get("aguardando_finalizacao"):
+            await ctx.send("❌ Este combate não está aguardando finalização PvP.")
+            return
+        vencedor = self._por_id(combate, combate.get("vencedor_id"))
+        perdedor = self._por_id(combate, combate.get("perdedor_id"))
+        if not vencedor or not perdedor:
+            raise RuntimeError("finalização PvP sem vencedor ou perdedor válido")
+        if str(vencedor.get("id")) != str(getattr(ctx.author, "id", "")):
+            await ctx.send("❌ Apenas o vencedor do turno decisivo pode finalizar este PvP.")
+            return
+        if motivo not in {"morte", "desmaio"}:
+            raise ValueError("motivo de finalização PvP inválido")
+        if motivo == "morte":
+            perdedor["vida"] = 0
+        else:
+            perdedor["vida"] = max(1, int(float(perdedor.get("vida", 0) or 0)))
+        combate["aguardando_finalizacao"] = False
+        combate["fase"] = "finalizacao"
+        await self._finalizar(ctx, motivo=motivo, vencedor=vencedor, perdedor=perdedor)
+
     async def avancar(self, interaction: discord.Interaction):
         combate = self._obter_combate(interaction.channel.id)
         if not combate or not combate.get("ativo"):
