@@ -44,4 +44,5 @@ async def _ataque_monstro_resiliente(self, ctx):
         raise RuntimeError("fallback não criou ataque pendente")
     combate["fase"] = "defesa"
     combate["ui_stage"] = "attack"
+    await self._anunciar_ataque(ctx)
     return ataque
