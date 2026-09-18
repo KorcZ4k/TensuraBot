@@ -63,11 +63,13 @@ class Luta(_BaseLuta):
             return None
         atual = int(combate.get("turno", 0)) % len(participantes)
         if _vivo(participantes[atual]):
+            combate["_turno_participante_id"] = participantes[atual].get("id")
             return participantes[atual]
         for passo in range(1, len(participantes) + 1):
             indice = (atual + passo) % len(participantes)
             if _vivo(participantes[indice]):
                 combate["turno"] = indice
+                combate["_turno_participante_id"] = participantes[indice].get("id")
                 return participantes[indice]
         return None
 
