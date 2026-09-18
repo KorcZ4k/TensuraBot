@@ -166,8 +166,8 @@ async def on_command_error(ctx, error):
                 try:
                     if await canal_bloqueado(ctx.guild.id, ctx.channel.id):
                         return
-                except Exception:
-                    pass
+                except Exception as erro_bloqueio:
+                    print(f"[COMANDO][CHECK][ERRO] {type(erro_bloqueio).__name__}: {erro_bloqueio}")
     if isinstance(error, commands.CommandNotFound):
         return
     erro_original = getattr(error, "original", error)
