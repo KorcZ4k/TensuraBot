@@ -1,12 +1,11 @@
-"""Pacote modular do sistema de combate."""
+"""Pacote modular do sistema de combate.
 
-from . import ui_fix  # noqa: F401,E402
-from . import robustez  # noqa: F401,E402
-from . import ataque_resiliente  # noqa: F401,E402
-from . import integridade_estado  # noqa: F401,E402
-from . import contrato_monstro  # noqa: F401,E402
-from . import recompensa_fix  # noqa: F401,E402
-from . import hardening_final  # noqa: F401,E402
-from . import compat_ui  # noqa: F401,E402
+O motor efetivo é hardening_final.Luta. Os módulos antigos de monkey-patch
+não são importados aqui para evitar múltiplos donos do mesmo método.
+"""
+from . import contrato_monstro
+from . import recompensa_fix
+from . import hardening_final
+from . import compat_ui
 
 __all__ = ["Infos_Luta", "Mensagens_luta", "sistemas_luta", "comandos_luta"]
