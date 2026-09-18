@@ -237,12 +237,16 @@ def obter_vencedores(combate):
 
 
 def finalizar_combate(combate):
+    """Compatibilidade de baixo nível: persiste estado, mas não concede recompensa.
+
+    A recompensa pertence exclusivamente ao motor Discord para evitar XP/TP/Hunos
+    duplicados quando uma finalização for chamada por caminhos diferentes.
+    """
     guild_id = combate.get("guild_id")
     resultado = obter_vencedores(combate)
-    participantes = combate.get("participantes", [])
     if not guild_id:
         return resultado
-    for participante in participantes:
+    for participante in combate.get("participantes", []):
         if participante.get("tipo") != "jogador":
             continue
         vida = max(0, int(participante.get("vida", 0) or 0))
@@ -252,16 +256,4 @@ def finalizar_combate(combate):
             {"ID": str(participante.get("id")), "guild_id": str(guild_id)},
             {"$set": {"Vida": vida, "Mana": mana, "Situação": situacao}},
         )
-    if resultado and resultado.get("tipo") == "vitoria" and resultado.get("lado") == "jogadores":
-        vivos = [p for p in participantes if p.get("tipo") == "jogador" and p.get("vida", 0) > 0]
-        derrotados_monstros = [p for p in participantes if p.get("tipo") == "monstro" and p.get("vida", 0) <= 0]
-        xp_total = sum(int(p.get("xp_recompensa", 0) or 0) for p in derrotados_monstros)
-        hunos_total = sum(int(p.get("hunos_recompensa", 0) or 0) for p in derrotados_monstros)
-        for indice, jogador in enumerate(vivos):
-            xp = xp_total // len(vivos) + (1 if indice < xp_total % len(vivos) else 0)
-            hunos = hunos_total // len(vivos) + (1 if indice < hunos_total % len(vivos) else 0)
-            filtro = {"ID": str(jogador.get("id")), "guild_id": str(guild_id)}
-            db["Jogadores"].update_one(filtro, {"$inc": {"XP": xp}})
-            db["Hunos"].update_one(filtro, {"$inc": {"carteira": hunos}}, upsert=True)
-        return {"xp": xp_total, "hunos": hunos_total}
     return resultado
