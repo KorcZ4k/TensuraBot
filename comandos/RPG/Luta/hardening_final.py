@@ -481,6 +481,7 @@ class Luta(_BaseLuta):
                 await self._finalizar(self._ui_context(ctx, combate), motivo="vida")
                 return
             combate["turno"] = proximo
+            combate["_turno_participante_id"] = combate["participantes"][proximo].get("id")
             combate["numero_turno"] = int(combate.get("numero_turno", 1)) + 1
             combate["fase"] = "ataque"
             combate["ataque_pendente"] = None
