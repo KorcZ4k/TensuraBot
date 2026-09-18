@@ -6,7 +6,7 @@ e normaliza registros já existentes, sem substituir funções em runtime.
 from database.python import luta as luta_db
 from ..monstros_balanceamento import criar_monstro_balanceado
 
-def normalizar_recompensa(monstro):
+def _normalizar_recompensa(monstro):
     if not monstro:
         return monstro
     monstro["xp_recompensa"] = int(float(monstro.get("xp_recompensa", 0) or 0))
@@ -19,7 +19,10 @@ def normalizar_recompensa(monstro):
     monstro.setdefault("efeitos", [])
     return monstro
 
-for _dados in luta_db.MONSTROS.values():
-    normalizar_recompensa(_dados)
+normalizar_recompensa = _normalizar_recompensa
+criar_monstro_balanceado_contrato = criar_monstro_balanceado
 
-__all__ = ["normalizar_recompensa", "criar_monstro_balanceado"]
+for _dados in luta_db.MONSTROS.values():
+    _normalizar_recompensa(_dados)
+
+__all__ = ["_normalizar_recompensa", "normalizar_recompensa", "criar_monstro_balanceado", "criar_monstro_balanceado_contrato"]
