@@ -178,11 +178,12 @@ async def on_command_error(ctx, error):
             combate = luta._obter_combate(ctx.channel.id) if luta else None
             if combate and combate.get("ativo") and combate.get("fase") == "defesa":
                 ataque = combate.get("ataque_pendente")
-                if ataque and ataque.get("_resolvendo"):
-                    ataque["_resolvendo"] = False
-                    combate["ataque_pendente"] = None
-                    combate["fase"] = "ataque"
-                    await ctx.send("⚠️ A ação falhou e foi cancelada com segurança. O combate continua no turno atual.")
+                if ataque:
+                    ataque.pop("_resolvendo", None)
+                    combate["fase"] = "defesa"
+                    combate["ui_stage"] = "defense_action"
+                    combate["ui_waiting_advance"] = False
+                    print("[LUTA][RECUPERAÇÃO] ataque pendente preservado após erro de comando.")
                     return
         except Exception as recuperacao_erro:
             print(f"[COMANDO][RECUPERACAO][ERRO] {type(recuperacao_erro).__name__}: {recuperacao_erro}")
@@ -258,7 +259,7 @@ async def _carregar_extensao_com_recuperacao_de_conflito(extensao):
 async def carregar_extensoes():
     extensoes = [
         "comandos.RPG.Luta.comandos_luta",
-        "comandos.RPG.monstros_balanceamento", "comandos.RPG.party",
+        "comandos.RPG.party",
         "comandos.RPG.treino", "comandos.RPG.magias", "comandos.RPG.habs",
         "comandos.RPG.status", "comandos.RPG.racas_chances", "comandos.RPG.nivel", "comandos.RPG.nascimento",
         "comandos.RPG.habilidades_combate", "comandos.RPG.correcoes_party", "comandos.RPG.correcoes_concorrencia",
