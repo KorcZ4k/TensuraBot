@@ -131,14 +131,16 @@ def inicio_especial(combate, participante):
     return False
 
 def preparar_proximo_turno(combate):
-    turno=int(combate.get("numero_turno",1))
-    lista=combate.get("participantes", [])
-    if lista:
-        idx=int(combate.get("turno",0)) % len(lista)
-        combate["_turno_participante_id"]=lista[idx].get("id")
-    combate["participantes"]=[p for p in combate.get("participantes",[]) if not (p.get("invocado") and turno>=int(p.get("expira_turno",10**9)))]
-    atual=next((p for p in combate.get("participantes",[]) if p.get("id")==combate.get("_turno_participante_id")),None)
-    for p in combate.get("participantes",[]):
-        if eh(p,"dragao-adulto") and not estado(p).get("furia_draconica") and vivo(p) and float(p.get("vida",0))<=float(p.get("vida_maxima",1))*.25:
-            estado(p)["furia_draconica"]=True; p["Velocidade"]=float(p.get("Velocidade",0))*1.2; p["velocidade"]=p["Velocidade"]
-    if atual in combate.get("participantes",[]): combate["turno"]=combate["participantes"].index(atual)
+    """Calcula regras especiais sem alterar a lista de participantes."""
+    turno = int(combate.get("numero_turno", 1))
+    participantes = combate.get("participantes", [])
+    expirados = {
+        str(p.get("id")) for p in participantes
+        if p.get("invocado") and turno >= int(p.get("expira_turno", 10**9))
+    }
+    combate["_participantes_expirados"] = expirados
+    for p in participantes:
+        if eh(p,"dragao-adulto") and not estado(p).get("furia_draconica") and vivo(p) and float(p.get("vida",0)) <= float(p.get("vida_maxima",1)) * .25:
+            estado(p)["furia_draconica"] = True
+            p["Velocidade"] = float(p.get("Velocidade",0)) * 1.2
+            p["velocidade"] = p["Velocidade"]
