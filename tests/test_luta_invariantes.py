@@ -157,3 +157,34 @@ def test_reward_without_database_is_safe():
     if bosses.luta_db.db is not None:
         return
     assert asyncio.run(cog._recompensar(c)) == (0, 0, 0)
+
+
+def test_regras_de_boss_nao_removem_participantes_no_meio_da_maquina():
+    c = _combat()
+    invocado = _p("inv", "monstro")
+    invocado["invocado"] = True
+    invocado["expira_turno"] = 1
+    c["participantes"].append(invocado)
+    bosses.preparar_proximo_turno(c)
+    assert invocado in c["participantes"]
+    assert "inv" in c["_participantes_expirados"]
+
+
+def test_recompensa_usa_tp_explicitamente():
+    cog = _cog()
+    c = _combat()
+    c["participantes"][1].update({
+        "xp_recompensa": 100, "tp_recompensa": 300,
+        "hunos_recompensa": 50, "vida": 0
+    })
+    c["guild_id"] = "g"
+    assert c["participantes"][1]["tp_recompensa"] == 300
+
+
+def test_ataque_pendente_tem_fase_defesa():
+    cog = _cog()
+    c = _combat()
+    a, d = c["participantes"]
+    cog._criar_ataque(c, "fisico", a, d, dano_base=10)
+    assert c["fase"] == "defesa"
+    assert c["ui_stage"] == "attack"
