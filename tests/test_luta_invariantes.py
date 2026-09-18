@@ -45,6 +45,11 @@ class LutaInvariantTests(unittest.TestCase):
         from comandos.RPG.luta import Luta as LutaCanonica
         self.assertIs(sistemas_luta.Luta, LutaCanonica)
         self.assertTrue(issubclass(LutaFinal, LutaCanonica))
+        self.assertIs(LutaFinal._dano_fisico, LutaCanonica._dano_fisico)
+        self.assertIs(LutaFinal._dano_magia, LutaCanonica._dano_magia)
+        self.assertIs(LutaFinal._aplicar_efeito, LutaCanonica._aplicar_efeito)
+        self.assertIs(LutaFinal._aplicar_efeitos_inicio, LutaCanonica._aplicar_efeitos_inicio)
+        self.assertIs(LutaFinal._defesa_jogador, LutaCanonica._defesa_jogador)
 
     def test_camadas_de_dados_nao_expoem_calculo_de_dano(self):
         import database.python.luta as luta_db
@@ -330,7 +335,7 @@ class LutaInvariantTests(unittest.TestCase):
         resultado = {"participantes": [{"id": "1", "tipo": "jogador", "vida": 10}], "guild_id": "g"}
         if luta_db.db is not None:
             self.skipTest("Banco disponível")
-        self.assertIsNotNone(luta_db.finalizar_combate(resultado))
+        self.assertIsNone(luta_db.finalizar_combate(resultado))
 
 
 if __name__ == "__main__":
