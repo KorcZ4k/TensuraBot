@@ -55,7 +55,10 @@ class _UIContext:
         if view is None and self._owner:
             view = _AvancarView(self._owner)
             self._owner._ui_views[self._message.id] = view
-        await self._message.edit(embed=padrao, attachments=[], view=view)
+        if self._owner is not None:
+            await self._owner._ui_editar(combate, padrao, view=True)
+        else:
+            await self._message.edit(embed=padrao, attachments=[], view=view)
         return self._message
 
     @staticmethod
