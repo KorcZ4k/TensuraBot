@@ -26,5 +26,23 @@ def _obter_atacante_integridade(self, combate):
 
 
 async def _executar_defesa_unificado(self, ctx, acao, embed=None):
-    """Encaminha a defesa para o resolver canônico do motor efetivo."""
-    return await self.executar_defesa_jogador(ctx, acao, embed=embed)
+    combate = self._obter_combate(ctx.channel.id)
+    if not combate or not combate.get("ativo"):
+        return
+    ui = self._ui_context(ctx, combate)
+    ataque = combate.get("ataque_pendente") or {}
+    defensor = self._obter_defensor(combate)
+    if not defensor or str(defensor.get("id")) != str(ctx.author.id):
+        return
+    defensor["defesa_ativa"] = acao == "defesa"
+    defensor["esquiva_ativa"] = acao == "esquiva"
+    combate["ui_stage"] = "resolving"
+    try:
+        await self._resolver_ataque(ui)
+    except Exception:
+        ataque.pop("_resolvendo", None)
+        if combate.get("ativo") and combate.get("ataque_pendente") is ataque:
+            combate["ui_stage"] = "defense_action"
+            combate["ui_waiting_advance"] = False
+            await ui.send("❌ Erro ao resolver a defesa.", _luta_error=True)
+
