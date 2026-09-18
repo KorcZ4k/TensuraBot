@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import discord
 from database.python import luta as luta_db
+from .. import monstros_balanceamento as boss_rules
 
 from .sistemas_luta import Luta as _BaseLuta, _UIContext, _AvancarView, _vivo
 
@@ -78,6 +79,9 @@ class Luta(_BaseLuta):
             return existente
         if not atacante or not defensor or not _vivo(atacante) or not _vivo(defensor):
             raise RuntimeError("ataque criado com participante inválido ou derrotado")
+        dados.setdefault("efeito", {})
+        dados.setdefault("mana_base", 0)
+        dados.setdefault("com_arma", False)
         ataque = {"tipo": tipo, "nome": dados.pop("nome", "⚔️ Ataque"),
                   "atacante_id": atacante.get("id"), "defensor_id": defensor.get("id"), **dados}
         combate["ataque_pendente"] = ataque
@@ -141,14 +145,20 @@ class Luta(_BaseLuta):
         if not atacante or not defensor or atacante.get("tipo") != "monstro":
             raise RuntimeError("turno do monstro sem atacante/defensor válido")
         import random
-        golpes = [luta_db.GOLPES[i] for i in (atacante.get("golpes") or []) if i in luta_db.GOLPES]
-        if not golpes:
-            raise RuntimeError("monstro sem golpe válido")
-        golpe = random.choice(golpes)
-        ataque = self._criar_ataque(combate, golpe.get("tipo", "fisico"), atacante, defensor,
-            nome=golpe.get("nome", "Ataque"), dano_base=float(golpe.get("dano_base", atacante.get("dano_base", 0)) or 0),
-            mana_base=float(golpe.get("custo_mana", 0) or 0), com_arma=bool(golpe.get("com_arma", False)),
-            efeito=golpe.get("efeito", {}) or {})
+        especial = boss_rules.ataque_especial(combate, atacante, defensor)
+        if especial is not None:
+            dados = especial
+            tipo = "fisico"
+        else:
+            golpes = [luta_db.GOLPES[i] for i in (atacante.get("golpes") or []) if i in luta_db.GOLPES]
+            if not golpes:
+                raise RuntimeError("monstro sem golpe válido: configure pelo menos um golpe válido")
+            golpe = boss_rules.ajustar_ataque(atacante, random.choice(golpes))
+            dados = {"nome": golpe.get("nome", "Ataque"), "dano_base": float(golpe.get("dano_base", atacante.get("dano_base", 0)) or 0),
+                     "mana_base": float(golpe.get("custo_mana", 0) or 0), "com_arma": bool(golpe.get("com_arma", False)),
+                     "efeito": golpe.get("efeito", {}) or {}}
+            tipo = golpe.get("tipo", "fisico")
+        ataque = self._criar_ataque(combate, tipo, atacante, defensor, **dados)
         if combate.get("ui_message"):
             await self._mostrar_ataque_ui(combate)
         else:
@@ -226,6 +236,33 @@ class Luta(_BaseLuta):
         if mensagem is not None:
             self._ui_views.pop(mensagem.id, None)
             getattr(self, "_ui_avancar_locks", {}).pop(mensagem.id, None)
+
+    def _dano_fisico(self, atacante, defensor, ataque):
+        dano, resultado = super()._dano_fisico(atacante, defensor, ataque)
+        combate = self._obter_combate_por_participantes(defensor)
+        return boss_rules.regras_dano(dano, resultado, atacante, defensor, ataque, combate)
+
+    def _dano_magia(self, atacante, defensor, ataque):
+        dano, resultado = super()._dano_magia(atacante, defensor, ataque)
+        combate = self._obter_combate_por_participantes(defensor)
+        return boss_rules.regras_dano(dano, resultado, atacante, defensor, ataque, combate)
+
+    def _aplicar_efeito(self, defensor, efeito):
+        especial = boss_rules.efeito_especial(defensor, efeito)
+        if especial is not None:
+            return especial
+        return super()._aplicar_efeito(defensor, efeito)
+
+    async def _aplicar_efeitos_inicio(self, ctx, participante):
+        combate = self._obter_combate(ctx.channel.id)
+        boss_rules.inicio_especial(combate or {}, participante)
+        return await super()._aplicar_efeitos_inicio(ctx, participante)
+
+    def _obter_combate_por_participantes(self, participante):
+        for combate in self.combates.values():
+            if participante in combate.get("participantes", []):
+                return combate
+        return {}
 
     async def _recompensar(self, combate):
         """Único cálculo de recompensa: XP, TP e Hunos dos monstros derrotados."""
