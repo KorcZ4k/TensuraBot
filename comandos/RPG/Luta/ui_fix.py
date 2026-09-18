@@ -301,10 +301,5 @@ async def _avancar_resiliente(self, interaction):
                 await interaction.followup.send("❌ Houve uma falha nesta etapa, mas o combate foi preservado. Clique em Avançar novamente.", ephemeral=True)
 
 
-Luta._ataque_jogador = _ataque_jogador_ui
-Luta._defesa_jogador = _defesa_jogador_ui
-Luta.executar_defesa_jogador = _executar_defesa_ui
-Luta._ui_editar = _ui_editar_seguro
-Luta._criar_ataque_monstro_ui = _criar_ataque_monstro_ui_seguro
-Luta.avancar = _avancar_resiliente
-_UIContext.send = _ui_context_send_seguro
+
+__all__ = ["_ataque_jogador_ui", "_defesa_jogador_ui", "_ui_editar_seguro", "_executar_defesa_ui", "_criar_ataque_monstro_ui_seguro", "_avancar_resiliente"]
