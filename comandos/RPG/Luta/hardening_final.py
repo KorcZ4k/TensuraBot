@@ -394,13 +394,19 @@ class Luta(_BaseLuta):
             return
 
     async def _limpar_recursos_combate(self, channel_id, combate):
+        """Libera recursos locais e invalida a View no Discord sem mascarar falhas."""
         self._embeds_acao.pop(channel_id, None)
         mensagem = combate.get("ui_message")
-        if mensagem is not None:
-            view = self._ui_views.pop(mensagem.id, None)
-            if view is not None:
-                view.stop()
-            getattr(self, "_ui_avancar_locks", {}).pop(mensagem.id, None)
+        if mensagem is None:
+            return
+        view = self._ui_views.pop(mensagem.id, None)
+        if view is not None:
+            view.stop()
+        getattr(self, "_ui_avancar_locks", {}).pop(mensagem.id, None)
+        try:
+            await mensagem.edit(view=None)
+        except Exception as erro:
+            print(f"[LUTA][UI][LIMPEZA][ERRO] {type(erro).__name__}: {erro}")
 
     def _dano_fisico(self, atacante, defensor, ataque):
         if defensor.get("esquiva_ativa"):
