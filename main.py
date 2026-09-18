@@ -184,6 +184,10 @@ async def on_command_error(ctx, error):
                     combate["ui_stage"] = "defense_action"
                     combate["ui_waiting_advance"] = False
                     print("[LUTA][RECUPERAÇÃO] ataque pendente preservado após erro de comando.")
+                    try:
+                        await luta._ui_context(ctx, combate).send("⚠️ A ação falhou, mas o ataque pendente foi preservado. Escolha a defesa novamente.")
+                    except Exception as ui_erro:
+                        print(f"[LUTA][RECUPERAÇÃO][UI][ERRO] {type(ui_erro).__name__}: {ui_erro}")
                     return
         except Exception as recuperacao_erro:
             print(f"[COMANDO][RECUPERACAO][ERRO] {type(recuperacao_erro).__name__}: {recuperacao_erro}")
