@@ -300,7 +300,9 @@ class Luta(commands.Cog):
         if combate.get("pvp"):
             descricao = f"💀 **{vencedor.get('nome')}** finalizou **{perdedor.get('nome')}** ({motivo})." if vencedor and perdedor else "⚖️ O combate PvP terminou em empate."
         elif resultado == "jogadores":
-            xp, hunos = await self._recompensar(combate)
+            recompensas = await self._recompensar(combate)
+            xp, hunos = recompensas[0], recompensas[1]
+            tp = recompensas[2] if len(recompensas) > 2 else 0
             descricao = "🏆 Os jogadores venceram o combate!"
         elif resultado == "inimigos":
             descricao = "💀 Os jogadores foram derrotados."
@@ -309,7 +311,7 @@ class Luta(commands.Cog):
         if combate.get("pvp") and vencedor and perdedor:
             descricao = f"💀 **{vencedor.get('nome')}** finalizou **{perdedor.get('nome')}** ({motivo})."
         embed = discord.Embed(title="⚔️ Combate Finalizado", description=descricao, color=discord.Color.green() if resultado == "jogadores" else discord.Color.red())
-        embed.add_field(name="🎁 Recompensas", value=f"✨ XP: **{xp}**\n💰 Hunos: **{hunos}**", inline=False)
+        embed.add_field(name="🎁 Recompensas", value=f"✨ XP: **{xp}**\n🔷 TP: **{tp}**\n💰 Hunos: **{hunos}**", inline=False)
         embed.add_field(name="📋 Status", value=self._texto_status(combate["participantes"]), inline=False)
         await ctx.send(embed=embed)
         self.combates.pop(ctx.channel.id, None)
