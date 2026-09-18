@@ -292,10 +292,20 @@ class Luta(_BaseLuta):
         return await super()._aplicar_efeitos_inicio(ctx, participante)
 
     def _obter_combate_por_participantes(self, participante):
+        """Busca por identidade do objeto, evitando colisões de IDs entre combates."""
+        if participante is None:
+            return {}
         for combate in self.combates.values():
-            if participante in combate.get("participantes", []):
+            if any(p is participante for p in combate.get("participantes", [])):
                 return combate
         return {}
+    
+    def _limpar_defesas(self, combate):
+        for participante in combate.get("participantes", []):
+            participante["defesa_ativa"] = False
+            participante["esquiva_ativa"] = False
+            participante["defesa_magica_ativa"] = False
+            participante["defesa_magica_valor"] = 0
 
     async def _recompensar(self, combate):
         """Único cálculo de recompensa: XP, TP e Hunos dos monstros derrotados."""
