@@ -91,11 +91,13 @@ def criar_monstro(tipo: str, nivel: int = 1):
         "defesa": defesa_total, "velocidade": velocidade, "Velocidade": velocidade,
         "Magia": int(atributos_base.get("Magia", 0) or 0),
         "Inteligencia": int(atributos_base.get("Inteligencia", 0) or 0),
-        "dano_base": dano_base, "xp_recompensa": xp_recompensa, "hunos_recompensa": hunos_recompensa,
+        "dano_base": dano_base, "xp_recompensa": xp_recompensa,
+        "tp_recompensa": int(dados.get("tp_recompensa", xp_recompensa) or xp_recompensa),
+        "hunos_recompensa": hunos_recompensa,
         "golpes": list(dados.get("golpes", [])),
         "cooldown_horas": max(1, int(dados.get("cooldown_horas", MONSTRO_COOLDOWN_HORAS))),
         "defesa_ativa": False, "esquiva_ativa": False,
-        "defesa_magica_ativa": False, "defesa_magica_valor": 0,
+        "defesa_magica_ativa": False, "defesa_magica_valor": 0, "efeitos": [],
     }
 
 
