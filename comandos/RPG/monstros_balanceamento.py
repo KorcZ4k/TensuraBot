@@ -130,23 +130,18 @@ def efeito_especial(defensor,efeito):
     if nome in {"corrosao","sangramento_profundo"}: return adicionar_efeito(defensor,efeito)
     return None
 
-def inicio_especial(combate,participante):
-    if not vivo(participante): 
-        if eh(participante,"cavaleiro-esqueletico"): matar_invocados(combate,"cavaleiro-esqueletico")
+def inicio_especial(combate, participante):
+    """Aplica apenas efeitos exclusivos de boss; o dano periódico é do motor base."""
+    if not vivo(participante):
+        if eh(participante, "cavaleiro-esqueletico"):
+            matar_invocados(combate, "cavaleiro-esqueletico")
         return False
-    if eh(participante,"fenix"):
+    if eh(participante, "fenix"):
         cura=max(1,int(float(participante.get("vida_maxima",0))*0.04))
-        participante["vida"]=min(float(participante.get("vida_maxima",participante.get("vida",0))),float(participante.get("vida",0))+cura)
-    novos=[]; dano=0
-    defesa=float(participante.get("defesa",0) or 0)
-    for e in participante.get("efeitos",[]):
-        nome=str(e.get("nome","")).casefold()
-        if nome=="sangramento_profundo": dano+=max(1,int(float(e.get("valor",10) or 10)-defesa*.5))
-        turnos=int(float(e.get("turnos",1) or 1))-1
-        if turnos>0: e["turnos"]=turnos; novos.append(e)
-    participante["efeitos"]=novos
-    if dano: participante["vida"]=max(0,float(participante.get("vida",0))-dano)
-    if not vivo(participante) and eh(participante,"cavaleiro-esqueletico"): matar_invocados(combate,"cavaleiro-esqueletico")
+        participante["vida"]=min(float(participante.get("vida_maxima",participante.get("vida",0))),
+                                 float(participante.get("vida",0))+cura)
+    if not vivo(participante) and eh(participante, "cavaleiro-esqueletico"):
+        matar_invocados(combate, "cavaleiro-esqueletico")
     return False
 
 def preparar_proximo_turno(combate):
