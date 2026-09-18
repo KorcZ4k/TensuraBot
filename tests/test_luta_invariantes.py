@@ -1,4 +1,6 @@
 import asyncio
+import unittest
+from unittest.mock import patch
 
 from comandos.RPG.Luta.hardening_final import Luta
 from comandos.RPG import monstros_balanceamento as bosses
@@ -19,9 +21,9 @@ def _p(pid, tipo="jogador", equipe=None, vida=100):
         "equipe": equipe or ("jogadores" if tipo == "jogador" else "inimigos"),
         "vida": vida, "vida_maxima": 100, "defesa": 10,
         "Força": 10, "Defesa": 10, "Velocidade": 10, "Destreza": 10,
-        "mana": 50, "efeitos": [], "defesa_ativa": False,
-        "esquiva_ativa": False, "defesa_magica_ativa": False,
-        "defesa_magica_valor": 0,
+        "Magia": 50, "Inteligencia": 10, "mana": 50,
+        "efeitos": [], "defesa_ativa": False, "esquiva_ativa": False,
+        "defesa_magica_ativa": False, "defesa_magica_valor": 0,
     }
 
 
@@ -35,156 +37,136 @@ def _combat():
     }
 
 
-def test_turno_preserva_identidade_mesmo_com_lista_reordenada():
-    cog = _cog()
-    c = _combat()
-    cog._normalizar_estado(c)
-    assert c["_turno_participante_id"] == "1"
-    c["participantes"].reverse()
-    cog._normalizar_estado(c)
-    assert c["_turno_participante_id"] == "1"
-    assert cog._obter_atacante(c)["id"] == "1"
+class LutaInvariantTests(unittest.TestCase):
+    def test_turno_preserva_identidade_mesmo_com_lista_reordenada(self):
+        cog, c = _cog(), _combat()
+        cog._normalizar_estado(c)
+        c["participantes"].reverse()
+        cog._normalizar_estado(c)
+        self.assertEqual(c["_turno_participante_id"], "1")
+        self.assertEqual(cog._obter_atacante(c)["id"], "1")
+
+    def test_ataque_pendente_nao_pode_ser_substituido(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        primeiro = cog._criar_ataque(c, "soco", a, d, dano_base=10)
+        segundo = cog._criar_ataque(c, "soco", a, d, dano_base=99)
+        self.assertIs(segundo, primeiro)
+        self.assertEqual(c["ataque_pendente"]["dano_base"], 10)
+
+    def test_ataque_pendente_com_outro_alvo_falha(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        outro = _p("outro", "monstro")
+        c["participantes"].append(outro)
+        cog._criar_ataque(c, "soco", a, d, dano_base=10)
+        with self.assertRaises(RuntimeError):
+            cog._criar_ataque(c, "soco", a, outro, dano_base=10)
+
+    def test_ataque_invalido_nao_e_criado(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        with self.assertRaises(ValueError):
+            cog._criar_ataque(c, "invalido", a, d)
+
+    def test_defesas_sao_limpa_em_um_unico_ponto(self):
+        cog, c = _cog(), _combat()
+        for p in c["participantes"]:
+            p.update(defesa_ativa=True, esquiva_ativa=True, defesa_magica_ativa=True, defesa_magica_valor=20)
+        cog._limpar_defesas(c)
+        self.assertTrue(all(not p["defesa_ativa"] and not p["esquiva_ativa"] for p in c["participantes"]))
+        self.assertTrue(all(not p["defesa_magica_ativa"] and p["defesa_magica_valor"] == 0 for p in c["participantes"]))
+
+    def test_pendente_com_alvo_morto_mantem_alvo_original(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        cog._criar_ataque(c, "soco", a, d, dano_base=10)
+        d["vida"] = 0
+        self.assertIs(cog._obter_defensor(c), d)
+
+    def test_pendente_com_atacante_morto_mantem_atacante_original(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        cog._criar_ataque(c, "soco", a, d, dano_base=10)
+        a["vida"] = 0
+        self.assertIs(cog._por_id(c, c["ataque_pendente"]["atacante_id"]), a)
+
+    def test_criador_balanceado_usa_o_mesmo_criador_de_dados(self):
+        tipo = next(iter(bosses.luta_db.MONSTROS))
+        base = bosses.luta_db.criar_monstro(tipo, 1)
+        balanceado = bosses.criar_monstro_balanceado(tipo, 1)
+        self.assertIsNotNone(base)
+        self.assertIsNotNone(balanceado)
+        self.assertEqual(balanceado["vida"], base["vida"])
+        self.assertEqual(balanceado["dano_base"], base["dano_base"])
+        self.assertEqual(balanceado["xp_recompensa"], base["xp_recompensa"])
+        self.assertEqual(balanceado["tp_recompensa"], base["tp_recompensa"])
+
+    def test_contrato_recompensa_tem_tp(self):
+        for tipo in bosses.luta_db.MONSTROS:
+            monstro = bosses.luta_db.criar_monstro(tipo, 1)
+            self.assertIn("xp_recompensa", monstro)
+            self.assertIn("tp_recompensa", monstro)
+            self.assertIn("hunos_recompensa", monstro)
+
+    def test_resistencia_de_efeito_nao_aplica_stun_resistido(self):
+        defensor = _p("d", "monstro")
+        defensor["boss_id"] = "dragao-adulto"
+        with patch.object(bosses.random, "random", return_value=0.1):
+            resultado = bosses.efeito_especial(defensor, {"nome": "stun", "turnos": 1})
+        self.assertFalse(resultado)
+        self.assertEqual(defensor["efeitos"], [])
+
+    def test_efeito_corrosao_e_normalizado(self):
+        defensor = _p("d", "monstro")
+        efeito = bosses.efeito_especial(defensor, {"nome": "corrosao", "valor": 10, "turnos": 3})
+        self.assertEqual(efeito["nome"], "corrosao")
+        self.assertEqual(defensor["efeitos"][0]["turnos"], 3)
+
+    def test_reward_without_database_is_safe(self):
+        if bosses.luta_db.db is not None:
+            self.skipTest("Banco disponível")
+        cog, c = _cog(), _combat()
+        c["participantes"][1].update(xp_recompensa=10, tp_recompensa=20, hunos_recompensa=30, vida=0)
+        self.assertEqual(asyncio.run(cog._recompensar(c)), (0, 0, 0))
+
+    def test_regras_de_boss_nao_removem_participantes_no_meio_da_maquina(self):
+        c = _combat()
+        invocado = _p("inv", "monstro")
+        invocado.update(invocado=True, expira_turno=1)
+        c["participantes"].append(invocado)
+        bosses.preparar_proximo_turno(c)
+        self.assertIn(invocado, c["participantes"])
+        self.assertIn("inv", c["_participantes_expirados"])
+
+    def test_recompensa_usa_tp_explicitamente(self):
+        cog, c = _cog(), _combat()
+        c["participantes"][1].update(xp_recompensa=100, tp_recompensa=300, hunos_recompensa=50, vida=0)
+        self.assertEqual(c["participantes"][1]["tp_recompensa"], 300)
+
+    def test_ataque_pendente_tem_fase_defesa(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        cog._criar_ataque(c, "fisico", a, d, dano_base=10)
+        self.assertEqual(c["fase"], "defesa")
+        self.assertEqual(c["ui_stage"], "attack")
+
+    def test_todos_os_golpes_dos_monstros_tem_tipo_aceitavel_ou_sao_defensivos(self):
+        defensivos = {"defesa", "esquiva"}
+        for monstro_id, dados in bosses.luta_db.MONSTROS.items():
+            for golpe_id in dados.get("golpes", []):
+                golpe = bosses.luta_db.GOLPES[golpe_id]
+                tipo = str(golpe.get("tipo", "")).casefold()
+                self.assertTrue(tipo in {"fisico", "magia", "magico", "mágico", "monstro"} or golpe_id in defensivos,
+                                f"{monstro_id}/{golpe_id}: tipo={tipo}")
+
+    def test_finalizar_combate_sem_db_nao_acessa_banco(self):
+        import database.python.luta as luta_db
+        resultado = {"participantes": [{"id": "1", "tipo": "jogador", "vida": 10}], "guild_id": "g"}
+        if luta_db.db is not None:
+            self.skipTest("Banco disponível")
+        self.assertIsNotNone(luta_db.finalizar_combate(resultado))
 
 
-def test_ataque_pendente_nao_pode_ser_substituido():
-    cog = _cog()
-    c = _combat()
-    a, d = c["participantes"]
-    primeiro = cog._criar_ataque(c, "soco", a, d, dano_base=10)
-    segundo = cog._criar_ataque(c, "soco", a, d, dano_base=99)
-    assert segundo is primeiro
-    assert c["ataque_pendente"]["dano_base"] == 10
-
-
-def test_ataque_pendente_com_outro_alvo_falha():
-    cog = _cog()
-    c = _combat()
-    a, d = c["participantes"]
-    outro = _p("outro", "monstro")
-    c["participantes"].append(outro)
-    cog._criar_ataque(c, "soco", a, d, dano_base=10)
-    try:
-        cog._criar_ataque(c, "soco", a, outro, dano_base=10)
-    except RuntimeError:
-        pass
-    else:
-        raise AssertionError("ataque pendente foi redirecionado")
-
-
-def test_ataque_invalido_nao_e_criado():
-    cog = _cog()
-    c = _combat()
-    a, d = c["participantes"]
-    try:
-        cog._criar_ataque(c, "invalido", a, d)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("tipo inválido aceito")
-
-
-def test_defesas_sao_limpa_em_um_unico_ponto():
-    cog = _cog()
-    c = _combat()
-    for p in c["participantes"]:
-        p["defesa_ativa"] = True
-        p["esquiva_ativa"] = True
-        p["defesa_magica_ativa"] = True
-        p["defesa_magica_valor"] = 20
-    cog._limpar_defesas(c)
-    assert all(not p["defesa_ativa"] and not p["esquiva_ativa"] for p in c["participantes"])
-    assert all(not p["defesa_magica_ativa"] and p["defesa_magica_valor"] == 0 for p in c["participantes"])
-
-
-def test_pendente_com_alvo_morto_mantem_alvo_original():
-    cog = _cog()
-    c = _combat()
-    a, d = c["participantes"]
-    cog._criar_ataque(c, "soco", a, d, dano_base=10)
-    d["vida"] = 0
-    assert cog._obter_defensor(c) is d
-
-
-def test_pendente_com_atacante_morto_mantem_atacante_original():
-    cog = _cog()
-    c = _combat()
-    a, d = c["participantes"]
-    cog._criar_ataque(c, "soco", a, d, dano_base=10)
-    a["vida"] = 0
-    assert cog._por_id(c, c["ataque_pendente"]["atacante_id"]) is a
-
-
-def test_criador_balanceado_usa_o_mesmo_criador_de_dados():
-    tipo = next(iter(bosses.luta_db.MONSTROS))
-    base = bosses.luta_db.criar_monstro(tipo, 1)
-    balanceado = bosses.criar_monstro_balanceado(tipo, 1)
-    assert base is not None and balanceado is not None
-    assert balanceado["vida"] == base["vida"]
-    assert balanceado["dano_base"] == base["dano_base"]
-    assert balanceado["xp_recompensa"] == base["xp_recompensa"]
-    assert balanceado["tp_recompensa"] == base["tp_recompensa"]
-
-
-def test_contrato_recompensa_tem_tp():
-    tipo = next(iter(bosses.luta_db.MONSTROS))
-    monstro = bosses.luta_db.criar_monstro(tipo, 1)
-    if monstro is not None:
-        assert "xp_recompensa" in monstro
-        assert "tp_recompensa" in monstro
-        assert "hunos_recompensa" in monstro
-
-
-def test_resistencia_de_efeito_nao_aplica_stun_resistido(monkeypatch):
-    defensor = _p("d", "monstro")
-    defensor["boss_id"] = "dragao-adulto"
-    monkeypatch.setattr(bosses.random, "random", lambda: 0.1)
-    resultado = bosses.efeito_especial(defensor, {"nome": "stun", "turnos": 1})
-    assert resultado is False
-    assert defensor["efeitos"] == []
-
-
-def test_efeito_corrosao_e_normalizado():
-    defensor = _p("d", "monstro")
-    efeito = bosses.efeito_especial(defensor, {"nome": "corrosao", "valor": 10, "turnos": 3})
-    assert efeito["nome"] == "corrosao"
-    assert defensor["efeitos"][0]["turnos"] == 3
-
-
-def test_reward_without_database_is_safe():
-    cog = _cog()
-    c = _combat()
-    c["participantes"][1].update({"xp_recompensa": 10, "tp_recompensa": 20, "hunos_recompensa": 30, "vida": 0})
-    if bosses.luta_db.db is not None:
-        return
-    assert asyncio.run(cog._recompensar(c)) == (0, 0, 0)
-
-
-def test_regras_de_boss_nao_removem_participantes_no_meio_da_maquina():
-    c = _combat()
-    invocado = _p("inv", "monstro")
-    invocado["invocado"] = True
-    invocado["expira_turno"] = 1
-    c["participantes"].append(invocado)
-    bosses.preparar_proximo_turno(c)
-    assert invocado in c["participantes"]
-    assert "inv" in c["_participantes_expirados"]
-
-
-def test_recompensa_usa_tp_explicitamente():
-    cog = _cog()
-    c = _combat()
-    c["participantes"][1].update({
-        "xp_recompensa": 100, "tp_recompensa": 300,
-        "hunos_recompensa": 50, "vida": 0
-    })
-    c["guild_id"] = "g"
-    assert c["participantes"][1]["tp_recompensa"] == 300
-
-
-def test_ataque_pendente_tem_fase_defesa():
-    cog = _cog()
-    c = _combat()
-    a, d = c["participantes"]
-    cog._criar_ataque(c, "fisico", a, d, dano_base=10)
-    assert c["fase"] == "defesa"
-    assert c["ui_stage"] == "attack"
+if __name__ == "__main__":
+    unittest.main()
