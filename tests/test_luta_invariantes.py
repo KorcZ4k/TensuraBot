@@ -39,6 +39,60 @@ def _combat():
 
 
 class LutaInvariantTests(unittest.TestCase):
+    def test_turno_pendente_tem_prioridade_e_nao_troca_identidade(self):
+        cog, c = _cog(), _combat()
+        a = {"id": "1", "tipo": "jogador", "vida": 100, "equipe": "jogadores"}
+        d = {"id": "2", "tipo": "monstro", "vida": 100, "equipe": "inimigos"}
+        c["participantes"] = [a, d]
+        c["turno"] = 1
+        c["numero_turno"] = 7
+        c["_turno_participante_id"] = "1"
+        c["fase"] = "ataque"
+        c["ataque_pendente"] = {"atacante_id": "1", "defensor_id": "2"}
+        cog._normalizar_estado(c)
+        self.assertEqual(c["fase"], "defesa")
+        self.assertIs(cog._obter_atacante(c), a)
+        self.assertIs(cog._obter_defensor(c), d)
+        self.assertEqual(c["numero_turno"], 7)
+
+    def test_nao_seleciona_derrotado_no_proximo_turno(self):
+        cog, c = _cog(), _combat()
+        morto = {"id": "1", "tipo": "jogador", "vida": 0, "equipe": "jogadores"}
+        vivo = {"id": "2", "tipo": "jogador", "vida": 100, "equipe": "jogadores"}
+        c["participantes"] = [morto, vivo]
+        c["turno"] = 0
+        self.assertIs(cog._obter_atacante(c), vivo)
+
+    def test_identidade_de_turno_sobrevive_a_reordenacao(self):
+        cog, c = _cog(), _combat()
+        a = {"id": "10", "tipo": "jogador", "vida": 100, "equipe": "jogadores"}
+        b = {"id": "20", "tipo": "monstro", "vida": 100, "equipe": "inimigos"}
+        c["participantes"] = [a, b]
+        c["_turno_participante_id"] = "20"
+        c["turno"] = 0
+        cog._normalizar_estado(c)
+        self.assertEqual(c["turno"], 1)
+        self.assertEqual(c["_turno_participante_id"], "20")
+
+    def test_participante_invocado_expirado_e_marcado_na_troca(self):
+        from comandos.RPG import monstros_balanceamento as regras
+        c = _combat()
+        inv = {"id": "99", "tipo": "monstro", "vida": 100, "equipe": "inimigos",
+               "invocado": True, "expira_turno": 1}
+        c["participantes"] = [inv]
+        c["numero_turno"] = 1
+        regras.preparar_proximo_turno(c)
+        self.assertIn("99", c["_participantes_expirados"])
+
+    def test_id_de_ataque_pendente_nao_redireciona_para_outro_participante(self):
+        cog, c = _cog(), _combat()
+        a = {"id": "1", "tipo": "jogador", "vida": 100}
+        d = {"id": "2", "tipo": "monstro", "vida": 0}
+        outro = {"id": "3", "tipo": "monstro", "vida": 100}
+        c["participantes"] = [a, d, outro]
+        c["ataque_pendente"] = {"atacante_id": "1", "defensor_id": "2"}
+        self.assertIsNone(cog._obter_defensor(c))
+
     def test_motor_e_unico_e_sistemas_e_apenas_compatibilidade(self):
         from comandos.RPG.Luta import sistemas_luta
         from comandos.RPG.Luta.hardening_final import Luta as LutaFinal
