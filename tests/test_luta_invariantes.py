@@ -243,6 +243,43 @@ class LutaInvariantTests(unittest.TestCase):
         self.assertLess(extra["vida"], 100)
 
 
+    def test_recompensa_idempotente_retorna_cache(self):
+        cog, c = _cog(), _combat()
+        c.update(recompensa_aplicada=True, recompensa_xp=10, recompensa_hunos=20, recompensa_tp=30)
+        self.assertEqual(asyncio.run(cog._recompensar(c)), (10, 20, 30))
+
+    def test_lock_por_canal_e_unico(self):
+        cog = _cog()
+        self.assertIs(cog._lock(123), cog._lock(123))
+        self.assertIsNot(cog._lock(123), cog._lock(456))
+
+    def test_limpeza_de_recursos_para_view_registrada(self):
+        cog, c = _cog(), _combat()
+        class View:
+            def __init__(self):
+                self.parou = False
+            def stop(self):
+                self.parou = True
+        class Msg:
+            id = 55
+        view = View()
+        c["ui_message"] = Msg()
+        cog._ui_views[55] = view
+        asyncio.run(cog._limpar_recursos_combate(1, c))
+        self.assertTrue(view.parou)
+        self.assertNotIn(55, cog._ui_views)
+
+    def test_ataque_pendente_e_fonte_de_verdade_mesmo_com_fase_incorreta(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        primeiro = cog._criar_ataque(c, "soco", a, d, dano_base=10)
+        c["fase"] = "ataque"
+        resultado = asyncio.run(cog._ataque_monstro(type("Ctx", (), {"channel": type("Ch", (), {"id": 1})()})())) if a.get("tipo") == "monstro" else primeiro
+        self.assertIs(c["ataque_pendente"], primeiro)
+        self.assertIs(resultado, primeiro)
+        self.assertEqual(c["fase"], "defesa")
+
+
     def test_todos_os_golpes_dos_monstros_tem_tipo_aceitavel_ou_sao_defensivos(self):
         defensivos = {"defesa", "esquiva"}
         for monstro_id, dados in bosses.luta_db.MONSTROS.items():
