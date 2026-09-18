@@ -11,7 +11,27 @@ import discord
 from database.python import luta as luta_db
 from .. import monstros_balanceamento as boss_rules
 
-from .sistemas_luta import Luta as _BaseLuta, _UIContext, _vivo
+from .luta import Luta as _BaseLuta, _vivo
+
+
+class _UIContext:
+    """Adaptador mínimo do motor final para Context/Interaction."""
+    def __init__(self, original, message, combate=None, owner=None):
+        self._original = original
+        self._message = message
+        self._combate = combate or {}
+        self._owner = owner
+
+    @property
+    def channel(self):
+        return self._message.channel
+
+    @property
+    def author(self):
+        return getattr(self._original, "user", getattr(self._original, "author", None))
+
+    def __getattr__(self, name):
+        return getattr(self._original, name)
 
 
 class Luta(_BaseLuta):
