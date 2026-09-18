@@ -21,16 +21,25 @@ class Luta(_BaseLuta):
                      if str(p.get("id")) == str(participante_id)), None)
 
     def _normalizar_estado(self, combate):
-        combate.setdefault("participantes", [])
+        """Normaliza invariantes sem trocar identidade de turno silenciosamente."""
+        participantes = combate.setdefault("participantes", [])
         combate.setdefault("historico", [])
         combate.setdefault("ataque_pendente", None)
         combate.setdefault("turno", 0)
         combate.setdefault("numero_turno", 1)
         combate.setdefault("fase", "ataque")
         combate.setdefault("ativo", True)
+        combate.setdefault("ui_stage", "attributes")
         combate.setdefault("ui_waiting_advance", False)
-        if combate["participantes"]:
-            combate["turno"] = int(combate.get("turno", 0)) % len(combate["participantes"])
+        combate.setdefault("_turno_participante_id", None)
+        if participantes:
+            ids = {str(p.get("id")) for p in participantes}
+            turno_id = combate.get("_turno_participante_id")
+            if turno_id is not None and str(turno_id) in ids:
+                combate["turno"] = next(i for i,p in enumerate(participantes) if str(p.get("id")) == str(turno_id))
+            else:
+                combate["turno"] = max(0, min(int(combate.get("turno", 0)), len(participantes)-1))
+                combate["_turno_participante_id"] = participantes[combate["turno"]].get("id")
         combate["numero_turno"] = max(1, int(combate.get("numero_turno", 1)))
         ataque = combate.get("ataque_pendente")
         if ataque:
