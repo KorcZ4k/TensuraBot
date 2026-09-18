@@ -275,16 +275,16 @@ async def _ataque(ctx, chave, titulo):
     cog = await _cog(ctx)
     if cog is None:
         return
-    combate = cog._obter_combate(ctx.channel.id)
-    atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
-    defensor = cog._obter_defensor(combate) if combate else {"nome": "-"}
-    golpe = luta_db.GOLPES.get(chave, {})
-    embed = _embed_acao(
-        titulo, atacante, defensor, combate.get("numero_turno", 1) if combate else 1,
-        dano=_valor_int(golpe.get("dano_base")), mana=_valor_int(golpe.get("custo_mana")),
-        efeito=_efeito_texto(golpe.get("efeito")), extra=golpe.get("descricao", "Ação de combate."),
-    )
     async with cog._lock(ctx.channel.id):
+        combate = cog._obter_combate(ctx.channel.id)
+        atacante = cog._obter_atacante(combate) if combate else {"nome": ctx.author.display_name}
+        defensor = cog._obter_defensor(combate) if combate else {"nome": "-"}
+        golpe = luta_db.GOLPES.get(chave, {})
+        embed = _embed_acao(
+            titulo, atacante, defensor, combate.get("numero_turno", 1) if combate else 1,
+            dano=_valor_int(golpe.get("dano_base")), mana=_valor_int(golpe.get("custo_mana")),
+            efeito=_efeito_texto(golpe.get("efeito")), extra=golpe.get("descricao", "Ação de combate."),
+        )
         await cog.executar_ataque_jogador(ctx, chave, embed=embed)
 
 
