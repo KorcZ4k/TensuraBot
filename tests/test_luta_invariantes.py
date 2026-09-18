@@ -270,6 +270,25 @@ class LutaInvariantTests(unittest.TestCase):
         self.assertTrue(view.parou)
         self.assertNotIn(55, cog._ui_views)
 
+    def test_limpeza_local_continua_se_message_edit_falhar(self):
+        cog, c = _cog(), _combat()
+        class View:
+            def __init__(self):
+                self.parou = False
+            def stop(self):
+                self.parou = True
+        class Msg:
+            id = 77
+            async def edit(self, **kwargs):
+                raise RuntimeError("discord indisponível")
+        view = View()
+        c["ui_message"] = Msg()
+        cog._ui_views[77] = view
+        asyncio.run(cog._limpar_recursos_combate(1, c))
+        self.assertTrue(view.parou)
+        self.assertNotIn(77, cog._ui_views)
+        self.assertNotIn(1, cog._embeds_acao)
+
     def test_ataque_pendente_e_fonte_de_verdade_mesmo_com_fase_incorreta(self):
         cog, c = _cog(), _combat()
         a, d = c["participantes"]
