@@ -365,6 +365,21 @@ class Luta(_LutaLegada):
         elif stage == "resolving":
             await interaction.followup.send("❌ A defesa está sendo processada. Aguarde o resultado.", ephemeral=True)
 
+    async def _ataque_monstro(self, ctx):
+        """Contrato legado mantido para extensões de balanceamento; o Cog efetivo sobrescreve este método."""
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo"):
+            return None
+        ataque = combate.get("ataque_pendente")
+        if ataque:
+            combate["fase"] = "defesa"
+            return ataque
+        atacante = self._obter_atacante(combate)
+        defensor = self._obter_defensor(combate)
+        if not atacante or not defensor:
+            raise RuntimeError("turno do monstro sem atacante/defensor válido")
+        raise RuntimeError("implementação efetiva de ataque de monstro não carregada")
+
     async def _criar_ataque_monstro_ui(self, combate):
         atacante = self._obter_atacante(combate)
         defensor = self._obter_defensor(combate)
