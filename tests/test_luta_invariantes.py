@@ -151,6 +151,72 @@ class LutaInvariantTests(unittest.TestCase):
         self.assertEqual(c["fase"], "defesa")
         self.assertEqual(c["ui_stage"], "attack")
 
+    def test_resolucao_restaurada_se_edicao_da_ui_falhar(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        cog._criar_ataque(c, "soco", a, d, dano_base=10)
+        original_vida = d["vida"]
+
+        async def falhar_ui(*_args, **_kwargs):
+            raise RuntimeError("message.edit falhou")
+
+        async def salvar(*_args, **_kwargs):
+            return None
+
+        async def proximo(*_args, **_kwargs):
+            return None
+
+        cog._ui_editar = falhar_ui
+        cog._salvar = salvar
+        cog._proximo_turno = proximo
+        with self.assertRaises(RuntimeError):
+            asyncio.run(cog._resolver_ataque(type("Ctx", (), {"channel": type("Ch", (), {"id": 1})()})()))
+        self.assertIsNotNone(c["ataque_pendente"])
+        self.assertEqual(c["fase"], "defesa")
+        self.assertEqual(c["ui_stage"], "attack")
+        self.assertEqual(d["vida"], original_vida)
+        self.assertNotIn("_resolvendo", c["ataque_pendente"])
+
+    def test_resolucao_de_pendente_com_atacante_morto_descarta_sem_redirecionar(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        cog._criar_ataque(c, "soco", a, d, dano_base=10)
+        a["vida"] = 0
+        calls = []
+
+        async def salvar(*_args, **_kwargs):
+            return None
+
+        async def proximo(*_args, **_kwargs):
+            calls.append(True)
+
+        cog._salvar = salvar
+        cog._proximo_turno = proximo
+        asyncio.run(cog._resolver_ataque(type("Ctx", (), {"channel": type("Ch", (), {"id": 1})()})()))
+        self.assertIsNone(c["ataque_pendente"])
+        self.assertEqual(calls, [True])
+        self.assertIs(cog._por_id(c, "1"), a)
+
+    def test_resolucao_de_pendente_com_defensor_morto_descarta_sem_redirecionar(self):
+        cog, c = _cog(), _combat()
+        a, d = c["participantes"]
+        cog._criar_ataque(c, "soco", a, d, dano_base=10)
+        d["vida"] = 0
+        calls = []
+
+        async def salvar(*_args, **_kwargs):
+            return None
+
+        async def proximo(*_args, **_kwargs):
+            calls.append(True)
+
+        cog._salvar = salvar
+        cog._proximo_turno = proximo
+        asyncio.run(cog._resolver_ataque(type("Ctx", (), {"channel": type("Ch", (), {"id": 1})()})()))
+        self.assertIsNone(c["ataque_pendente"])
+        self.assertEqual(calls, [True])
+        self.assertIs(cog._por_id(c, "slime"), d)
+
     def test_todos_os_golpes_dos_monstros_tem_tipo_aceitavel_ou_sao_defensivos(self):
         defensivos = {"defesa", "esquiva"}
         for monstro_id, dados in bosses.luta_db.MONSTROS.items():
