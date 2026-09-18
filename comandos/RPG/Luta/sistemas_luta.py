@@ -235,8 +235,14 @@ class Luta(_LutaLegada):
         if atacante.get("tipo") != "jogador" or str(atacante.get("id")) != str(ctx.author.id):
             await ui.send(f"❌ É a vez de **{atacante.get('nome', 'outro jogador')}**.")
             return
-        golpe = luta_db.GOLPES.get(tipo_ataque, {})
-        self._criar_ataque(combate, tipo_ataque, atacante, defensor, nome=golpe.get("nome", tipo_ataque.title()), dano_base=float(golpe.get("dano_base", 0) or 0), com_arma=bool(golpe.get("com_arma")), efeito=golpe.get("efeito", {}))
+        golpe = luta_db.GOLPES.get(tipo_ataque)
+        if not isinstance(golpe, dict):
+            await ui.send("Golpe não está configurado.")
+            return
+        tipo = str(golpe.get("tipo", "fisico") or "fisico")
+        if tipo not in {"fisico", "magia"}:
+            tipo = "fisico"
+        self._criar_ataque(combate, tipo, atacante, defensor, nome=golpe.get("nome", tipo_ataque.title()), dano_base=float(golpe.get("dano_base", 0) or 0), com_arma=bool(golpe.get("com_arma")), efeito=golpe.get("efeito", {}))
         if combate.get("ui_message"):
             await self._mostrar_ataque_ui(combate)
             combate["ui_stage"] = "attack"
