@@ -34,9 +34,15 @@ class Luta(_BaseLuta):
         combate["numero_turno"] = max(1, int(combate.get("numero_turno", 1)))
         ataque = combate.get("ataque_pendente")
         if ataque:
-            if not self._por_id(combate, ataque.get("atacante_id")) or not self._por_id(combate, ataque.get("defensor_id")):
-                raise RuntimeError("ataque pendente aponta para participante inexistente")
-            combate["fase"] = "defesa"
+            atacante = self._por_id(combate, ataque.get("atacante_id"))
+            defensor = self._por_id(combate, ataque.get("defensor_id"))
+            if not atacante or not defensor:
+                combate["ataque_pendente"] = None
+                combate["fase"] = "ataque"
+                combate["ui_stage"] = "turn"
+                combate["ui_waiting_advance"] = False
+            else:
+                combate["fase"] = "defesa"
 
     def _obter_atacante(self, combate):
         self._normalizar_estado(combate)
