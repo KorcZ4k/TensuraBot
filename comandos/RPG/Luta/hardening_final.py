@@ -428,6 +428,55 @@ async def _callback_avancar_seguro(self, interaction: discord.Interaction):
             print(f"[LUTA][UI][AVANCAR][RESPOSTA][ERRO] {type(resposta_erro).__name__}: {resposta_erro}")
 
 
+    async def _proximo_turno(self, ctx):
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo"):
+            return
+        if combate.get("ui_message"):
+            if combate.get("ui_waiting_advance"):
+                return
+            resultado = self._condicao_vitoria(combate)
+            if resultado:
+                await self._finalizar(self._ui_context(ctx, combate), motivo="vida")
+                return
+            boss_rules.preparar_proximo_turno(combate)
+            proximo = self._proximo_indice(combate, int(combate.get("turno", 0)))
+            if proximo is None:
+                await self._finalizar(self._ui_context(ctx, combate), motivo="vida")
+                return
+            combate["turno"] = proximo
+            combate["numero_turno"] = int(combate.get("numero_turno", 1)) + 1
+            combate["fase"] = "ataque"
+            combate["ataque_pendente"] = None
+            combate["ui_stage"] = "turn"
+            combate["ui_waiting_advance"] = False
+            for participante in combate.get("participantes", []):
+                participante["defesa_ativa"] = False
+                participante["esquiva_ativa"] = False
+                participante["defesa_magica_ativa"] = False
+                participante["defesa_magica_valor"] = 0
+            atacante = self._obter_atacante(combate)
+            if not atacante:
+                await self._finalizar(self._ui_context(ctx, combate), motivo="vida")
+                return
+            ui_ctx = self._ui_context(ctx, combate)
+            bloqueado = await self._aplicar_efeitos_inicio(ui_ctx, atacante)
+            if not _vivo(atacante):
+                await self._salvar(combate)
+                await self._finalizar(ui_ctx, motivo="efeitos")
+                return
+            if bloqueado:
+                combate["ui_stage"] = "result"
+                combate["ui_waiting_advance"] = True
+                await self._ui_editar(combate, self._acao_embed(atacante=atacante, defensor=atacante,
+                    nome="Stun", emoji="💫", turno=combate.get("numero_turno",1), dano=0,
+                    mana=atacante.get("mana",0), descricao=f"**{atacante.get('nome')}** perdeu este turno."))
+                return
+            await self._ui_editar(combate, self._embed_turno_monstro(combate) if atacante.get("tipo")=="monstro" else self._embed_aguarde_jogador(combate))
+            return
+        return await super()._proximo_turno(ctx)
+
+
 _AvancarView._callback = _callback_avancar_seguro    async def _proximo_turno(self, ctx):
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
