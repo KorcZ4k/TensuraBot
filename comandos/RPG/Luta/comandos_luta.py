@@ -356,12 +356,12 @@ async def fugir(ctx):
         if not sucesso:
             await ctx.send(embed=embed)
             return
-        combate["ativo"] = False
-        combate["fase"] = "finalizado"
-        await cog._salvar(combate)
-        await cog._marcar_combate([p for p in combate.get("participantes", []) if p.get("tipo") == "jogador"], guild_id=str(combate.get("guild_id")), situacao="ativo")
-        await cog._limpar_recursos_combate(ctx.channel.id, combate)
-        cog.combates.pop(ctx.channel.id, None)
+        try:
+            await cog._abandonar_combate(ctx)
+        except Exception as erro:
+            print(f"[LUTA][FUGA][ERRO] {type(erro).__name__}: {erro}")
+            await ctx.send(embed=_embed_erro("Fuga", "Não foi possível concluir a fuga; o combate foi preservado."))
+            return
         await ctx.send(embed=embed)
 
 
