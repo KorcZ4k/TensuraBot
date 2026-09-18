@@ -555,6 +555,28 @@ class Luta(_BaseLuta):
                 print(f"[LUTA][ROLLBACK][ERRO] {type(save_erro).__name__}: {save_erro}")
             raise
 
+    async def _abandonar_combate(self, ctx):
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo"):
+            return False
+        snapshot = {"ativo": combate.get("ativo", True), "fase": combate.get("fase", "ataque"),
+                    "ataque_pendente": copy.deepcopy(combate.get("ataque_pendente")),
+                    "ui_stage": combate.get("ui_stage", "turn")}
+        try:
+            combate["ativo"] = False
+            combate["fase"] = "finalizado"
+            combate["ataque_pendente"] = None
+            self._limpar_defesas(combate)
+            await self._salvar(combate)
+            jogadores = [p for p in combate.get("participantes", []) if p.get("tipo") == "jogador"]
+            await self._marcar_combate(jogadores, str(combate.get("guild_id")), "ativo")
+            await self._limpar_recursos_combate(ctx.channel.id, combate)
+            self.combates.pop(ctx.channel.id, None)
+            return True
+        except Exception:
+            combate.update(snapshot)
+            raise
+
     async def _finalizar_pvp(self, ctx, motivo):
         """Finaliza PvP somente quando existe uma vitória pendente válida."""
         combate = self._obter_combate(ctx.channel.id)
