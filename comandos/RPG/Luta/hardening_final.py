@@ -126,6 +126,34 @@ class Luta(_BaseLuta):
             embed = discord.Embed(description=f"**{atacante.get('nome')}** atacou **{defensor.get('nome')}**!", color=discord.Color.orange())
         await ctx.send(embed=embed)
 
+    async def _ataque_monstro(self, ctx):
+        """Único caminho de criação do ataque de monstro; nunca duplica pending."""
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo"):
+            return None
+        if combate.get("ataque_pendente"):
+            combate["fase"] = "defesa"
+            return combate["ataque_pendente"]
+        atacante = self._obter_atacante(combate)
+        defensor = self._obter_defensor(combate)
+        if not atacante or not defensor or atacante.get("tipo") != "monstro":
+            raise RuntimeError("turno do monstro sem atacante/defensor válido")
+        import random
+        from database.python import luta as luta_db
+        golpes = [luta_db.GOLPES[i] for i in (atacante.get("golpes") or []) if i in luta_db.GOLPES]
+        if not golpes:
+            raise RuntimeError("monstro sem golpe válido")
+        golpe = random.choice(golpes)
+        ataque = self._criar_ataque(combate, golpe.get("tipo", "fisico"), atacante, defensor,
+            nome=golpe.get("nome", "Ataque"), dano_base=float(golpe.get("dano_base", atacante.get("dano_base", 0)) or 0),
+            mana_base=float(golpe.get("custo_mana", 0) or 0), com_arma=bool(golpe.get("com_arma", False)),
+            efeito=golpe.get("efeito", {}) or {})
+        if combate.get("ui_message"):
+            await self._mostrar_ataque_ui(combate)
+        else:
+            await self._anunciar_ataque(ctx)
+        return ataque
+
     async def _criar_ataque_monstro_ui(self, combate):
         mensagem = combate.get("ui_message")
         if mensagem is None:
