@@ -6,4 +6,4 @@ não são importados aqui para evitar múltiplos donos do mesmo método.
 from . import contrato_monstro
 from . import hardening_final
 
-__all__ = ["Infos_Luta", "Mensagens_luta", "sistemas_luta", "comandos_luta"]
+__all__ = ["contrato_monstro", "hardening_final"]
