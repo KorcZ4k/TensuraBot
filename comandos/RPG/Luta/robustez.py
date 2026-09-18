@@ -99,14 +99,6 @@ def _aplicar_corrosao_robusto(self, dano, defensor):
     return int(dano * (1 - 0.10 * stacks))
 
 
-Luta._aplicar_corrosao = _aplicar_corrosao_robusto
-
-# Verificação final após todos os patches do balanceamento.
-_faltantes = [nome for nome in _METODOS_MONSTRO_OBRIGATORIOS if not callable(getattr(Luta, nome, None))]
-if _faltantes:
-    raise RuntimeError("[LUTA] Métodos obrigatórios de monstros ausentes: " + ", ".join(_faltantes))
-
-
 _original_resolver_defesa_ui = ui_fix._resolver_defesa_ui
 
 
@@ -138,9 +130,6 @@ async def _resolver_defesa_ui_robusto(self, ctx, combate, ataque, defensor, atac
         raise
 
 
-ui_fix._resolver_defesa_ui = _resolver_defesa_ui_robusto
-
-
 _original_ataque_jogador = Luta.executar_ataque_jogador
 
 
@@ -166,4 +155,4 @@ async def _executar_ataque_jogador_robusto(self, ctx, tipo_ataque, embed=None):
         raise
 
 
-Luta.executar_ataque_jogador = _executar_ataque_jogador_robusto
+__all__ = ["_aplicar_corrosao_robusto", "_resolver_defesa_ui_robusto", "_executar_ataque_jogador_robusto"]
