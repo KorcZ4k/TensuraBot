@@ -244,9 +244,7 @@ class Luta(_BaseLuta):
             nome = defensor.get("nome", "outro jogador") if defensor else "outro jogador"
             await self._ui_context(ctx, combate).send(f"❌ É **{nome}** quem deve defender este ataque.", _luta_error=True)
             return
-        for participante in combate.get("participantes", []):
-            participante["defesa_ativa"] = False
-            participante["esquiva_ativa"] = False
+        self._limpar_defesas(combate)
         defensor["defesa_ativa"] = acao == "defesa"
         defensor["esquiva_ativa"] = acao == "esquiva"
         combate["ui_stage"] = "resolving"
