@@ -51,8 +51,6 @@ class _UIContext:
             turno=combate.get("numero_turno", 1), oponente=defensor, vida_oponente=self._vida(defensor),
             extra=extra or "Atualização do combate.", cor=discord.Color.blurple(),
         )
-        combate["ui_stage"] = "result"
-        combate["ui_waiting_advance"] = True
         view = self._owner._ui_views.get(self._message.id) if self._owner else None
         if view is None and self._owner:
             view = _AvancarView(self._owner)
@@ -114,8 +112,8 @@ class _AvancarView(discord.ui.View):
                     await interaction.followup.send("❌ Erro ao avançar o combate. O estado foi preservado.", ephemeral=True)
                 else:
                     await interaction.response.send_message("❌ Erro ao avançar o combate. O estado foi preservado.", ephemeral=True)
-            except Exception:
-                pass
+            except Exception as resposta_erro:
+                print(f"[LUTA][UI][AVANCAR][RESPOSTA][ERRO] {type(resposta_erro).__name__}: {resposta_erro}")
 
 
 class Luta(_LutaLegada):
