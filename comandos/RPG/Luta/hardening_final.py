@@ -86,24 +86,40 @@ class Luta(_BaseLuta):
                      if p is not atacante and _vivo(p) and p.get("equipe") != equipe), None)
 
     def _criar_ataque(self, combate, tipo, atacante, defensor, **dados):
+        """Cria exatamente um ataque e congela atacante/alvo até a resolução."""
         self._normalizar_estado(combate)
         existente = combate.get("ataque_pendente")
         if existente:
-            if (str(existente.get("atacante_id")) != str(atacante.get("id")) or
-                    str(existente.get("defensor_id")) != str(defensor.get("id"))):
+            if (str(existente.get("atacante_id")) != str((atacante or {}).get("id")) or
+                    str(existente.get("defensor_id")) != str((defensor or {}).get("id"))):
                 raise RuntimeError("tentativa de substituir ataque pendente por outro alvo")
             combate["fase"] = "defesa"
             return existente
-        if not atacante or not defensor or not _vivo(atacante) or not _vivo(defensor):
-            raise RuntimeError("ataque criado com participante inválido ou derrotado")
+        if not atacante or not defensor:
+            raise RuntimeError("ataque criado sem atacante ou defensor")
+        if not _vivo(atacante):
+            raise RuntimeError("ataque criado por participante derrotado")
+        if not _vivo(defensor):
+            raise RuntimeError("ataque criado contra participante derrotado")
+        if tipo not in {"fisico", "magia", "soco", "chute", "ataque_monstro"}:
+            raise ValueError(f"tipo de ataque inválido: {tipo}")
         dados.setdefault("efeito", {})
         dados.setdefault("mana_base", 0)
         dados.setdefault("com_arma", False)
+        try:
+            dados["dano_base"] = float(dados.get("dano_base", 0) or 0)
+            dados["mana_base"] = float(dados.get("mana_base", 0) or 0)
+        except (TypeError, ValueError) as erro:
+            raise ValueError("dano_base/mana_base inválidos") from erro
+        efeito = dados.get("efeito")
+        if efeito is not None and not isinstance(efeito, (dict, str)):
+            raise ValueError("efeito de ataque inválido")
         ataque = {"tipo": tipo, "nome": dados.pop("nome", "⚔️ Ataque"),
                   "atacante_id": atacante.get("id"), "defensor_id": defensor.get("id"), **dados}
         combate["ataque_pendente"] = ataque
         combate["fase"] = "defesa"
         combate["ui_waiting_advance"] = False
+        combate["ui_stage"] = "attack"
         return ataque
 
     async def _mostrar_ataque_ui(self, combate):
