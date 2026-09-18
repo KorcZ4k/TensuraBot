@@ -296,7 +296,7 @@ class Luta(commands.Cog):
         combate["ativo"] = False
         combate["fase"] = "finalizado"
         await self._salvar(combate)
-        xp = hunos = 0
+        xp = hunos = tp = 0
         if combate.get("pvp"):
             descricao = f"💀 **{vencedor.get('nome')}** finalizou **{perdedor.get('nome')}** ({motivo})." if vencedor and perdedor else "⚖️ O combate PvP terminou em empate."
         elif resultado == "jogadores":
