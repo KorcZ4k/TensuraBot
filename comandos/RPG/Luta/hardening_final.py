@@ -293,71 +293,75 @@ class Luta(_BaseLuta):
             return await super().avancar(interaction)
         mensagem = combate.get("ui_message")
         if mensagem is None or interaction.message is None or interaction.message.id != mensagem.id:
+            msg = "❌ Esta tela não pertence ao combate atual."
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ Esta tela não pertence ao combate atual.", ephemeral=True)
+                await interaction.response.send_message(msg, ephemeral=True)
             else:
-                await interaction.followup.send("❌ Esta tela não pertence ao combate atual.", ephemeral=True)
+                await interaction.followup.send(msg, ephemeral=True)
             return
         if combate.get("ui_owner_id") is not None and str(combate["ui_owner_id"]) != str(interaction.user.id):
+            msg = "❌ Apenas o jogador deste combate pode avançar a tela."
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ Apenas o jogador deste combate pode avançar a tela.", ephemeral=True)
+                await interaction.response.send_message(msg, ephemeral=True)
             else:
-                await interaction.followup.send("❌ Apenas o jogador deste combate pode avançar a tela.", ephemeral=True)
+                await interaction.followup.send(msg, ephemeral=True)
             return
         if not interaction.response.is_done():
             await interaction.response.defer()
         self._normalizar_estado(combate)
         try:
-                stage = combate.get("ui_stage", "attributes")
-                if combate.get("ataque_pendente"):
-                    await self._mostrar_ataque_ui(combate)
-                    return
-                if stage == "attributes":
-                    combate["ui_stage"] = "velocity"
-                    await self._ui_editar(combate, self._embed_velocidade(combate))
-                elif stage == "velocity":
-                    if (self._obter_atacante(combate) or {}).get("tipo") == "monstro":
-                        await self._criar_ataque_monstro_ui(combate)
-                    else:
-                        combate["ui_stage"] = "player_action"
-                        await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
-                elif stage == "attack":
-                    defensor = self._obter_defensor(combate)
-                    if defensor and defensor.get("tipo") == "monstro":
-                        defensor["defesa_ativa"] = False
-                        defensor["esquiva_ativa"] = False
-                        await self._resolver_ataque(self._ui_context(interaction, combate))
-                    else:
-                        combate["ui_stage"] = "defense_action"
-                        await self._ui_editar(combate, self._embed_defesa(combate))
-                elif stage == "result":
-                    combate["ui_waiting_advance"] = False
-                    await self._proximo_turno(interaction)
-                elif stage == "turn":
-                    atacante = self._obter_atacante(combate)
-                    if atacante and atacante.get("tipo") == "monstro":
-                        await self._criar_ataque_monstro_ui(combate)
-                    else:
-                        combate["ui_stage"] = "player_action"
-                        await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
-                elif stage == "player_action":
+            stage = combate.get("ui_stage", "attributes")
+            if combate.get("ataque_pendente"):
+                await self._mostrar_ataque_ui(combate)
+                return
+            if stage == "attributes":
+                combate["ui_stage"] = "velocity"
+                await self._ui_editar(combate, self._embed_velocidade(combate))
+            elif stage == "velocity":
+                if (self._obter_atacante(combate) or {}).get("tipo") == "monstro":
+                    await self._criar_ataque_monstro_ui(combate)
+                else:
+                    combate["ui_stage"] = "player_action"
                     await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
-                elif stage == "defense_action":
+            elif stage == "attack":
+                defensor = self._obter_defensor(combate)
+                if defensor and defensor.get("tipo") == "monstro":
+                    defensor["defesa_ativa"] = False
+                    defensor["esquiva_ativa"] = False
+                    await self._resolver_ataque(self._ui_context(interaction, combate))
+                else:
+                    combate["ui_stage"] = "defense_action"
                     await self._ui_editar(combate, self._embed_defesa(combate))
-                elif stage == "resolving":
-                    await interaction.followup.send("❌ A defesa está sendo processada. Aguarde o resultado.", ephemeral=True)
+            elif stage == "result":
+                combate["ui_waiting_advance"] = False
+                await self._proximo_turno(interaction)
+            elif stage == "turn":
+                atacante = self._obter_atacante(combate)
+                if atacante and atacante.get("tipo") == "monstro":
+                    await self._criar_ataque_monstro_ui(combate)
+                else:
+                    combate["ui_stage"] = "player_action"
+                    await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
+            elif stage == "player_action":
+                await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
+            elif stage == "defense_action":
+                await self._ui_editar(combate, self._embed_defesa(combate))
+            elif stage == "resolving":
+                await interaction.followup.send("❌ A defesa está sendo processada. Aguarde o resultado.", ephemeral=True)
         except Exception as erro:
             combate["ui_waiting_advance"] = False
-                if combate.get("ataque_pendente"):
-                    combate["fase"] = "defesa"
-                    combate["ui_stage"] = "attack"
-                else:
-                    combate["fase"] = "ataque"
-                print(f"[LUTA][AVANCAR][ERRO] {type(erro).__name__}: {erro}")
-                if interaction.response.is_done():
-                    await interaction.followup.send(f"❌ Não foi possível avançar: `{type(erro).__name__}`. O estado foi preservado.", ephemeral=True)
-                else:
-                    await interaction.response.send_message(f"❌ Não foi possível avançar: `{type(erro).__name__}`. O estado foi preservado.", ephemeral=True)
+            if combate.get("ataque_pendente"):
+                combate["fase"] = "defesa"
+                combate["ui_stage"] = "attack"
+            else:
+                combate["fase"] = "ataque"
+                combate["ui_stage"] = "turn"
+            print(f"[LUTA][AVANCAR][ERRO] {type(erro).__name__}: {erro}")
+            msg = f"❌ Não foi possível avançar: `{type(erro).__name__}`. O estado foi preservado."
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
 
 
 async def _callback_avancar_seguro(self, interaction: discord.Interaction):
