@@ -217,9 +217,10 @@ async def pve(ctx, *, monstro_tipo: str = ""):
                     await run_db(luta_db.cancelar_cooldown_monstro, user_id, guild_id, str(monstro_id), fim_cooldown)
                 except Exception as erro:
                     print(f"[LUTA][PVE][COOLDOWN][ERRO] {type(erro).__name__}: {erro}")
+            await cog._limpar_recursos_combate(ctx.channel.id, combate if "combate" in locals() else {})
             cog.combates.pop(ctx.channel.id, None)
-            cog._embeds_acao.pop(ctx.channel.id, None)
-            raise
+            await ctx.send(embed=_embed_erro("PvE", "Não foi possível iniciar o combate. A reserva foi desfeita."))
+            return
 
 
 async def pvp(ctx, membro: Optional[discord.Member] = None):
@@ -345,10 +346,8 @@ async def fugir(ctx):
         combate["fase"] = "finalizado"
         await cog._salvar(combate)
         await cog._marcar_combate([p for p in combate.get("participantes", []) if p.get("tipo") == "jogador"], guild_id=str(combate.get("guild_id")), situacao="ativo")
+        await cog._limpar_recursos_combate(ctx.channel.id, combate)
         cog.combates.pop(ctx.channel.id, None)
-        cog._embeds_acao.pop(ctx.channel.id, None)
-        if combate.get("ui_message") is not None:
-            cog._ui_views.pop(combate["ui_message"].id, None)
         await ctx.send(embed=embed)
 
 
