@@ -6,6 +6,7 @@ balanceado e centraliza alvo, ataque pendente, defesa, UI e avanço.
 from __future__ import annotations
 
 import asyncio
+import copy
 import discord
 from database.python import luta as luta_db
 from .. import monstros_balanceamento as boss_rules
@@ -224,6 +225,17 @@ class Luta(_BaseLuta):
         ataque = combate.get("ataque_pendente")
         if not ataque or ataque.get("_resolvendo"):
             return
+        participante_snapshots = [(p, copy.deepcopy(p)) for p in combate.get("participantes", [])]
+        estado_anterior = {
+            "ataque_pendente": copy.deepcopy(ataque),
+            "fase": combate.get("fase", "defesa"),
+            "ui_stage": combate.get("ui_stage", "attack"),
+            "ui_waiting_advance": combate.get("ui_waiting_advance", False),
+            "aguardando_finalizacao": combate.get("aguardando_finalizacao", False),
+            "vencedor_id": combate.get("vencedor_id"),
+            "perdedor_id": combate.get("perdedor_id"),
+            "historico": list(combate.get("historico", [])),
+        }
         atacante = self._por_id(combate, ataque.get("atacante_id"))
         defensor = self._por_id(combate, ataque.get("defensor_id"))
         ataque["_resolvendo"] = True
@@ -246,6 +258,7 @@ class Luta(_BaseLuta):
                 await self._salvar(combate)
                 await self._proximo_turno(ctx)
                 return
+            duelo_pendente = False
             if ataque.get("tipo") == "magia" and float(ataque.get("cura_base", 0) or 0) > 0:
                 cura = int(float(atacante.get("Magia", atacante.get("magia", 0)) or 0) + float(atacante.get("Inteligencia", atacante.get("Inteligência", 0)) or 0) + float(ataque.get("cura_base", 0) or 0))
                 atacante["vida"] = min(int(float(atacante.get("vida_maxima", atacante.get("vida", 0)) or 0)), int(float(atacante.get("vida", 0) or 0)) + cura)
@@ -261,7 +274,6 @@ class Luta(_BaseLuta):
                     mensagem = f"💨 **{defensor.get('nome')}** esquivou do ataque!"
                 else:
                     vida_antes = int(float(defensor.get("vida", 0) or 0))
-                    duelo_pendente = False
                     if combate.get("assentamento_duelo") and dano >= vida_antes:
                         dano = max(0, vida_antes - 1)
                         duelo_pendente = True
@@ -283,7 +295,7 @@ class Luta(_BaseLuta):
             embed = discord.Embed(title="💥 Resultado", description=mensagem, color=discord.Color.red())
             embed.add_field(name="📋 Status", value=self._texto_status(combate["participantes"]), inline=False)
             await self._ui_editar(combate, embed)
-            if combate.get("assentamento_duelo") and 'duelo_pendente' in locals() and duelo_pendente:
+            if combate.get("assentamento_duelo") and duelo_pendente:
                 await self._finalizar_duelo_assentamento(ctx, atacante, defensor)
                 return
             if combate.get("pvp") and not _vivo(defensor):
@@ -291,8 +303,6 @@ class Luta(_BaseLuta):
                 combate["vencedor_id"] = str(atacante.get("id"))
                 combate["perdedor_id"] = str(defensor.get("id"))
                 combate["fase"] = "finalizacao"
-                combate["ui_stage"] = "result"
-                combate["ui_waiting_advance"] = True
                 await self._salvar(combate)
                 return
             resultado = self._condicao_vitoria(combate)
@@ -302,10 +312,25 @@ class Luta(_BaseLuta):
                 return
             await self._salvar(combate)
         except Exception:
-            if combate.get("ativo") and combate.get("ataque_pendente") is ataque:
-                combate["fase"] = "defesa"
-                combate["ui_stage"] = "defense_action"
-                combate["ui_waiting_advance"] = False
+            for participante, snapshot in participante_snapshots:
+                participante.clear()
+                participante.update(snapshot)
+            combate["ataque_pendente"] = estado_anterior["ataque_pendente"]
+            combate["fase"] = estado_anterior["fase"]
+            combate["ui_stage"] = estado_anterior["ui_stage"]
+            combate["ui_waiting_advance"] = estado_anterior["ui_waiting_advance"]
+            combate["aguardando_finalizacao"] = estado_anterior["aguardando_finalizacao"]
+            if estado_anterior["vencedor_id"] is None:
+                combate.pop("vencedor_id", None)
+            else:
+                combate["vencedor_id"] = estado_anterior["vencedor_id"]
+            if estado_anterior["perdedor_id"] is None:
+                combate.pop("perdedor_id", None)
+            else:
+                combate["perdedor_id"] = estado_anterior["perdedor_id"]
+            combate["historico"] = estado_anterior["historico"]
+            if combate.get("ataque_pendente"):
+                combate["ataque_pendente"].pop("_resolvendo", None)
             raise
         finally:
             if combate.get("ataque_pendente") is ataque:
@@ -346,7 +371,9 @@ class Luta(_BaseLuta):
         self._embeds_acao.pop(channel_id, None)
         mensagem = combate.get("ui_message")
         if mensagem is not None:
-            self._ui_views.pop(mensagem.id, None)
+            view = self._ui_views.pop(mensagem.id, None)
+            if view is not None:
+                view.stop()
             getattr(self, "_ui_avancar_locks", {}).pop(mensagem.id, None)
 
     def _dano_fisico(self, atacante, defensor, ataque):
