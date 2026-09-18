@@ -4,6 +4,7 @@ O contrato é implementado pelos criadores de dados; este módulo apenas valida
 e normaliza registros já existentes, sem substituir funções em runtime.
 """
 from database.python import luta as luta_db
+from ..monstros_balanceamento import criar_monstro_balanceado
 
 def normalizar_recompensa(monstro):
     if not monstro:
@@ -21,4 +22,4 @@ def normalizar_recompensa(monstro):
 for _dados in luta_db.MONSTROS.values():
     normalizar_recompensa(_dados)
 
-__all__ = ["normalizar_recompensa"]
+__all__ = ["normalizar_recompensa", "criar_monstro_balanceado"]
