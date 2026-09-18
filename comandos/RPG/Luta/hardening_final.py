@@ -219,6 +219,29 @@ class Luta(_BaseLuta):
                 await self._ui_context(ctx, combate).send(f"❌ Erro ao resolver a defesa: `{type(erro).__name__}: {erro}`.", _luta_error=True)
             return
 
+    async def _recompensar(self, combate):
+        """Único cálculo de recompensa: XP, TP e Hunos dos monstros derrotados."""
+        if self._condicao_vitoria(combate) != "jogadores" or luta_db.db is None:
+            return 0, 0
+        monstros = [p for p in combate.get("participantes", [])
+                    if p.get("tipo") == "monstro" and not p.get("invocado") and _vivo(p) is False]
+        xp_total = sum(int(float(p.get("xp_recompensa", 0) or 0)) for p in monstros)
+        tp_total = sum(int(float(p.get("tp_recompensa", p.get("xp_recompensa", 0)) or 0)) for p in monstros)
+        hunos_total = sum(int(float(p.get("hunos_recompensa", 0) or 0)) for p in monstros)
+        vivos = [p for p in combate.get("participantes", [])
+                 if p.get("tipo") == "jogador" and _vivo(p)]
+        if not vivos:
+            return xp_total, hunos_total
+        guild_id = str(combate.get("guild_id"))
+        for i, jogador in enumerate(vivos):
+            xp = xp_total // len(vivos) + (i < xp_total % len(vivos))
+            tp = tp_total // len(vivos) + (i < tp_total % len(vivos))
+            hunos = hunos_total // len(vivos) + (i < hunos_total % len(vivos))
+            filtro = {"ID": str(jogador.get("id")), "guild_id": guild_id}
+            await luta_db.run_db(luta_db.db["Jogadores"].update_one, filtro, {"$inc": {"XP": int(xp), "TP": int(tp)}})
+            await luta_db.run_db(luta_db.db["Hunos"].update_one, filtro, {"$inc": {"carteira": int(hunos)}}, upsert=True)
+        return xp_total, hunos_total
+
     async def _finalizar_pvp(self, ctx, motivo):
         """Finaliza PvP somente quando existe uma vitória pendente válida."""
         combate = self._obter_combate(ctx.channel.id)
