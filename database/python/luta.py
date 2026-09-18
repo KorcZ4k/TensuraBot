@@ -194,33 +194,11 @@ def pode_lutar(user_id: str, guild_id: str):
     return {"pode": True, "mensagem": "Pode lutar."}
 
 
-def obter_vencedores(combate):
-    participantes = combate.get("participantes", [])
-    derrotados = [p for p in participantes if p.get("vida", 0) <= 0]
-    if not derrotados:
-        return None
-    if combate.get("pvp", False):
-        vivos = [p for p in participantes if p.get("vida", 0) > 0]
-        return {"tipo": "vitoria", "vencedor": vivos[0]} if vivos else {"tipo": "empate", "vencedor": None}
-    jogadores_vivos = any(p.get("tipo") == "jogador" and p.get("vida", 0) > 0 for p in participantes)
-    monstros_vivos = any(p.get("tipo") == "monstro" and p.get("vida", 0) > 0 for p in participantes)
-    if jogadores_vivos and not monstros_vivos:
-        return {"tipo": "vitoria", "lado": "jogadores"}
-    if monstros_vivos and not jogadores_vivos:
-        return {"tipo": "vitoria", "lado": "monstros"}
-    return {"tipo": "empate"}
-
-
 def finalizar_combate(combate):
-    """Compatibilidade de baixo nível: persiste estado, mas não concede recompensa.
-
-    A recompensa pertence exclusivamente ao motor Discord para evitar XP/TP/Hunos
-    duplicados quando uma finalização for chamada por caminhos diferentes.
-    """
+    """Persiste o estado final; a condição de vitória pertence ao motor de combate."""
     guild_id = combate.get("guild_id")
-    resultado = obter_vencedores(combate)
     if not guild_id or db is None:
-        return resultado
+        return None
     for participante in combate.get("participantes", []):
         if participante.get("tipo") != "jogador":
             continue
@@ -231,4 +209,4 @@ def finalizar_combate(combate):
             {"ID": str(participante.get("id")), "guild_id": str(guild_id)},
             {"$set": {"Vida": vida, "Mana": mana, "Situação": situacao}},
         )
-    return resultado
+    return None
