@@ -76,10 +76,16 @@ class _UIContext:
 
     @staticmethod
     def _atacante(combate):
+        """Resolve o atacante pela mesma fonte de verdade do motor."""
         participantes = combate.get("participantes", [])
         if not participantes:
             return None
-        return participantes[int(combate.get("turno", 0)) % len(participantes)]
+        ataque = combate.get("ataque_pendente") or {}
+        atacante_id = ataque.get("atacante_id")
+        if atacante_id is not None:
+            return next((p for p in participantes if str(p.get("id")) == str(atacante_id)), None)
+        indice = int(combate.get("turno", 0)) % len(participantes)
+        return participantes[indice]
 
     @staticmethod
     def _defensor(combate):
@@ -418,6 +424,13 @@ class Luta(_LutaLegada):
             combate["numero_turno"] = int(combate.get("numero_turno", 1)) + 1
             combate["fase"] = "ataque"
             combate["ataque_pendente"] = None
+            combate["ui_stage"] = "turn"
+            combate["ui_waiting_advance"] = False
+            for participante in combate.get("participantes", []):
+                participante["defesa_ativa"] = False
+                participante["esquiva_ativa"] = False
+                participante["defesa_magica_ativa"] = False
+                participante["defesa_magica_valor"] = 0
             atacante = self._obter_atacante(combate)
             if not atacante:
                 return
