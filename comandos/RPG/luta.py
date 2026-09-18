@@ -16,7 +16,7 @@ from discord.ext import commands
 
 from database.python.mongodb import db, run_db
 from database.python import luta as luta_db
-from .Luta import monstros_balanceamento as boss_rules
+from . import monstros_balanceamento as boss_rules
 
 
 def _num(valor, padrao=0.0):
