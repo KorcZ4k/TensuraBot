@@ -217,8 +217,22 @@ class Luta(_BaseLuta):
         ataque = combate.get("ataque_pendente")
         if not ataque or ataque.get("_resolvendo"):
             return
+        atacante = self._por_id(combate, ataque.get("atacante_id"))
+        defensor = self._por_id(combate, ataque.get("defensor_id"))
         ataque["_resolvendo"] = True
         try:
+            # Alvo pendente nunca é redirecionado. Se atacante ou defensor já
+            # morreu/desapareceu, o ataque é descartado e o turno avança.
+            if not atacante or not defensor or not _vivo(atacante) or not _vivo(defensor):
+                combate["historico"].append("Ataque pendente descartado: participante inválido ou derrotado.")
+                combate["ataque_pendente"] = None
+                combate["fase"] = "ataque"
+                combate["ui_stage"] = "turn"
+                combate["ui_waiting_advance"] = False
+                self._limpar_defesas(combate)
+                await self._salvar(combate)
+                await self._proximo_turno(ctx)
+                return
             await super()._resolver_ataque(ctx)
         except Exception:
             if combate.get("ataque_pendente") is ataque and combate.get("ativo"):
