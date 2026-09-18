@@ -348,7 +348,11 @@ async def fugir(ctx):
         combate["ativo"] = False
         combate["fase"] = "finalizado"
         await cog._salvar(combate)
+        await cog._marcar_combate([p for p in combate.get("participantes", []) if p.get("tipo") == "jogador"], guild_id=str(combate.get("guild_id")), situacao="ativo")
         cog.combates.pop(ctx.channel.id, None)
+        cog._embeds_acao.pop(ctx.channel.id, None)
+        if combate.get("ui_message") is not None:
+            cog._ui_views.pop(combate["ui_message"].id, None)
         await ctx.send(embed=embed)
 
 
