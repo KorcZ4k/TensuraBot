@@ -13,7 +13,7 @@ from discord.ext import commands
 
 from database.python.mongodb import run_db
 from database.python import luta as luta_db
-from ..luta import _criar_participante
+from ..lutac import _criar_participante
 from .Mensagens_luta import imagem_monstro, painel
 from .hardening_final import Luta
 
