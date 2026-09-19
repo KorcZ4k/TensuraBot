@@ -258,23 +258,7 @@ class Luta(commands.Cog):
         else:
             await self._resolver_ataque(ctx)
     
-    async def _anunciar_ataque(self, ctx):
-        combate = self._obter_combate(ctx.channel.id)
-        if not combate or not combate.get("ativo"):
-            return
-        ataque = combate.get("ataque_pendente")
-        atacante = self._participante(combate, ataque.get("atacante_id")) if ataque else None
-        defensor = self._participante(combate, ataque.get("defensor_id")) if ataque else None
-        if not ataque or not atacante or not defensor:
-            return
-        if combate.get("ui_message"):
-            await self._mostrar_ataque_ui(combate)
-            combate["ui_stage"] = "attack"
-            return
-        embed = self._embeds_acao.pop(ctx.channel.id, None)
-        embed = embed[0] if isinstance(embed, tuple) else embed
-        await self.mostrar_ataque(ctx, embed)
-    
+
     async def _mostrar_inicio(self, ctx):
         combate = self._obter_combate(ctx.channel.id)
         if not combate or not combate.get("ativo"):
@@ -486,7 +470,9 @@ class Luta(commands.Cog):
         ))
 
     async def _recompensar(self, combate):
-        """Compatibilidade legada: mantém o mesmo contrato XP/TP/Hunos do motor final."""
+        """Calcula e aplica a recompensa uma única vez, preservando o cache."""
+        if combate.get("recompensa_aplicada"):
+            return (int(combate.get("recompensa_xp", 0)), int(combate.get("recompensa_hunos", 0)), int(combate.get("recompensa_tp", 0)))
         resultado = self._condicao_vitoria(combate)
         if resultado != "jogadores" or db is None:
             return 0, 0, 0
@@ -665,28 +651,6 @@ class Luta(commands.Cog):
         return bloqueado
 
 
-    def _criar_ataque(self, combate, tipo, atacante, defensor, **dados):
-        ataque = {"tipo": tipo, "nome": dados.pop("nome", "⚔️ Ataque"), "atacante_id": atacante.get("id"), "defensor_id": defensor.get("id"), **dados}
-        combate["ataque_pendente"] = ataque
-        combate["fase"] = "defesa"
-        return ataque
-
-    async def _anunciar_ataque(self, ctx):
-        combate = self._obter_combate(ctx.channel.id)
-        if not combate or not combate.get("ativo"):
-            return
-        ataque = combate.get("ataque_pendente")
-        atacante = self._participante(combate, ataque.get("atacante_id")) if ataque else self._obter_atacante(combate)
-        defensor = self._participante(combate, ataque.get("defensor_id")) if ataque else self._obter_defensor(combate)
-        if not ataque or not atacante or not defensor:
-            return
-        embed = discord.Embed(title=f"⚔️ Turno {combate['numero_turno']}", description=f"{ataque.get('nome', 'Ataque')}\n\n⚔️ **{atacante.get('nome')}** atacou **{defensor.get('nome')}**!", color=discord.Color.orange())
-        embed.add_field(name="🛡️ Quem deve defender", value=f"**{defensor.get('nome')}**", inline=False)
-        embed.add_field(name="📋 Status", value=self._texto_status(combate["participantes"]), inline=False)
-        await ctx.send(embed=embed)
-        if defensor.get("tipo") == "monstro":
-            await asyncio.sleep(0.25)
-            await self._defesa_monstro(ctx)
 
     async def _defesa_jogador(self, ctx, acao):
         combate = self._obter_combate(ctx.channel.id)
@@ -747,15 +711,6 @@ class Luta(commands.Cog):
         if combate.get("fase") != "ataque":
             await ctx.send("❌ O ataque anterior ainda precisa ser resolvido.")
             return True
-
-
-# Camada de interface visual incorporada ao arquivo único.
-"""Interface visual única das mensagens de combate e dos painéis RPG."""
-
-
-
-
-FOOTER = "Tensura Moon - Korczak Technologies!"
 
 
     async def _mostrar_aguarde_player(self, combate):
@@ -1760,6 +1715,16 @@ def ordem_velocidade(participantes):
 
 def acao(*, atacante, defensor, nome_ataque, dano=0, efeito="Nenhum", turno="-", extra="", cor=None):
     return painel(atacante=_nome(atacante, "User"), ataque=nome_ataque, vida=_vida(atacante), mana=_mana(atacante), dano=dano, efeito=efeito or "Nenhum", alvo=_nome(defensor), turno=turno, oponente=defensor or "-", vida_oponente=_vida(defensor), extra=extra, cor=cor)
+
+
+
+# Camada de interface visual incorporada ao arquivo único.
+"""Interface visual única das mensagens de combate e dos painéis RPG."""
+
+
+
+
+FOOTER = "Tensura Moon - Korczak Technologies!"
 
 
 # Regras especiais dos monstros incorporadas ao arquivo único.
