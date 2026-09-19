@@ -990,7 +990,7 @@ motor efetivo de combate. A classe Luta não é modificada durante import.
 ATRIBUTOS = ("Força","Defesa","Vitalidade","Velocidade","Destreza","Magia","Sorte","Inteligencia")
 BOSS_IDS = {"slime-rei","goblin-rei","lobo-alpha","orc-rei","cavaleiro-esqueletico","dragao-adulto","arquidemonio","fenix"}
 
-def estado
+def estado(monstro):
 def estado(monstro):
     return monstro.setdefault("boss_estado", {})
 
