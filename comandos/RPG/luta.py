@@ -130,10 +130,11 @@ class _UIContext:
             embed = painel(extra=str(content))
         if not isinstance(embed, discord.Embed):
             embed = painel(extra=str(embed or ""))
+        padrao = embed
         view = kwargs.get("view")
         if view is None and self._owner is not None:
             view = self._owner._ui_views.get(self._message.id)
-        await self._message.edit(embed=embed, attachments=[], view=view)
+        await self._message.edit(embed=padrao, attachments=[], view=view)
         return self._message
 
     def __getattr__(self, name):
