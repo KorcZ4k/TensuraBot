@@ -91,7 +91,7 @@ class LutaInvariantTests(unittest.TestCase):
         outro = {"id": "3", "tipo": "monstro", "vida": 100}
         c["participantes"] = [a, d, outro]
         c["ataque_pendente"] = {"atacante_id": "1", "defensor_id": "2"}
-        self.assertIsNone(cog._obter_defensor(c))
+        self.assertIs(cog._obter_defensor(c), d)
 
     def test_motor_e_unico_e_sistemas_e_apenas_compatibilidade(self):
         from comandos.RPG.Luta import sistemas_luta
