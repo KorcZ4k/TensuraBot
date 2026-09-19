@@ -303,8 +303,6 @@ class LutaBase(commands.Cog):
         return await self._finalizar(ctx, motivo=motivo, vencedor=vencedor, perdedor=perdedor)
     
     
-    SistemaLuta = Luta
-    __all__ = ["Luta", "SistemaLuta"]
     """Maquina de estados unica para PvP, PvE e party."""
 
     def __init__(self, bot):
