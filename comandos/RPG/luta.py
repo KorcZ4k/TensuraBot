@@ -1274,6 +1274,18 @@ class _UIContext:
     def author(self):
         return getattr(self._original, "user", getattr(self._original, "author", None))
 
+    async def send(self, content=None, **kwargs):
+        """Entrega mensagens da máquina de combate na mensagem única da UI."""
+        if self._message is None:
+            return await self._original.send(content, **kwargs)
+        embed = kwargs.pop("embed", None)
+        view = kwargs.pop("view", None)
+        if content is not None:
+            embed = painel(extra=str(content))
+        padrao = embed if isinstance(embed, discord.Embed) else painel(extra=str(embed or ""))
+        await self._message.edit(embed=padrao, attachments=[], view=view)
+        return self._message
+
     def __getattr__(self, name):
         return getattr(self._original, name)
 
