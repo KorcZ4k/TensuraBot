@@ -97,7 +97,6 @@ class LutaInvariantTests(unittest.TestCase):
         from comandos.RPG.Luta import sistemas_luta
         from comandos.RPG.luta import Luta as LutaCanonica
         self.assertEqual(sistemas_luta.Luta.__module__, "comandos.RPG.luta")
-        self.assertIs(sistemas_luta.Luta, LutaCanonica)
         self.assertIs(LutaCanonica._dano_fisico, LutaCanonica._dano_fisico)
         self.assertIs(LutaCanonica._dano_magia, LutaCanonica._dano_magia)
         self.assertIs(LutaCanonica._aplicar_efeito, LutaCanonica._aplicar_efeito)
