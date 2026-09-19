@@ -96,13 +96,224 @@ async def _criar_participante(user_id, guild_id):
     return participante
 
 
+class _AvancarView(discord.ui.View):
+    def __init__(self, cog, timeout=7200):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        botao = discord.ui.Button(label="Avançar", emoji="▶️", style=discord.ButtonStyle.primary, custom_id="luta:avancar")
+        botao.callback = self._callback
+        self.add_item(botao)
+
+    async def _callback(self, interaction: discord.Interaction):
+        # O callback sempre responde ao Discord, mesmo se alguma etapa do motor falhar.
+        try:
+            await self.cog.avancar(interaction)
+        except Exception as erro:
+            print(f"[LUTA][UI][AVANCAR][ERRO] {type(erro).__name__}: {erro}")
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send("❌ Erro ao avançar o combate. O estado foi preservado.", ephemeral=True)
+                else:
+                    await interaction.response.send_message("❌ Erro ao avançar o combate. O estado foi preservado.", ephemeral=True)
+            except Exception as resposta_erro:
+                print(f"[LUTA][UI][AVANCAR][RESPOSTA][ERRO] {type(resposta_erro).__name__}: {resposta_erro}")
+
+
+
 class LutaBase(commands.Cog):
+    def _acao_embed(self, *, atacante, defensor, nome, emoji, turno, dano, mana, descricao, efeito="Nenhum"):
+        return painel(
+            atacante=atacante.get("nome", "User"), ataque=f"{emoji} {nome}", vida=self._vida(atacante), mana=mana,
+            dano=dano, efeito=efeito or "Nenhum", alvo=defensor.get("nome", "-"), turno=turno,
+            oponente=defensor, vida_oponente=self._vida(defensor), extra=descricao, cor=discord.Color.blurple(),
+        )
+    
+    async def _ui_editar(self, combate, embed, view=True):
+        mensagem = combate.get("ui_message")
+        if mensagem is None:
+            return
+        if not isinstance(embed, discord.Embed):
+            embed = painel(extra=str(embed))
+        kwargs = {"embed": embed, "attachments": []}
+        if view:
+            view_obj = self._ui_views.get(mensagem.id)
+            if view_obj is None:
+                view_obj = _AvancarView(self)
+                self._ui_views[mensagem.id] = view_obj
+            kwargs["view"] = view_obj
+        else:
+            kwargs["view"] = None
+        await mensagem.edit(**kwargs)
+    
+    def _ui_context(self, ctx, combate):
+        mensagem = combate.get("ui_message")
+        return _UIContext(ctx, mensagem, combate, self) if mensagem is not None else ctx
+    
+    def _embed_velocidade(self, combate):
+        ordem = "\n".join(f"{i + 1}. {p.get('nome', 'Desconhecido')} — {int(float(p.get('Velocidade', p.get('velocidade', 0)) or 0))} Vel." for i, p in enumerate(combate.get("participantes", []))) or "Nenhum participante."
+        atacante = self._obter_atacante(combate) or {}
+        return painel(atacante=atacante.get("nome", "User"), ataque="ordem de velocidade", vida=self._vida(atacante), mana=atacante.get("mana", 0), dano="-", efeito="-", alvo="Todos", turno=combate.get("numero_turno", 1), oponente="Todos", vida_oponente="-", extra=ordem, cor=discord.Color.blurple())
+    
+    def _embed_aguarde_jogador(self, combate):
+        atacante = self._obter_atacante(combate) or {}
+        defensor = self._obter_defensor(combate) or {}
+        return self._acao_embed(atacante=atacante, defensor=defensor, nome="Sua vez", emoji="👤", turno=combate.get("numero_turno", 1), dano=0, mana=atacante.get("mana", 0), descricao=f"Use `!soco` ou `!chute` para atacar **{defensor.get('nome', '-')}**.")
+    
+    def _embed_turno_monstro(self, combate):
+        atacante = self._obter_atacante(combate) or {}
+        defensor = self._obter_defensor(combate) or {}
+        return self._acao_embed(atacante=atacante, defensor=defensor, nome="Vez do monstro", emoji="👹", turno=combate.get("numero_turno", 1), dano=0, mana=0, descricao=f"**{atacante.get('nome', 'Monstro')}** está pronto para atacar.")
+    
+    def _embed_defesa(self, combate):
+        ataque = combate.get("ataque_pendente") or {}
+        defensor = self._obter_defensor(combate) or {}
+        atacante = self._participante(combate, ataque.get("atacante_id")) or {}
+        return self._acao_embed(atacante=atacante, defensor=defensor, nome="Defenda-se", emoji="🛡️", turno=combate.get("numero_turno", 1), dano=ataque.get("dano_base", 0), mana=0, descricao=f"**{defensor.get('nome', 'Jogador')}**, use `!defesa` ou `!esquiva`.")
+    
+    async def mostrar_ataque(self, ctx, embed, arquivo=None):
+        combate = self._obter_combate(ctx.channel.id)
+        if combate and combate.get("ui_message"):
+            await self._mostrar_ataque_ui(combate)
+            combate["ui_stage"] = "attack"
+            return
+        if embed is not None:
+            kwargs = {"embed": embed}
+            if arquivo is not None:
+                kwargs["file"] = arquivo
+            await ctx.send(**kwargs)
+    
+    async def executar_ataque_jogador(self, ctx, tipo_ataque, embed):
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo"):
+            if combate and combate.get("ui_message"):
+                await self._ui_context(ctx, combate).send("❌ Não há combate ativo.")
+            else:
+                await ctx.send("❌ Não há combate ativo.")
+            return
+        ui = self._ui_context(ctx, combate)
+        if combate.get("aguardando_finalizacao"):
+            await ui.send("❌ O combate aguarda a finalização PvP.")
+            return
+        if combate.get("fase") != "ataque":
+            await ui.send("❌ O ataque anterior ainda não foi defendido.")
+            return
+        atacante = self._obter_atacante(combate)
+        defensor = self._obter_defensor(combate)
+        if not atacante or not defensor:
+            return
+        if atacante.get("tipo") != "jogador" or str(atacante.get("id")) != str(ctx.author.id):
+            await ui.send(f"❌ É a vez de **{atacante.get('nome', 'outro jogador')}**.")
+            return
+        golpe = luta_db.GOLPES.get(tipo_ataque)
+        if not isinstance(golpe, dict):
+            await ui.send("Golpe não está configurado.")
+            return
+        tipo = str(golpe.get("tipo", "fisico") or "fisico")
+        if tipo not in {"fisico", "magia"}:
+            tipo = "fisico"
+        self._criar_ataque(combate, tipo, atacante, defensor, nome=golpe.get("nome", tipo_ataque.title()), dano_base=float(golpe.get("dano_base", 0) or 0), com_arma=bool(golpe.get("com_arma")), efeito=golpe.get("efeito", {}))
+        if combate.get("ui_message"):
+            await self._mostrar_ataque_ui(combate)
+            combate["ui_stage"] = "attack"
+        else:
+            await self.mostrar_ataque(ctx, embed)
+    
+    async def executar_defesa_jogador(self, ctx, acao, embed):
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo") or combate.get("fase") != "defesa":
+            if combate and combate.get("ui_message"):
+                await self._ui_context(ctx, combate).send("❌ Não há ataque pendente para defender.")
+            else:
+                await ctx.send("❌ Não há ataque pendente para defender.")
+            return
+        defensor = self._obter_defensor(combate)
+        if not defensor or defensor.get("tipo") != "jogador" or str(defensor.get("id")) != str(ctx.author.id):
+            nome = defensor.get("nome", "outro jogador") if defensor else "outro jogador"
+            await self._ui_context(ctx, combate).send(f"❌ É **{nome}** quem deve defender este ataque.")
+            return
+        defensor["defesa_ativa"] = acao == "defesa"
+        defensor["esquiva_ativa"] = acao == "esquiva"
+        if combate.get("ui_message"):
+            combate["ui_waiting_advance"] = False
+            await self._resolver_ataque(self._ui_context(ctx, combate))
+        else:
+            await self._resolver_ataque(ctx)
+    
+    async def _anunciar_ataque(self, ctx):
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo"):
+            return
+        ataque = combate.get("ataque_pendente")
+        atacante = self._participante(combate, ataque.get("atacante_id")) if ataque else None
+        defensor = self._participante(combate, ataque.get("defensor_id")) if ataque else None
+        if not ataque or not atacante or not defensor:
+            return
+        if combate.get("ui_message"):
+            await self._mostrar_ataque_ui(combate)
+            combate["ui_stage"] = "attack"
+            return
+        embed = self._embeds_acao.pop(ctx.channel.id, None)
+        embed = embed[0] if isinstance(embed, tuple) else embed
+        await self.mostrar_ataque(ctx, embed)
+    
+    async def _mostrar_inicio(self, ctx):
+        combate = self._obter_combate(ctx.channel.id)
+        if not combate or not combate.get("ativo"):
+            return
+        preparado = self._embeds_acao.pop(ctx.channel.id, None)
+        arquivo = preparado[1] if isinstance(preparado, tuple) else None
+        embed = preparado[0] if isinstance(preparado, tuple) else preparado
+        if embed is None:
+            atacante = self._obter_atacante(combate) or {}
+            defensor = self._obter_defensor(combate) or {}
+            embed = painel(atacante=atacante.get("nome", "User"), ataque="início do combate", vida=self._vida(atacante), mana=atacante.get("mana", 0), alvo=defensor.get("nome", "-"), turno=1, oponente=defensor, vida_oponente=self._vida(defensor), extra="Combate iniciado.", cor=discord.Color.red())
+        if combate.get("ui_message"):
+            await self._ui_editar(combate, embed)
+            return
+        kwargs = {"embed": embed}
+        if arquivo is not None:
+            kwargs["file"] = arquivo
+        mensagem = await ctx.send(**kwargs)
+        combate["ui_message"] = mensagem
+        combate["ui_owner_id"] = getattr(ctx.author, "id", None)
+        combate["ui_stage"] = "attributes"
+        combate["ui_waiting_advance"] = True
+        self._ui_views[mensagem.id] = _AvancarView(self)
+        await self._ui_editar(combate, embed, view=True)
+    
+    def preparar_embed(self, ctx, embed, arquivo=None):
+        self._embeds_acao[ctx.channel.id] = (embed, arquivo) if arquivo is not None else embed
+    
+    async def resultado_ataque(self, ctx):
+        return await self._resolver_ataque(ctx)
+    
+    async def resultado_defesa(self, ctx, acao):
+        return await self._defesa_jogador(ctx, acao)
+    
+    async def resultado_magia(self, ctx, dados_magia):
+        return await self.usar_magia_no_combate(ctx, dados_magia)
+    
+    async def resultado_ataque_monstro(self, ctx):
+        return await self._ataque_monstro(ctx)
+    
+    async def resultado_pvp(self, ctx, motivo):
+        return await self._finalizar_pvp(ctx, motivo)
+    
+    async def resultado_final(self, ctx, motivo="vida", vencedor=None, perdedor=None):
+        return await self._finalizar(ctx, motivo=motivo, vencedor=vencedor, perdedor=perdedor)
+    
+    
+    SistemaLuta = Luta
+    __all__ = ["Luta", "SistemaLuta"]
     """Maquina de estados unica para PvP, PvE e party."""
 
     def __init__(self, bot):
         self.bot = bot
         self.combates = {}
         self._locks = {}
+        self._ui_views = {}
+        self._embeds_acao = {}
+        self._ui_avancar_locks = {}
 
     def _lock(self, channel_id):
         return self._locks.setdefault(channel_id, asyncio.Lock())
