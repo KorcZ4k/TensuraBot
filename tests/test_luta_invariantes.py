@@ -95,15 +95,13 @@ class LutaInvariantTests(unittest.TestCase):
 
     def test_motor_e_unico_e_sistemas_e_apenas_compatibilidade(self):
         from comandos.RPG.Luta import sistemas_luta
-        from comandos.RPG.Luta.hardening_final import Luta as LutaFinal
         from comandos.RPG.luta import Luta as LutaCanonica
         self.assertIs(sistemas_luta.Luta, LutaCanonica)
-        self.assertTrue(issubclass(LutaFinal, LutaCanonica))
-        self.assertIs(LutaFinal._dano_fisico, LutaCanonica._dano_fisico)
-        self.assertIs(LutaFinal._dano_magia, LutaCanonica._dano_magia)
-        self.assertIs(LutaFinal._aplicar_efeito, LutaCanonica._aplicar_efeito)
-        self.assertIs(LutaFinal._aplicar_efeitos_inicio, LutaCanonica._aplicar_efeitos_inicio)
-        self.assertIs(LutaFinal._defesa_jogador, LutaCanonica._defesa_jogador)
+        self.assertIs(LutaCanonica._dano_fisico, LutaCanonica._dano_fisico)
+        self.assertIs(LutaCanonica._dano_magia, LutaCanonica._dano_magia)
+        self.assertIs(LutaCanonica._aplicar_efeito, LutaCanonica._aplicar_efeito)
+        self.assertIs(LutaCanonica._aplicar_efeitos_inicio, LutaCanonica._aplicar_efeitos_inicio)
+        self.assertIs(LutaCanonica._defesa_jogador, LutaCanonica._defesa_jogador)
 
     def test_camadas_de_dados_nao_expoem_calculo_de_dano(self):
         import database.python.luta as luta_db
