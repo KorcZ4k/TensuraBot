@@ -22,25 +22,6 @@ from discord.ext import commands
 from database.python.mongodb import db, run_db
 from database.python import luta as luta_db
 
-"""Sistema de combate canonico do TensuraBot.
-
-Este modulo e a unica fonte de verdade do sistema de luta: motor, estado,
-regras e registro dos comandos publicos ficam aqui. Os callbacks publicos sao
-registrados como funcoes de modulo para que discord.py entregue ``ctx``
-diretamente, sem binding de ``self`` em callbacks de Cog.
-"""
-
-import asyncio
-import random
-import unicodedata
-from typing import Optional
-
-import discord
-from discord.ext import commands
-
-from database.python.mongodb import db, run_db
-from database.python import luta as luta_db
-from . import monstros_balanceamento as boss_rules
 
 
 def _num(valor, padrao=0.0):
@@ -120,7 +101,7 @@ class _AvancarView(discord.ui.View):
 
 
 
-class LutaBase(commands.Cog):
+class Luta(commands.Cog):
     def _acao_embed(self, *, atacante, defensor, nome, emoji, turno, dano, mana, descricao, efeito="Nenhum"):
         return painel(
             atacante=atacante.get("nome", "User"), ataque=f"{emoji} {nome}", vida=self._vida(atacante), mana=mana,
@@ -582,29 +563,6 @@ class LutaBase(commands.Cog):
                 return combate
         return {}
 
-    def _dano_fisico(self, atacante, defensor, ataque):
-        if defensor.get("esquiva_ativa"):
-            defensor["esquiva_ativa"] = False
-            velocidade = _velocidade(defensor)
-            destreza = _attr(defensor, "Destreza", "destreza")
-            if random.random() < min(0.75, 0.10 + (velocidade + destreza) / 500):
-                return 0, "esquivou"
-        dano = _attr(atacante, "Força", "forca") + _velocidade(atacante)
-        dano += _num(ataque.get("dano_base"))
-        if ataque.get("com_arma"):
-            dano += _num(atacante.get("dano_arma"))
-        if defensor.get("defesa_magica_ativa"):
-            dano -= _num(defensor.get("defesa_magica_valor"))
-            defensor["defesa_magica_ativa"] = False
-            defensor["defesa_magica_valor"] = 0
-        elif defensor.get("defesa_ativa"):
-            defesa_total = _attr(defensor, "Força", "forca") + _attr(defensor, "Defesa", "defesa")
-            dano *= 1.0 - min(1.0, max(0.0, defesa_total) / 300.0)
-        defensor["defesa_ativa"] = False
-        dano = max(0, int(dano))
-        combate = self._obter_combate_por_participantes(defensor)
-        dano = boss_rules.corrosao(dano, defensor)
-        return boss_rules.regras_dano(dano, "atingiu", atacante, defensor, ataque, combate)
 
     def _dano_magia(self, atacante, defensor, ataque):
         if defensor.get("esquiva_ativa"):
@@ -668,85 +626,6 @@ class LutaBase(commands.Cog):
             await ctx.send(f"⚠️ **{participante.get('nome')}** sofreu **{dano_total}** de efeitos.")
         return bloqueado
 
-    async def _resolver_ataque(self, ctx):
-        combate = self._obter_combate(ctx.channel.id)
-        if not combate or not combate.get("ativo") or combate.get("fase") != "defesa":
-            return
-        ataque = combate.get("ataque_pendente")
-        if not ataque or ataque.get("_resolvendo"):
-            return
-        ataque["_resolvendo"] = True
-        try:
-            atacante = self._participante(combate, ataque.get("atacante_id"))
-            defensor = self._participante(combate, ataque.get("defensor_id"))
-            if not atacante or not defensor or not _vivo(atacante) or not _vivo(defensor):
-                combate["ataque_pendente"] = None
-                combate["fase"] = "ataque"
-                await self._proximo_turno(ctx)
-                return
-            duelo_pendente = False
-            if ataque.get("tipo") == "magia" and ataque.get("cura_base", 0) > 0:
-                cura = int(_attr(atacante, "Magia") + _attr(atacante, "Inteligencia") + _num(ataque.get("cura_base")))
-                atacante["vida"] = min(int(_num(atacante.get("vida_maxima"), _num(atacante.get("vida")))), int(_num(atacante.get("vida"))) + cura)
-                mensagem = f"✨ **{atacante.get('nome')}** recuperou **{cura} de vida**."
-            elif ataque.get("tipo") == "magia":
-                dano, resultado = self._dano_magia(atacante, defensor, ataque)
-                if resultado == "esquivou":
-                    mensagem = f"💨 **{defensor.get('nome')}** esquivou da magia!"
-                else:
-                    vida_antes = int(_num(defensor.get("vida")))
-                    if combate.get("assentamento_duelo") and dano >= vida_antes:
-                        dano = max(0, vida_antes - 1)
-                        duelo_pendente = True
-                    defensor["vida"] = max(0, vida_antes - dano)
-                    mensagem = f"✨ **{atacante.get('nome')}** causou **{dano} de dano mágico** em **{defensor.get('nome')}**."
-                    efeito = self._aplicar_efeito(defensor, ataque.get("efeito"))
-                    if efeito:
-                        mensagem += f"\n⚠️ Efeito: **{efeito.title()}**."
-            else:
-                dano, resultado = self._dano_fisico(atacante, defensor, ataque)
-                if resultado == "esquivou":
-                    mensagem = f"💨 **{defensor.get('nome')}** esquivou do ataque!"
-                else:
-                    vida_antes = int(_num(defensor.get("vida")))
-                    if combate.get("assentamento_duelo") and dano >= vida_antes:
-                        dano = max(0, vida_antes - 1)
-                        duelo_pendente = True
-                    defensor["vida"] = max(0, vida_antes - dano)
-                    mensagem = f"⚔️ **{atacante.get('nome')}** causou **{dano} de dano** em **{defensor.get('nome')}**."
-                    efeito = self._aplicar_efeito(defensor, ataque.get("efeito"))
-                    if efeito:
-                        mensagem += f"\n⚠️ Efeito: **{efeito.title()}**."
-            if combate.get("assentamento_duelo") and defensor.get("vida", 0) <= 0:
-                defensor["vida"] = 1
-                duelo_pendente = True
-            combate["historico"].append(mensagem)
-            defensor["defesa_ativa"] = False
-            defensor["esquiva_ativa"] = False
-            combate["ataque_pendente"] = None
-            combate["fase"] = "ataque"
-            embed = discord.Embed(title="💥 Resultado", description=mensagem, color=discord.Color.red())
-            embed.add_field(name="📋 Status", value=self._texto_status(combate["participantes"]), inline=False)
-            await ctx.send(embed=embed)
-            if combate.get("assentamento_duelo") and duelo_pendente:
-                await self._finalizar_duelo_assentamento(ctx, atacante, defensor)
-                return
-            if combate.get("pvp") and not _vivo(defensor):
-                combate["aguardando_finalizacao"] = True
-                combate["vencedor_id"] = str(atacante.get("id"))
-                combate["perdedor_id"] = str(defensor.get("id"))
-                combate["fase"] = "finalizacao"
-                await ctx.send(f"⚔️ **{atacante.get('nome')}** venceu o turno decisivo. Use `!matar` ou `!desmaiar` para finalizar o PvP.")
-                return
-            resultado = self._condicao_vitoria(combate)
-            if resultado and not combate.get("pvp"):
-                await self._finalizar(ctx, motivo="vida", vencedor=atacante, perdedor=defensor)
-                return
-            await self._salvar(combate)
-            await asyncio.sleep(0.25)
-            await self._proximo_turno(ctx)
-        finally:
-            ataque.pop("_resolvendo", None)
 
     def _criar_ataque(self, combate, tipo, atacante, defensor, **dados):
         ataque = {"tipo": tipo, "nome": dados.pop("nome", "⚔️ Ataque"), "atacante_id": atacante.get("id"), "defensor_id": defensor.get("id"), **dados}
@@ -1111,22 +990,7 @@ motor efetivo de combate. A classe Luta não é modificada durante import.
 ATRIBUTOS = ("Força","Defesa","Vitalidade","Velocidade","Destreza","Magia","Sorte","Inteligencia")
 BOSS_IDS = {"slime-rei","goblin-rei","lobo-alpha","orc-rei","cavaleiro-esqueletico","dragao-adulto","arquidemonio","fenix"}
 
-def criar_monstro_balanceado(tipo: str, nivel: int = 1):
-    """Único criador de atributos; adiciona apenas metadados de boss."""
-    monstro = luta_db.criar_monstro(tipo, nivel)
-    if monstro is None:
-        return None
-    monstro = dict(monstro)
-    mid = str(tipo)
-    monstro.update({
-        "monstro_id": mid,
-        "boss": mid in BOSS_IDS,
-        "boss_id": mid if mid in BOSS_IDS else None,
-        "boss_estado": dict(monstro.get("boss_estado") or {}),
-        "efeitos": list(monstro.get("efeitos") or []),
-    })
-    return monstro
-
+def estado
 def estado(monstro):
     return monstro.setdefault("boss_estado", {})
 
@@ -1249,7 +1113,6 @@ def preparar_proximo_turno(combate):
 
 
 boss_rules = SimpleNamespace(
-    criar_monstro_balanceado=criar_monstro_balanceado,
     estado=estado, eh=eh, vivo=vivo, alvos=alvos,
     matar_invocados=matar_invocados, ataque_especial=ataque_especial,
     ajustar_ataque=ajustar_ataque, regras_dano=regras_dano,
@@ -1257,40 +1120,6 @@ boss_rules = SimpleNamespace(
     efeito_especial=efeito_especial, inicio_especial=inicio_especial,
     preparar_proximo_turno=preparar_proximo_turno,
 )
-
-class _UIContext:
-    """Adaptador simples para usar Context e Interaction com a mesma máquina de combate."""
-    def __init__(self, original, message, combate=None, owner=None):
-        self._original = original
-        self._message = message
-        self._combate = combate or {}
-        self._owner = owner
-
-    @property
-    def channel(self):
-        return self._message.channel
-
-    @property
-    def author(self):
-        return getattr(self._original, "user", getattr(self._original, "author", None))
-
-    async def send(self, content=None, **kwargs):
-        """Entrega mensagens da máquina de combate na mensagem única da UI."""
-        if self._message is None:
-            return await self._original.send(content, **kwargs)
-        embed = kwargs.pop("embed", None)
-        view = kwargs.pop("view", None)
-        if content is not None:
-            embed = painel(extra=str(content))
-        padrao = embed if isinstance(embed, discord.Embed) else painel(extra=str(embed or ""))
-        await self._message.edit(embed=padrao, attachments=[], view=view)
-        return self._message
-
-    def __getattr__(self, name):
-        return getattr(self._original, name)
-
-
-class Luta(LutaBase):
     async def _mostrar_aguarde_player(self, combate):
         combate["ui_stage"] = "player_action"
         await self._ui_editar(combate, self._embed_aguarde_jogador(combate))
@@ -1640,7 +1469,7 @@ class Luta(LutaBase):
     
     async def executar_defesa_jogador(self, ctx, acao, embed=None):
         """Entrada compatível; a resolução de defesa vive no motor canônico."""
-        return await super()._defesa_jogador(ctx, acao)
+        return await self._defesa_jogador(ctx, acao)
     
     async def _limpar_recursos_combate(self, channel_id, combate):
         """Libera recursos locais e invalida a View no Discord sem mascarar falhas."""
