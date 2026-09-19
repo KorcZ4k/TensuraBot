@@ -29,7 +29,8 @@ class CombatHardeningTests(unittest.TestCase):
 
     def test_combat_has_one_canonical_resolver(self):
         text = source("comandos/RPG/luta.py")
-        self.assertIn("class Luta(LutaBase)", text)
+        self.assertIn("class Luta(commands.Cog)", text)
+        self.assertNotIn("class LutaBase", text)
         self.assertIn("async def _resolver_ataque", text)
         self.assertIn('ataque.get("defensor_id")', text)
         self.assertEqual(text.count("async def _resolver_ataque"), 1)
@@ -51,7 +52,8 @@ class CombatHardeningTests(unittest.TestCase):
     def test_no_duplicate_combat_cogs_remain(self):
         self.assertFalse((ROOT / "comandos/RPG/correcoes_monstros.py").exists())
         self.assertFalse((ROOT / "comandos/RPG/correcoes_luta_segura.py").exists())
-        self.assertIn("class Luta(LutaBase)", source("comandos/RPG/luta.py"))
+        self.assertIn("class Luta(commands.Cog)", source("comandos/RPG/luta.py"))
+        self.assertNotIn("class LutaBase", source("comandos/RPG/luta.py"))
 
     def test_public_commands_are_module_callbacks_without_self_binding(self):
         text = source("comandos/RPG/luta.py")
@@ -124,7 +126,7 @@ class CombatHardeningTests(unittest.TestCase):
         text = source("comandos/RPG/luta.py")
         self.assertLess(text.index("monstro_id = cog._encontrar_monstro"), text.index("luta_db.pode_lutar"))
         self.assertLess(text.index("luta_db.pode_lutar"), text.index("luta_db.iniciar_cooldown_monstro"))
-        self.assertLess(text.index("luta_db.iniciar_cooldown_monstro"), text.index("criar_monstro"))
+        self.assertLess(text.index("luta_db.iniciar_cooldown_monstro"), text.index("luta_db.criar_monstro"))
         self.assertIn("cancelar_cooldown_monstro", text)
         self.assertIn("cog.combates.pop(ctx.channel.id, None)", text)
 
@@ -166,6 +168,7 @@ class CombatHardeningTests(unittest.TestCase):
     def test_single_message_ui_adapts_engine_sends_and_finalization(self):
         text = source("comandos/RPG/luta.py")
         self.assertIn('async def send(self, content=None, **kwargs):', text)
+        self.assertIn("class _UIContext:", text)
         self.assertIn('self._message.edit(embed=padrao, attachments=[], view=view)', text)
         self.assertIn('attachments=[]', text)
         self.assertIn('ui_waiting_advance', text)
