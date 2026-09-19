@@ -36,9 +36,9 @@ class CombatHardeningTests(unittest.TestCase):
 
     def test_luta_is_the_only_public_fight_command_owner(self):
         main = source("main.py")
-        comandos = source("comandos/RPG/Luta/comandos_luta.py")
-        self.assertIn('"comandos.RPG.Luta.comandos_luta"', main)
-        self.assertNotIn('"comandos.RPG.luta"', main)
+        comandos = source("comandos/RPG/luta.py")
+        self.assertIn('"comandos.RPG.luta"', main)
+        self.assertNotIn('"comandos.RPG.Luta.comandos_luta"', main)
         self.assertNotIn('"comandos.RPG.correcoes_luta"', main)
         self.assertNotIn('"comandos.RPG.correcoes_monstros"', main)
         self.assertNotIn('"comandos.RPG.correcoes_luta_segura"', main)
@@ -54,7 +54,7 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("class Luta(LutaBase)", source("comandos/RPG/luta.py"))
 
     def test_public_commands_are_module_callbacks_without_self_binding(self):
-        text = source("comandos/RPG/Luta/comandos_luta.py")
+        text = source("comandos/RPG/luta.py")
         for signature in (
             "async def luta(ctx)",
             "async def monstros(ctx)",
@@ -152,7 +152,7 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertNotIn("imagem_ataque=imagem_ataque", text)
 
     def test_single_message_combat_ui_requires_manual_advance(self):
-        text = source("comandos/RPG/Luta/sistemas_luta.py")
+        text = source("comandos/RPG/luta.py")
         self.assertIn("class _AvancarView(discord.ui.View):", text)
         self.assertIn('custom_id="luta:avancar"', text)
         self.assertIn('label="Avançar"', text)
@@ -191,9 +191,6 @@ class CombatHardeningTests(unittest.TestCase):
             "comandos/RPG/correcoes_party.py",
             "comandos/RPG/habilidades_combate.py",
             "comandos/RPG/Luta/Infos_Luta.py",
-            "comandos/RPG/Luta/Mensagens_luta.py",
-            "comandos/RPG/Luta/sistemas_luta.py",
-            "comandos/RPG/Luta/comandos_luta.py",
             "comandos/RPG/monstros_balanceamento.py",
             "main.py",
         ):
