@@ -121,7 +121,7 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("timedelta(hours=horas)", text)
 
     def test_pve_reserves_cooldown_only_after_validation(self):
-        text = source("comandos/RPG/Luta/comandos_luta.py")
+        text = source("comandos/RPG/luta.py")
         self.assertLess(text.index("monstro_id = cog._encontrar_monstro"), text.index("luta_db.pode_lutar"))
         self.assertLess(text.index("luta_db.pode_lutar"), text.index("luta_db.iniciar_cooldown_monstro"))
         self.assertLess(text.index("luta_db.iniciar_cooldown_monstro"), text.index("criar_monstro"))
@@ -145,7 +145,7 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn("imagem_ataque é propositalmente ignorada", text)
 
     def test_combat_image_can_be_attached_to_embed(self):
-        text = source("comandos/RPG/Luta/comandos_luta.py")
+        text = source("comandos/RPG/luta.py")
         self.assertIn("async def _baixar_imagem_monstro(url):", text)
         self.assertIn('panel.set_image(url=f"attachment://{filename}")', text)
         self.assertIn('kwargs["file"] = arquivo', text)
@@ -164,7 +164,7 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn('await self._resolver_ataque(self._ui_context(interaction, combate))', text)
 
     def test_single_message_ui_adapts_engine_sends_and_finalization(self):
-        text = source("comandos/RPG/Luta/sistemas_luta.py")
+        text = source("comandos/RPG/luta.py")
         self.assertIn('async def send(self, content=None, **kwargs):', text)
         self.assertIn('self._message.edit(embed=padrao, attachments=[], view=view)', text)
         self.assertIn('attachments=[]', text)
@@ -173,7 +173,7 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn('await self._aplicar_efeitos_inicio(ui_ctx, atacante)', text)
 
     def test_monster_turn_is_not_auto_resolved_in_single_message_ui(self):
-        text = source("comandos/RPG/Luta/sistemas_luta.py")
+        text = source("comandos/RPG/luta.py")
         self.assertIn('if atacante and atacante.get("tipo") == "monstro":', text)
         self.assertIn('await self._criar_ataque_monstro_ui(combate)', text)
         self.assertIn('elif stage == "attack":', text)
