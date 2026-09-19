@@ -633,7 +633,7 @@ FOOTER = "Tensura Moon - Korczak Technologies!"
 
 
 def _carregar_imagens():
-    caminho = Path(__file__).resolve().parents[3] / "database" / "json" / "Imagens.json"
+    caminho = Path(__file__).resolve().parents[2] / "database" / "json" / "Imagens.json"
     try:
         with caminho.open("r", encoding="utf-8") as arquivo:
             dados = json.load(arquivo)
@@ -1657,7 +1657,11 @@ class Luta(LutaBase):
     async def _avancar_locked(self, interaction: discord.Interaction):
         combate = self._obter_combate(interaction.channel.id)
         if not combate or not combate.get("ativo"):
-            return await super().avancar(interaction)
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ Não há combate ativo neste canal.", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ Não há combate ativo neste canal.", ephemeral=True)
+            return
         mensagem = combate.get("ui_message")
         if mensagem is None or interaction.message is None or interaction.message.id != mensagem.id:
             msg = "❌ Esta tela não pertence ao combate atual."
