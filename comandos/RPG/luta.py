@@ -1049,6 +1049,26 @@ boss_rules = SimpleNamespace(
     preparar_proximo_turno=preparar_proximo_turno,
 )
 
+class _UIContext:
+    """Adaptador simples para usar Context e Interaction com a mesma máquina de combate."""
+    def __init__(self, original, message, combate=None, owner=None):
+        self._original = original
+        self._message = message
+        self._combate = combate or {}
+        self._owner = owner
+
+    @property
+    def channel(self):
+        return self._message.channel
+
+    @property
+    def author(self):
+        return getattr(self._original, "user", getattr(self._original, "author", None))
+
+    def __getattr__(self, name):
+        return getattr(self._original, name)
+
+
 class Luta(LutaBase):
     async def _mostrar_aguarde_player(self, combate):
         combate["ui_stage"] = "player_action"
