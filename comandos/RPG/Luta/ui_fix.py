@@ -7,8 +7,8 @@ import random
 import discord
 
 from database.python import luta as luta_db
-from .sistemas_luta import Luta, _UIContext, _AvancarView, _vivo
-from .Mensagens_luta import painel
+from ..luta import Luta, _UIContext, _AvancarView, _vivo
+from ..luta import painel
 
 
 async def _ataque_jogador_ui(self, ctx, tipo_ataque):
