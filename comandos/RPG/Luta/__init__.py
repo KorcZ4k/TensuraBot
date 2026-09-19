@@ -1,9 +1,7 @@
-"""Pacote modular do sistema de combate.
+"""Compatibilidade do pacote antigo de luta.
 
-O motor efetivo é hardening_final.Luta. Os módulos antigos de monkey-patch
-não são importados aqui para evitar múltiplos donos do mesmo método.
+A implementação completa agora está em comandos.RPG.luta.
 """
-from . import contrato_monstro
-from . import hardening_final
+from ..luta import Luta, _criar_participante
 
-__all__ = ["contrato_monstro", "hardening_final"]
+__all__ = ["Luta", "_criar_participante"]
