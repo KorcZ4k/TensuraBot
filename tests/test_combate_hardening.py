@@ -29,7 +29,7 @@ class CombatHardeningTests(unittest.TestCase):
 
     def test_combat_has_one_canonical_resolver(self):
         text = source("comandos/RPG/luta.py")
-        self.assertIn("class Luta(commands.Cog)", text)
+        self.assertIn("class Luta(LutaBase)", text)
         self.assertIn("async def _resolver_ataque", text)
         self.assertIn('ataque.get("defensor_id")', text)
         self.assertEqual(text.count("async def _resolver_ataque"), 1)
