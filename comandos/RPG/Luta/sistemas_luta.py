@@ -1,10 +1,10 @@
 """Compatibilidade do motor de combate.
 
-A implementação canônica vive em comandos.RPG.lutac; este módulo não contém
+A implementação canônica vive em comandos.RPG.luta; este módulo não contém
 regras de combate nem cálculos de dano. Os símbolos são mantidos para imports
 legados.
 """
-from .lutac import Luta, _vivo
+from ..luta import Luta, _vivo
 
 
 class _UIContext:
