@@ -164,7 +164,7 @@ class CombatRegressionTests(unittest.IsolatedAsyncioTestCase):
         from pathlib import Path
 
         root = Path(__file__).resolve().parents[1]
-        text = (root / "comandos/RPG/Luta/comandos_luta.py").read_text(encoding="utf-8")
+        text = (root / "comandos/RPG/luta.py").read_text(encoding="utf-8")
         self.assertLess(text.index("monstro_id = cog._encontrar_monstro"), text.index("luta_db.pode_lutar"))
         self.assertLess(text.index("luta_db.pode_lutar"), text.index("luta_db.iniciar_cooldown_monstro"))
         self.assertLess(text.index("luta_db.iniciar_cooldown_monstro"), text.index("criar_monstro"))
