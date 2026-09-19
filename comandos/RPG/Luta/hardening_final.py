@@ -11,7 +11,7 @@ import discord
 from database.python import luta as luta_db
 from .. import monstros_balanceamento as boss_rules
 
-from .luta import Luta as _BaseLuta, _vivo
+from .lutac import Luta as _BaseLuta, _vivo
 
 
 class _UIContext:
