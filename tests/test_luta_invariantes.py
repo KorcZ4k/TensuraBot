@@ -96,7 +96,7 @@ class LutaInvariantTests(unittest.TestCase):
     def test_motor_e_unico_e_sistemas_e_apenas_compatibilidade(self):
         from comandos.RPG.Luta import sistemas_luta
         from comandos.RPG.Luta.hardening_final import Luta as LutaFinal
-        from comandos.RPG.luta import Luta as LutaCanonica
+        from comandos.RPG.lutac import Luta as LutaCanonica
         self.assertIs(sistemas_luta.Luta, LutaCanonica)
         self.assertTrue(issubclass(LutaFinal, LutaCanonica))
         self.assertIs(LutaFinal._dano_fisico, LutaCanonica._dano_fisico)
