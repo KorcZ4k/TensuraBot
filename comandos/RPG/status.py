@@ -12,7 +12,7 @@ from discord.ext import commands
 from database.python.mongodb import db, run_db
 from database.python import status_async as status_db
 from comandos.RPG.barra_status import barra_mana, barra_vida, barra_xp
-from comandos.RPG.Luta.Mensagens_luta import painel
+from comandos.RPG.luta import painel
 
 fuso = datetime.timezone(datetime.timedelta(hours=-3))
 BASE_DIR = Path(__file__).resolve().parents[2]
