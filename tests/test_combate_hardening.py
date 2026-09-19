@@ -51,7 +51,7 @@ class CombatHardeningTests(unittest.TestCase):
     def test_no_duplicate_combat_cogs_remain(self):
         self.assertFalse((ROOT / "comandos/RPG/correcoes_monstros.py").exists())
         self.assertFalse((ROOT / "comandos/RPG/correcoes_luta_segura.py").exists())
-        self.assertIn("class Luta(_LutaLegada)", source("comandos/RPG/Luta/sistemas_luta.py"))
+        self.assertIn("class Luta(LutaBase)", source("comandos/RPG/luta.py"))
 
     def test_public_commands_are_module_callbacks_without_self_binding(self):
         text = source("comandos/RPG/Luta/comandos_luta.py")
@@ -135,7 +135,7 @@ class CombatHardeningTests(unittest.TestCase):
         self.assertIn('"vida_recuperada"', text)
 
     def test_combat_image_mapping_is_monster_only(self):
-        text = source("comandos/RPG/Luta/Mensagens_luta.py")
+        text = source("comandos/RPG/luta.py")
         imagens = json.loads(source("database/json/Imagens.json"))["Imagens"]
         for monstro in ("slime", "goblin", "lobo", "orc", "esqueleto", "dragao", "titan", "fenix", "demonio"):
             self.assertIn(f'"{monstro}-luta-url"', text)
